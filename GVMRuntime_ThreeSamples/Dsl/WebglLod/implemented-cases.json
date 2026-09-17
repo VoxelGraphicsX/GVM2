@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_lod",
+      "implementationLevel": "semantic-complete",
+      "notes": "专属实现已完成 r185 IcosahedronGeometry detail=16/8/4/2/1 的 CPU 非索引三角边流、单 Scene RenderSet、距离分级、FlyControls W/Q 固定回放、DSL Lambert 和运行时 LOD 重选；已将随机流统一为参考捕获的 0x12345678，并修正回放 target 元数据。当前运行时仅保留每个 LOD 根节点的可见级别实体（1000 entities），与 Manifest 要求的 5000 个层级子对象契约不一致，且几何/画面仍未达到严格门禁，不计入严格通过。",
+      "dslEntry": "WebglLod",
+      "hostTarget": "WebglLod",
+      "scenePasses": [
+        "WebglLodMainPass"
+      ],
+      "renderSetType": "WebglLodSceneRenderSet"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgpu_textures_2d-array","implementationLevel":"strict-pass","dslEntry":"Phase1WebgpuTextures2DArraySimpleRenderer","hostTarget":"Phase1WebgpuTextures2DArraySimple","scenePasses":["WebgpuTextures2DArrayMainPass"],"renderSetType":null}]}

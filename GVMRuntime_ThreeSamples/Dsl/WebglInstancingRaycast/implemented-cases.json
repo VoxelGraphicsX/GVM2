@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_instancing_raycast",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglInstancingRaycastRenderer",
+      "hostTarget": "WebglInstancingRaycast",
+      "scenePasses": [
+        "WebglInstancingRaycastMainPass"
+      ],
+      "renderSetType": "WebglInstancingRaycastSceneRenderSet",
+      "strictReport": "build/three-r185-instancing-raycast-state-formal/summary.json",
+      "notes": "实例化拾取场景使用唯一 RenderSet；补齐 ray-hit 与 reduced-count 的 GUI 状态脚本后，CPU Raycaster 只准备选中状态，GPU 绘制通过 entity/instance builtin 完成，四象限与三次稳定均通过。"
+    }
+  ]
+}

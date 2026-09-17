@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_multiple_scenes_comparison",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMultipleScenesComparisonRenderer",
+      "hostTarget": "WebglMultipleScenesComparison",
+      "scenePasses": [
+        "WebglMultipleScenesComparisonLeftPass",
+        "WebglMultipleScenesComparisonRightPass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-webgl-multiple-scenes-comparison-formal/cases/webgl_multiple_scenes_comparison/summary.json",
+      "notes": "两个独立简单 Scene、双离屏目标和滑块/Orbit 合成已通过四象限三次稳定门禁。"
+    }
+  ]
+}

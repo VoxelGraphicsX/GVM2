@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglMathOrientationTransform",
+  "cases": [
+    {
+      "caseId": "webgl_math_orientation_transform",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMathOrientationTransformRenderer",
+      "hostTarget": "WebglMathOrientationTransformRuntimeAdapter",
+      "scenePasses": [
+        "WebglMathOrientationOpaquePass",
+        "WebglMathOrientationWireframePass"
+      ],
+      "renderSetType": "WebglMathOrientationSceneRenderSet",
+      "strictReport": "build/three-r185-wave8-custom-override/three-r185-reports/webgl-math-orientation-strict-v2/summary.json",
+      "reportPath": "build/three-r185-wave8-custom-override/three-r185-reports/webgl-math-orientation-strict-v2/summary.json",
+      "notes": "已拆除 ThreeNextBatch 共享占位入口，建立独立 DSL RenderSet、独立 Host 适配器、确定性 CPU 几何与固定场景帧；Legacy/Experimental 双生成和专属生成产物 ABI lint 均通过。2026-08-11 已完成真实 Metal/Vulkan 四象限、4 个场景、每场景 3 次稳定运行：48 条 oracle 比较、48 条跨管线/后端比较、32 条稳定性比较全部通过统一阈值；该 diagnostic-pass 是单用例完整矩阵，按显式单用例闭环契约计入严格通过。",
+      "screenPasses": [
+        "gui-overlay",
+        "information-overlay"
+      ]
+    }
+  ]
+}

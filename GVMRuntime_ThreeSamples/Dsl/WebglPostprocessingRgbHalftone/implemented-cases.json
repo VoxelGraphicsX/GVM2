@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglPostprocessingRgbHalftone",
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_rgb_halftone",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglPostprocessingRgbHalftoneRenderer",
+      "hostTarget": "WebglPostprocessingRgbHalftoneRuntimeAdapter",
+      "scenePasses": [
+        "WebglPostprocessingRgbHalftoneMainPass"
+      ],
+      "renderSetType": "WebglPostprocessingRgbHalftoneSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom/WebglPostprocessingRgbHalftone/summary.json",
+      "notes": "已迁移到独立的多目标线性场景与屏幕后处理 DSL：Scene RenderSet 只负责几何，屏幕 pass 负责专用 RGB Halftone、色彩转换和输出；Host 已按 r185 精确锁定 50 个 BoxGeometry 子对象、xorshift32 随机流、RGBA16Float EffectComposer 中间目标和单采样输出。已用 Chrome 重新捕获并核对 r185 参数顺序：rotateR=π/12、rotateG=π/4、rotateB=π/6；真实 disabled 源场景比较通过统一阈值（异常像素比例 0.00001、MAE 0.0099、P99 0、SSIM 0.999933）。对 initial 进行了默认角度、通道排列、±0.25/0.5 像素相位、最近采样和背面剔除探针，均未达到门禁；精确参数当前为异常像素比例 0.17375、MAE 8.1643、P99 136、SSIM 0.741074，继续保持 semantic-complete，不计严格通过。",
+      "screenPasses": [
+        "rgb-halftone",
+        "output-color-conversion"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        }
+      ]
+    }
+  ]
+}

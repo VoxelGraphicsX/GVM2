@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_normalmap_object_space",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsNormalmapObjectSpaceRenderer",
+      "hostTarget": "WebglMaterialsNormalmapObjectSpace",
+      "scenePasses": [
+        "WebglMaterialsNormalmapObjectSpaceBackFacesPass",
+        "WebglMaterialsNormalmapObjectSpaceFrontFacesPass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-normalmap-object-space-strict-v3/summary.json",
+      "notes": "Dedicated GLB mesh, embedded base-color and object-normal textures, explicit mip chains, Standard lighting, dual DoubleSide passes, and Orbit replay; all three scenes pass the four-quadrant, three-repeat, cross-comparison, and lint gates."
+    }
+  ]
+}

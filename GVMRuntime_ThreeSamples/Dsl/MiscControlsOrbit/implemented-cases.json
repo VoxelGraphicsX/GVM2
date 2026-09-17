@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "MiscControlsOrbit",
+  "cases": [
+    {
+      "caseId": "misc_controls_orbit",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "MiscControlsOrbitRenderer",
+      "hostTarget": "MiscControlsOrbit",
+      "scenePasses": [
+        "MiscControlsOrbitSceneMainPass"
+      ],
+      "renderSetType": "MiscControlsOrbitSceneRenderSet",
+      "strictReport": "build/three-r185-wave8-case-reports/misc_controls_orbit/summary.json",
+      "notes": "专属 500-instance ConeGeometry 单 Scene 单 RenderSet；RenderEntityID/RenderEntityInstanceID、精确平面 Phong、双方向光、环境光、输出色域 Exp2 雾、136 次上游 UUID 随机流推进，以及旋转、平移缩放和键盘平移三个固定 OrbitControls 回放全部完成。4 场景 × 4 象限 × 3 次共 48 次运行、48 条跨象限比较和 32 条稳定性比较严格通过。"
+    }
+  ]
+}

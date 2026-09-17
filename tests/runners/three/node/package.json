@@ -1,0 +1,11 @@
+{
+  "name": "gvm-three-r185-runner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture-reference": "node ./cli.mjs capture-reference",
+    "lint": "node ./cli.mjs lint",
+    "summary": "node ./cli.mjs summary",
+    "test": "node --test ./tests/*.test.mjs"
+  }
+}

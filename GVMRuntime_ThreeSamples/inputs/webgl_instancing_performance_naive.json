@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgl_instancing_performance","scenarioId":"naive","frame":1,"target":".lil-gui select","canonicalState":{"method":"naive","count":1000},"events":[{"type":"change","frame":0,"value":"NAIVE","settleMs":250}]}

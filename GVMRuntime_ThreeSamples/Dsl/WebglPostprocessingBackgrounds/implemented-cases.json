@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_backgrounds",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingBackgrounds",
+      "hostTarget": "WebglPostprocessingBackgrounds",
+      "scenePasses": [
+        "WebglPostprocessingBackgroundsMainPass"
+      ],
+      "renderSetType": "WebglPostprocessingBackgroundsSceneRenderSet",
+      "strictReport": "build/three-r185-backgrounds-formal/summary.json",
+      "notes": "专属单 Scene RenderSet 已完成：C++ 锁定 hardwood2_diffuse.jpg 与 Pisa 六面 PNG，生成 SphereGeometry(1,48,24)，DSL 实现 Clear/Texture/Cube/Render/Output 五段链路、RGBA16Float 中间目标、sRGB 输出、StandardMaterial 三点光源和三种固定 GUI 状态。Legacy/Experimental × Metal/Vulkan 共 36 条正式记录、三次稳定与跨象限比较全部通过；全程单采样，不启用或模拟 MSAA。"
+    }
+  ]
+}

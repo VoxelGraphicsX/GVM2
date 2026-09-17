@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_rawshader",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryRawshaderRenderer",
+      "hostTarget": "WebglBuffergeometryRawshader",
+      "scenePasses": ["WebglBuffergeometryRawshaderMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_buffergeometry_rawshader/summary.json",
+      "notes": "RawShaderMaterial 语义重表达为样例私有 DSL；归一化 Uint8 色彩与时间动画通过。"
+    }
+  ]
+}

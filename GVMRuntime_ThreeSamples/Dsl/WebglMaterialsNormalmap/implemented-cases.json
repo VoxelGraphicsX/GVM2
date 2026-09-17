@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "cases": [{
+    "caseId": "webgl_materials_normalmap",
+    "implementationLevel": "strict-pass",
+    "dslEntry": "WebglMaterialsNormalmapRenderer",
+    "hostTarget": "WebglMaterialsNormalmap",
+    "scenePasses": ["WebglMaterialsNormalmapMainPass"],
+    "screenPasses": ["WebglMaterialsNormalmapBleachPass", "WebglMaterialsNormalmapColorPass", "WebglMaterialsNormalmapOutputPass", "WebglMaterialsNormalmapFxaaPass"],
+    "renderSetType": null,
+    "strictReport": "build/three-r185-wave3-normalmap-strict-v3/summary.json"
+  }]
+}

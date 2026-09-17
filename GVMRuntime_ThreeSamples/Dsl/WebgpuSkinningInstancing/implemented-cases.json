@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_skinning_instancing",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuSkinningInstancingRenderer",
+      "hostTarget": "WebgpuSkinningInstancing",
+      "scenePasses": [
+        "WebgpuSkinningInstancingMainPass"
+      ],
+      "screenPasses": [
+        "WebgpuSkinningInstancingBlurPass",
+        "WebgpuSkinningInstancingResolvePass"
+      ],
+      "renderSetType": "WebgpuSkinningInstancingSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/wave5-formal-webgpu-skinning-instancing-deterministic-roughness/summary.json",
+      "notes": "Dedicated two-entity Scene uses one RenderSet for the ground and thirty skinned Michelle instances, exact fixed animation, deterministic range data, two DSL Gaussian passes, and ordinary single-sample output. The fixed material roughness removes derivative helper-lane nondeterminism while preserving the strict r185 oracle result in all four quadrants."
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_texturegather",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuTexturegatherRenderer",
+      "hostTarget": "WebgpuTexturegather",
+      "scenePasses": [
+        "WebgpuTexturegatherWebgpuSourcePass",
+        "WebgpuTexturegatherWebgpuMainPass",
+        "WebgpuTexturegatherWebglSourcePass",
+        "WebgpuTexturegatherWebglMainPass"
+      ],
+      "screenPasses": [
+        "WebgpuTexturegatherWebgpuMainPass",
+        "WebgpuTexturegatherWebglMainPass"
+      ],
+      "renderSetType": "WebgpuTexturegatherSourceRenderSet",
+      "strictReport": "build/three-r185-wave5-gvm/webgpu_texturegather/formal-v1/summary.json",
+      "notes": [
+        "Two independent source Scenes each own exactly one RenderSet instance and one box entity.",
+        "The two standalone panel passes exercise component gather, the equivalent component-gather-then-depth-compare lowering, and offset (0,7).",
+        "Six explicit DSL downsample passes per source retain the authored seven-level color mip chain without relying on automatic mip generation.",
+        "All attachments and final presentation remain single-sample without MSAA emulation.",
+        "The formal gate passes 12 oracle comparisons, 8 stability comparisons, and 12 cross-quadrant comparisons."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_depth_texture",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglDepthTextureRenderer",
+      "hostTarget": "WebglDepthTexture",
+      "scenePasses": [
+        "WebglDepthTextureScenePass"
+      ],
+      "screenPasses": [
+        "WebglDepthTextureScreenPass"
+      ],
+      "renderSetType": "WebglDepthTextureSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-webgl-depth-texture-current-strict/summary.json",
+      "notes": "Dedicated r185 single-sample implementation: one TorusKnot InstancedMesh entity with 50 instances, one Scene RenderSet, Depth32Float attachment, and the original depth-linearization fullscreen shader. The reachable MSAA control is intentionally fixed to zero samples and is not simulated. Strict evidence: 24/24 quadrant runs, 24/24 cross-quadrant comparisons, and 16/16 stability comparisons passed; worst MAE 0.04777, P99 1, and SSIM 0.999461054205724."
+    }
+  ]
+}

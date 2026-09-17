@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_texture2darray_compressed",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1WebglTexture2DArrayCompressedSimpleRenderer",
+      "hostTarget": "Phase1WebglTexture2DArrayCompressedSimple",
+      "scenePasses": ["WebglTexture2DArrayCompressedMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-compressed-array-strict-v4/summary.json",
+      "notes": "锁定压缩 2D 数组纹理层采样和固定动画帧已通过四象限三次稳定门禁。"
+    }
+  ]
+}

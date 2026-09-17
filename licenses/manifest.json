@@ -1,0 +1,258 @@
+[
+  {
+    "component": "EASTL",
+    "version": "3.27.01",
+    "license": "BSD-3-Clause",
+    "source": "https://github.com/electronicarts/EASTL/tree/3.27.01",
+    "file": "EASTL.txt",
+    "sha256": "cebc1fa5ade455a79f821180cf86bf5f9717dd1df5704b4c2a3bb0617ab35f2a"
+  },
+  {
+    "component": "EABase",
+    "version": "0699a15efdfd20b6cecf02153bfa5663decb653c",
+    "license": "BSD-3-Clause",
+    "source": "https://github.com/electronicarts/EABase/tree/0699a15efdfd20b6cecf02153bfa5663decb653c",
+    "file": "EABase.txt",
+    "sha256": "6e63e8bd2b511ff2ec07ae8c19e9b968ff27b088d4837a13b4dbb6bc0c291891"
+  },
+  {
+    "component": "glm",
+    "version": "1.0.1",
+    "license": "MIT or Happy Bunny",
+    "source": "https://github.com/g-truc/glm/tree/1.0.1",
+    "file": "glm.txt",
+    "sha256": "62d2d642c7d054d4fb4c9b42faad617d6c88fcd91e317f8035aa9f277cc159c3"
+  },
+  {
+    "component": "cxxopts",
+    "version": "v3.3.1",
+    "license": "MIT",
+    "source": "https://github.com/jarro2783/cxxopts/tree/v3.3.1",
+    "file": "cxxopts.txt",
+    "sha256": "aa324fbe633a96546bebca975fbbab65caa175894bd00cfa13d7335e7363400c"
+  },
+  {
+    "component": "nlohmann-json",
+    "version": "v3.12.0",
+    "license": "MIT",
+    "source": "https://github.com/nlohmann/json/tree/v3.12.0",
+    "file": "nlohmann-json.txt",
+    "sha256": "c0d068392ea65358b798b8c165103560f06e9e3b38c4ab4e2d8810a7b931af86"
+  },
+  {
+    "component": "GoogleTest",
+    "version": "v1.15.2",
+    "license": "BSD-3-Clause",
+    "source": "https://github.com/google/googletest/tree/v1.15.2",
+    "file": "GoogleTest.txt",
+    "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+  },
+  {
+    "component": "SDL2",
+    "version": "release-2.32.10",
+    "license": "Zlib",
+    "source": "https://github.com/libsdl-org/SDL/tree/release-2.32.10",
+    "file": "SDL2.txt",
+    "sha256": "7826eca0a0f7e591f38dd844e207a200aac81a59b20d8a30c3af8c6282af13e6"
+  },
+  {
+    "component": "SDL2-hidapi",
+    "version": "release-2.32.10",
+    "license": "BSD-3-Clause",
+    "source": "https://github.com/libsdl-org/SDL/tree/release-2.32.10/src/hidapi",
+    "file": "SDL2-hidapi.txt",
+    "sha256": "30eb1bef29b46f8ba7ab8b416035dbd93cb034a45481dd97815b944284582cd2"
+  },
+  {
+    "component": "DearImGui",
+    "version": "v1.92.4",
+    "license": "MIT",
+    "source": "https://github.com/ocornut/imgui/tree/v1.92.4",
+    "file": "DearImGui.txt",
+    "sha256": "c80c5789748d955c4a650562baa0d750494e2c7128c2ca66aaebe2e3c4e198bf"
+  },
+  {
+    "component": "volk",
+    "version": "1.4.304",
+    "license": "MIT",
+    "source": "https://github.com/zeux/volk/tree/1.4.304",
+    "file": "volk.txt",
+    "sha256": "e85b35831f01da6aa8c029f0a06a0468be143534babe9014e37ee03bf078bf36"
+  },
+  {
+    "component": "VulkanMemoryAllocator",
+    "version": "v3.1.0",
+    "license": "MIT",
+    "source": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/tree/v3.1.0",
+    "file": "VulkanMemoryAllocator.txt",
+    "sha256": "f56ab0392925231e34dd008a7670bb5c5ead490203bc9e125de3106fef642a27"
+  },
+  {
+    "component": "SPIRV-Reflect",
+    "version": "10b4f09a24d7ac1603071e767c089551dc6a3949",
+    "license": "Apache-2.0",
+    "source": "https://github.com/KhronosGroup/SPIRV-Reflect/tree/10b4f09a24d7ac1603071e767c089551dc6a3949",
+    "file": "SPIRV-Reflect.txt",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  {
+    "component": "SPIRV-Headers",
+    "version": "vulkan-sdk-1.4.304.0",
+    "license": "MIT",
+    "source": "https://github.com/KhronosGroup/SPIRV-Headers/tree/vulkan-sdk-1.4.304.0",
+    "file": "SPIRV-Headers.txt",
+    "sha256": "ff04ae7e6a468587fe59434fee2e67c0e2a749b592c794b764ff80f30b94a084"
+  },
+  {
+    "component": "SPIRV-Tools",
+    "version": "vulkan-sdk-1.4.304.0",
+    "license": "Apache-2.0",
+    "source": "https://github.com/KhronosGroup/SPIRV-Tools/tree/vulkan-sdk-1.4.304.0",
+    "file": "SPIRV-Tools.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "component": "draco",
+    "version": "1.5.7",
+    "license": "Apache-2.0",
+    "source": "https://github.com/google/draco/tree/1.5.7",
+    "file": "draco.txt",
+    "sha256": "d3709b0fb4b8a94bbb1d02b8a2e484f258b0d9c5c5a01f940391f3fe662cd1a4"
+  },
+  {
+    "component": "pugixml",
+    "version": "v1.15",
+    "license": "MIT",
+    "source": "https://github.com/zeux/pugixml/tree/v1.15",
+    "file": "pugixml.txt",
+    "sha256": "0d0b3772af2fa45628a548a3b34583707ebcc68bb6f83ec48ca273aab4a510f1"
+  },
+  {
+    "component": "meshoptimizer",
+    "version": "v1.1.1",
+    "license": "MIT",
+    "source": "https://github.com/zeux/meshoptimizer/tree/v1.1.1",
+    "file": "meshoptimizer.txt",
+    "sha256": "f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26"
+  },
+  {
+    "component": "tinyobjloader",
+    "version": "v1.0.7",
+    "license": "MIT",
+    "source": "https://github.com/tinyobjloader/tinyobjloader/tree/v1.0.7",
+    "file": "tinyobjloader.txt",
+    "sha256": "27f4ba1a95e3e6b7f97782798ae738591ad142ef27fc7ee8b5c0ddaf944c5902"
+  },
+  {
+    "component": "fmt",
+    "version": "11.1.4",
+    "license": "MIT",
+    "source": "https://github.com/fmtlib/fmt/tree/11.1.4",
+    "file": "fmt.txt",
+    "sha256": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8"
+  },
+  {
+    "component": "spdlog",
+    "version": "v1.15.3",
+    "license": "MIT",
+    "source": "https://github.com/gabime/spdlog/tree/v1.15.3",
+    "file": "spdlog.txt",
+    "sha256": "c703fb8266409f5660523b307bbefd2bc8d7b92c848d0b973e6dd8640a5389f7"
+  },
+  {
+    "component": "DirectXShaderCompiler",
+    "version": "v1.8.2505.1",
+    "license": "LLVM and Microsoft licenses",
+    "source": "https://github.com/microsoft/DirectXShaderCompiler/tree/v1.8.2505.1",
+    "file": "DirectXShaderCompiler.txt",
+    "sha256": "27a49e35d1da96eba18fba54bc882667ff0ff8c0254f16f2b6e165d605ba7df8"
+  },
+  {
+    "component": "DirectXShaderCompiler-ThirdParty",
+    "version": "v1.8.2505.1",
+    "license": "See notices",
+    "source": "https://github.com/microsoft/DirectXShaderCompiler/tree/v1.8.2505.1",
+    "file": "DirectXShaderCompiler-ThirdParty.txt",
+    "sha256": "19512a5d0a015ef16d167272c164da49a604614a786206212a80ad486ed0be6d"
+  },
+  {
+    "component": "PowerVR",
+    "version": "vendored",
+    "license": "MIT",
+    "source": "https://github.com/powervr-graphics/Native_SDK",
+    "file": "PowerVR.txt",
+    "sha256": "f50cb9d8cf528d9d91cff7b2c5d7c35a87ba45d8c461fd58d2ffaebb2f833e69"
+  },
+  {
+    "component": "Metal-cpp",
+    "version": "vendored",
+    "license": "Apache-2.0",
+    "source": "https://developer.apple.com/metal/cpp/",
+    "file": "Metal-cpp.txt",
+    "sha256": "e872174b1e94425711e3b987b8f8f8b12eac4ecd4671b99d77f2827b13519c48"
+  },
+  {
+    "component": "dds-ktx",
+    "version": "v1.1.0 vendored",
+    "license": "BSD-2-Clause",
+    "source": "https://raw.githubusercontent.com/septag/dds-ktx/master/LICENSE",
+    "file": "dds-ktx.txt",
+    "sha256": "70c7fbd0f0df984c63a1ae6497b961745eb06672b8108d77c82af3498bf59d20"
+  },
+  {
+    "component": "bimg",
+    "version": "copyright retained in dds-ktx",
+    "license": "BSD-2-Clause",
+    "source": "https://raw.githubusercontent.com/bkaradzic/bimg/master/LICENSE",
+    "file": "bimg.txt",
+    "sha256": "ac2e0d253b1584316a36a0fae1d4407fa3ebcb15f27021ab479b23d27f0c9c08"
+  },
+  {
+    "component": "Three-js",
+    "version": "r185",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/mrdoob/three.js/r185/LICENSE",
+    "file": "Three-js.txt",
+    "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+  },
+  {
+    "component": "LLVM",
+    "version": "llvmorg-20.1.7",
+    "license": "Apache-2.0 WITH LLVM-exception",
+    "source": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-20.1.7/llvm/LICENSE.TXT",
+    "file": "LLVM.txt",
+    "sha256": "3340babe8ac7bc6ae294d93aa01c310a250d43d5b760e5c12954882d4e5c83c7"
+  },
+  {
+    "component": "Vulkan-Headers",
+    "version": "vulkan-sdk-1.3.280.0",
+    "license": "Apache-2.0 and MIT",
+    "source": "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/vulkan-sdk-1.3.280.0/LICENSE.md",
+    "file": "Vulkan-Headers.txt",
+    "sha256": "fb8209eca71a2ac07279f198a8eff87f419888c7e96063dc324c2f574716f39c"
+  },
+  {
+    "component": "defer",
+    "version": "vendored",
+    "license": "BSD-3-Clause",
+    "source": "GVM/third_party/defer/defer.hpp",
+    "file": "defer.txt",
+    "sha256": "15c363fad647e3a94b03fd3f8ae446a8e1b6323313f9b0210446fb99cb4c48f6"
+  },
+  {
+    "component": "Checkerboard",
+    "version": "vendored",
+    "license": "MIT",
+    "source": "GVMRuntime_Samples/Test_04_Cube/CheckerBoardBackground.hpp",
+    "file": "Checkerboard.txt",
+    "sha256": "4819e02aeb1e6df82391fff0356a16f1834f22780528b3eb38893fda96a36312"
+  },
+  {
+    "component": "CPM-cmake",
+    "version": "vendored",
+    "license": "MIT",
+    "source": "cmake/CPM.cmake",
+    "file": "CPM-cmake.txt",
+    "sha256": "3aafe9e1362da8601bc811671b9b2501412c9aaa60d95c69dcc035904a1aceb7"
+  }
+]

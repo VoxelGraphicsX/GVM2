@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_modifier_tessellation",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1ModifierTessellationSimpleRenderer",
+      "hostTarget": "Phase1ModifierTessellationSimple",
+      "scenePasses": ["WebglModifierTessellationMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-batch20-wave4-gates/webgl_modifier_tessellation/cases/webgl_modifier_tessellation/summary.json",
+      "notes": "CPU 文本/细分、DSL 顶点位移和自定义光照已用普通单采样输出通过三次稳定四象限门禁。"
+    }
+  ]
+}

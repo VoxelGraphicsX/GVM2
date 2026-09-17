@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_texture_tiff",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderTextureTiffRenderer",
+      "hostTarget": "WebglLoaderTextureTiff",
+      "scenePasses": [
+        "WebglLoaderTextureTiffOpaquePass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderTextureTiffSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave6-gvm/webgl_loader_texture_tiff/formal-v1/summary.json",
+      "notes": "Dedicated three-entity TIFF loader Scene, one unique RenderSet, locked uncompressed/LZW/JPEG-in-TIFF assets, r185 single-mip DataTexture filtering, normal single-sample output, and all 24 four-quadrant triple-run captures are within the immutable gate. Atomic publication remains pending the other sixteen batch cases."
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_colors_lookuptable",
+  "scenarioId": "cool-to-warm",
+  "frame": 1,
+  "target": ".lil-gui select",
+  "events": [
+    {
+      "frame": 0,
+      "type": "change",
+      "value": "cooltowarm"
+    }
+  ]
+}

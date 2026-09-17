@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_lightprobe_cubecamera",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuLightprobeCubecameraRenderer",
+      "hostTarget": "WebgpuLightprobeCubecamera",
+      "scenePasses": ["WebgpuLightprobeCubecameraSceneMainPass"],
+      "screenPasses": [
+        "WebgpuLightprobeCubecameraBackgroundPass",
+        "WebgpuLightprobeCubecameraInspectorPass"
+      ],
+      "renderSetType": "WebgpuLightprobeCubecameraSceneRenderSet",
+      "strictReport": "build/three-r185-wave4-lightprobe-cubecamera-gate-v3/cases/webgpu_lightprobe_cubecamera/summary.json"
+    }
+  ]
+}

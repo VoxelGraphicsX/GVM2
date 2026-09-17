@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_matcap",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "canonical-loaded-scene",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "2ab2470c44f889d08ef1d93eb850397913ba1406645f89d99c6cdcce20871b8c",
+    "assetCount": 4,
+    "vertexCount": 9279,
+    "indexCount": 53052,
+    "glbSha256": "402b8a8ac9f03232e6d64b5962929703a069daf99d3c49ac8eb0e48bedc9c576",
+    "exrSha256": "14deb8c88d02cd44d3694c9b63a5a56fb481364298900441a2be42f9eb70a9d3",
+    "normalMapSha256": "36925e51ad9b324b94e8faf4692da1b4132809f2762bb8d5bd549ffd215d4ca6",
+    "droppedMatcapSha256": "bf1c51469cd0bd5720b5ac0bb7023f5263c31f5f392e7710f7a6ca5df6b417b5"
+  }
+}

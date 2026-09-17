@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_lines",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryLinesRenderer",
+      "hostTarget": "WebglBuffergeometryLines",
+      "scenePasses": ["WebglBuffergeometryLinesMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_buffergeometry_lines/summary.json",
+      "notes": "单对象 LineStrip，顶点颜色和 morph 位移由私有 DSL 表达；三次稳定四象限通过。"
+    }
+  ]
+}

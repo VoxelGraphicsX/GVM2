@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_texture_partialupdate",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsTexturePartialupdateRenderer",
+      "hostTarget": "WebglMaterialsTexturePartialupdate",
+      "scenePasses": [
+        "WebglMaterialsTexturePartialupdateMainPass"
+      ],
+      "screenPasses": [
+        "WebglMaterialsTexturePartialupdateBaseCopyPass",
+        "WebglMaterialsTexturePartialupdatePatchPass",
+        "WebglMaterialsTexturePartialupdateResolvePass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-webgl-materials-texture-partialupdate-current-strict/summary.json",
+      "notes": "RGBA16Float 局部纹理更新由 DSL Compute 编排；当前统一 runner 正式报告覆盖 2 个场景、24 次四象限运行、24 次跨象限比较和 16 次稳定性比较。"
+    }
+  ]
+}

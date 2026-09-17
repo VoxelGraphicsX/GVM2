@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_tsl_skinning",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglTslSkinningRenderer",
+      "hostTarget": "WebglTslSkinning",
+      "scenePasses": [
+        "WebglTslSkinningBackPass",
+        "WebglTslSkinningFrontPass"
+      ],
+      "screenPasses": [
+        "WebglTslSkinningBackgroundPass"
+      ],
+      "renderSetType": "WebglTslSkinningSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_tsl_skinning/formal-v1/summary.json",
+      "notes": "Dedicated one-entity Michelle Scene with one unique RenderSet, exact 67-node GLB parsing, 65-joint CPU palette evaluation, four-texture DSL physical material, ordered double-sided passes, solid screen background, canonical loader semantics, and 36 strict executions. Atomic publication remains pending the other active batch cases."
+    }
+  ]
+}

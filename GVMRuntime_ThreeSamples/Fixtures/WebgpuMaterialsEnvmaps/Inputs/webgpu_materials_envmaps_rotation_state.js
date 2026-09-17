@@ -1,0 +1,11 @@
+params.Type = 'Cube';
+params.Refraction = false;
+params.backgroundRotationX = true;
+params.backgroundRotationY = true;
+params.backgroundRotationZ = true;
+params.syncMaterial = true;
+scene.background = textureCube;
+sphereMaterial.envMap = textureCube;
+textureEquirec.mapping = THREE.EquirectangularReflectionMapping;
+textureCube.mapping = THREE.CubeReflectionMapping;
+sphereMaterial.needsUpdate = true;

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_rtt",
+  "scenarioId": "mouse-camera",
+  "frame": 61,
+  "target": "body > div > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "mouseX": 120,
+    "mouseY": -70,
+    "cameraUpdateCount": 62
+  },
+  "events": [
+    {
+      "type": "mousemove",
+      "frame": 0,
+      "x": 520,
+      "y": 180,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

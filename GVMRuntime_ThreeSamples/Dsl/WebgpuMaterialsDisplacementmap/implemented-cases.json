@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_materials_displacementmap",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMaterialsDisplacementmapRenderer",
+      "hostTarget": "WebgpuMaterialsDisplacementmap",
+      "scenePasses": [
+        "WebgpuMaterialsDisplacementmapBackPass",
+        "WebgpuMaterialsDisplacementmapFrontPass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-displacement-strict-v3/summary.json",
+      "notes": "Ninja 头位移、双面 Phong、固定灯光和材质输入回放已通过统一四象限门禁。"
+    }
+  ]
+}

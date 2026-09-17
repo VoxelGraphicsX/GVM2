@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_fxaa",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuPostprocessingFxaaRenderer",
+      "hostTarget": "Phase1WebgpuPostprocessingFxaaRenderSet",
+      "scenePasses": ["WebgpuPostprocessingFxaaMainPass"],
+      "renderSetType": "WebgpuPostprocessingFxaaSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/runs/webgpu-fxaa-formal/summary.json",
+      "notes": "专属 WebGPU FXAA shard；100 个 TetrahedronGeometry 实例、RenderEntityInstanceID、父 Group 动画、sRGB renderOutput、全屏 FXAA/disabled 旁路均由现有 DSL 表达，普通单采样绘制。4 场景在 Legacy/Experimental × Metal/Vulkan 共 48 次运行、48 次跨象限比较和 32 次稳定性比较全部通过统一门禁，生成产物 ABI lint 通过。"
+    }
+  ]
+}

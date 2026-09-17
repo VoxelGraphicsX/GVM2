@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_rtt",
+  "scenarioId": "pointer-color",
+  "frame": 61,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pointerX": 0.25,
+    "pointerY": 0.75,
+    "saturation": 0.75,
+    "hueRadians": 0.75
+  },
+  "events": [
+    {
+      "type": "mousemove",
+      "frame": 0,
+      "x": 200,
+      "y": 375,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

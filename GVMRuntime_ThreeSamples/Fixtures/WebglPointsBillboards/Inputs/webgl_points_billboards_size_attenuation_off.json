@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_points_billboards",
+  "scenarioId": "size-attenuation-off",
+  "frame": 61,
+  "target": ".lil-gui .controller.boolean input",
+  "events": [
+    { "type": "click", "frame": 0, "x": 5, "y": 5 }
+  ]
+}

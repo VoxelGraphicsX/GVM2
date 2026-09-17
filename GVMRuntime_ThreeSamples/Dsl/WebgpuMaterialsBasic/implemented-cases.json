@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuMaterialsBasic",
+  "cases": [
+    {
+      "caseId": "webgpu_materials_basic",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebgpuMaterialsBasicRenderer",
+      "hostTarget": "WebgpuMaterialsBasicRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuMaterialsBasicOpaquePass",
+        "WebgpuMaterialsBasicTransparentPass"
+      ],
+      "screenPasses": [
+        "pisa-cube-atlas-gutter-build",
+        "environment-background"
+      ],
+      "renderSetType": "WebgpuMaterialsBasicSceneRenderSet",
+      "reportPath": "build/three-r185-webgpu-materials-basic-current-single/summary.json",
+      "notes": "已替换批量占位入口：CPU 生成 Three SphereGeometry(32,16)，固定 seed-42 生成 500 个实体；六张 Pisa PNG 通过 RenderSet TextureComponent 采样；反射、折射、透明排序复用同一 Scene RenderSet，场景绘制不启用 MSAA。尚未完成真实 Three oracle、四象限三次稳定门禁，因此不计严格通过。 已完成本批次 20 项双管线生成、宿主语法和生成产物 ABI lint，仍未取得正式 oracle。 2026-08-10 编译证据：显式 UGLC 覆盖链已完成 Legacy/Experimental codegen 40/40，专属 Host 静态库编译 40/40；仍未执行真实图形设备、oracle 比较和三次稳定门禁，严格通过数保持 0。"
+    }
+  ]
+}

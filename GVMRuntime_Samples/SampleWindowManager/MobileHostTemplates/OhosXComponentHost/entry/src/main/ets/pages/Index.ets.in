@@ -1,0 +1,30 @@
+@Entry
+@Component
+struct Index {
+  private xComponentContext?: Record<string, () => void>;
+
+  build() {
+    Stack() {
+      XComponent({
+        id: '@GVM_MOBILE_SAMPLE_LIBRARY_NAME@',
+        type: XComponentType.SURFACE,
+        libraryname: '@GVM_MOBILE_SAMPLE_LIBRARY_NAME@'
+      })
+        .onLoad((context) => {
+          this.xComponentContext = context as Record<string, () => void>;
+          this.xComponentContext.register();
+        })
+        .onDestroy(() => {
+          if (this.xComponentContext !== undefined) {
+            this.xComponentContext.unregister();
+            this.xComponentContext = undefined;
+          }
+        })
+        .width('100%')
+        .height('100%')
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Black)
+  }
+}

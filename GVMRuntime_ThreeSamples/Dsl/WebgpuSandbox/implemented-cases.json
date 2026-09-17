@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_sandbox",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuSandboxRenderer",
+      "hostTarget": "WebgpuSandbox",
+      "scenePasses": [
+        "WebgpuSandboxOpaquePass",
+        "WebgpuSandboxTransparentPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebgpuSandboxSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/wave5-formal-webgpu-sandbox/summary.json",
+      "notes": [
+        "The six upstream renderables are packed into one Scene RenderSet with one entity each.",
+        "KTX2 Basis transcoding, JPEG/PNG decode, point expansion, and line expansion are CPU-only asset preparation.",
+        "All node-material, displacement, alpha-test, blend, draw, and final RGBA8 work remains in the private DSL."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_effects_ascii",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglEffectsAscii",
+      "hostTarget": "WebglEffectsAscii",
+      "scenePasses": [
+        "WebglEffectsAsciiScenePass",
+        "WebglEffectsAsciiLuminancePass",
+        "WebglEffectsAsciiGlyphPass"
+      ],
+      "renderSetType": "WebglEffectsAsciiSceneRenderSet",
+      "reportPath": "build/three-r185-effects-ascii-final-probe/summary.json",
+      "notes": "已完成两实体单 Scene RenderSet、SphereGeometry(20,10)/PlaneGeometry、Three 透视相机与双 PointLight、Phong/Basic 材质、亮度量化和字符合成三段 DSL 链；字形覆盖图由 sample 私有 atlas 提供，当前首场景已完成四象限单轮比较和结构契约读回，但 ASCII 字形/场景投影仍未达到统一 RGBA 阈值，保持 semantic-complete。"
+    }
+  ]
+}

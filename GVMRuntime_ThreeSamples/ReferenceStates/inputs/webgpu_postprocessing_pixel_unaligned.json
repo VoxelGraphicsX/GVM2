@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_postprocessing_pixel",
+  "scenarioId": "unaligned-orbit",
+  "frame": 1,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "cameraPosition": [0.25, 1.1547005383792515, 2.0],
+    "cameraTarget": [0.0, 0.0, 0.0],
+    "pixelAlignedPanning": false
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(4) input[type=checkbox]",
+      "x": 6,
+      "y": 6
+    }
+  ]
+}

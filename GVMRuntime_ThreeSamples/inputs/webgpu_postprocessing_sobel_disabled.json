@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_postprocessing_sobel",
+  "scenarioId": "effect-disabled",
+  "frame": 1,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "enable": false
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1,
+      "button": -1,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

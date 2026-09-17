@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglPostprocessingTransition",
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_transition",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingTransitionRenderer",
+      "hostTarget": "WebglPostprocessingTransitionRuntimeAdapter",
+      "scenePasses": [
+        "WebglPostprocessingTransitionSceneAPass",
+        "WebglPostprocessingTransitionSceneBPass"
+      ],
+      "renderSetType": "WebglPostprocessingTransitionSceneRenderSet",
+      "reportPath": "build/three-r185-wave12-transition-rerun2-20260830/summary.json",
+      "notes": "已迁移到独立的多目标线性场景与屏幕后处理 DSL：fxSceneA 与 fxSceneB 各自拥有一个 RenderSet，Scene pass 只负责几何，屏幕 pass 负责纹理阈值过渡、色彩转换和输出；Host 已锁定 124 个前置随机样本，并在 Box 与 Icosahedron 构造之间补齐 40 个 r185 UUID/资源随机样本；同时锁定 r185 PolyhedronGeometry detail=1 的精确三角拓扑、单采样输出和动态 entity 快照。2026-08-30 正式复验覆盖 initial-scene-b、mid-transition、endpoint-scene-a、animated-no-texture：Legacy/Experimental × Metal/Vulkan、三次稳定、48 条 oracle、32 条稳定性、48 条跨象限比较全部通过，统一阈值全部满足；正式汇总证据为 build/three-r185-wave12-transition-rerun2-20260830/summary.json。始终为普通单采样绘制，不启用或模拟 MSAA。",
+      "screenPasses": [
+        "explicit-transition-mask-mips",
+        "texture-threshold-transition",
+        "output-color-conversion"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        }
+      ]
+    }
+  ]
+}

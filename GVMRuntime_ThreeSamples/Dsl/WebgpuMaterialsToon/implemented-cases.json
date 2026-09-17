@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuMaterialsToon",
+  "cases": [
+    {
+      "caseId": "webgpu_materials_toon",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMaterialsToonRenderer",
+      "hostTarget": "WebgpuMaterialsToonRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuMaterialsToonOutlinePass",
+        "WebgpuMaterialsToonMainPass"
+      ],
+      "renderSetType": "WebgpuMaterialsToonSceneRenderSet",
+      "reportPath": "build/three-r185-webgpu-materials-toon-strict-final/summary.json",
+      "notes": "专属 221-entity 单 RenderSet、Gentilis 字体、toon gradient atlas、粒子点光源、轮廓 pass 与四场景已实现。2026-08-17 精确恢复 r185 ToonLightingModel 的可观察语义：局部未归一化 normalGeometry 与视空间 PointLight 方向相乘，并使用上游 PointLight 强度 2.0。四场景在 Legacy/Experimental × Metal/Vulkan 共 48 次运行、48 次跨象限比较和 32 次稳定性比较全部通过统一门禁；正式报告为 build/three-r185-webgpu-materials-toon-strict-final/summary.json。",
+      "screenPasses": [
+        "gradient-map-compute"
+      ]
+    }
+  ]
+}

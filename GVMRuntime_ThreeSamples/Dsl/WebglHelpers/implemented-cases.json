@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_helpers",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglHelpersRenderer",
+      "hostTarget": "WebglHelpers",
+      "scenePasses": [
+        "WebglHelpersOpaquePass",
+        "WebglHelpersTransparentPass"
+      ],
+      "renderSetType": "WebglHelpersSceneRenderSet",
+      "diagnosticReport": "build/wave5-probe-webgl-helpers-endpoint/summary.json"
+    }
+  ]
+}

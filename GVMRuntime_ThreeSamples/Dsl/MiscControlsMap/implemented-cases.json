@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "MiscControlsMap",
+  "cases": [
+    {
+      "caseId": "misc_controls_map",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "MiscControlsMapRenderer",
+      "hostTarget": "MiscControlsMap",
+      "scenePasses": [
+        "MiscControlsMapSceneMainPass"
+      ],
+      "renderSetType": "MiscControlsMapSceneRenderSet",
+      "strictReport": "build/three-r185-wave8-case-reports/misc_controls_map/summary.json",
+      "notes": "专属 500-instance BoxGeometry 单 Scene 单 RenderSet；精确 24/36 拓扑、六 geometry groups 统一打包、非均匀实例缩放、平面 Phong、双方向光、环境光、输出色域 Exp2 雾，以及 MapControls 左键平移、右键旋转、光标缩放和屏幕空间平移固定回放全部完成。4 场景 × 4 象限 × 3 次共 48 次运行、48 条跨象限比较和 32 条稳定性比较严格通过。"
+    }
+  ]
+}

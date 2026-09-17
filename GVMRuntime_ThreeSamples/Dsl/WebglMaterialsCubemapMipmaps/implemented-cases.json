@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_cubemap_mipmaps",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglMaterialsCubemapMipmaps",
+      "hostTarget": "WebglMaterialsCubemapMipmaps",
+      "scenePasses": [
+        "WebglMaterialsCubemapMipmapsScenePass"
+      ],
+      "renderSetType": "WebglMaterialsCubemapMipmapsSceneRenderSet",
+      "implementationNotes": "Dedicated single-scene Set now loads all 54 locked Angus JPEG mip sources, packs generated and manual variants side-by-side into six RenderSet texture slots, builds SphereGeometry(100,128,128), and evaluates reflection in DSL. Formal all-scenario oracle comparison and cube-edge/LOD convergence remain pending; the case is intentionally not counted as semantic-complete or strict-pass."
+    }
+  ]
+}

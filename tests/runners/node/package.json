@@ -1,0 +1,26 @@
+{
+  "name": "gvm-test-runner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:all": "node ./cli.mjs run --profile macos-debug --group all --backend metal",
+    "test:all:metal": "node ./cli.mjs run --profile macos-debug --group all --backend metal",
+    "test:all:vulkan": "node ./cli.mjs run --profile macos-debug --group all --backend vulkan",
+    "test:unit": "node ./cli.mjs run --profile macos-debug --group unit --backend metal",
+    "test:unit:metal": "node ./cli.mjs run --profile macos-debug --group unit --backend metal",
+    "test:unit:vulkan": "node ./cli.mjs run --profile macos-debug --group unit --backend vulkan",
+    "test:rhi": "node ./cli.mjs run --profile macos-debug --group rhi --backend metal",
+    "test:rhi:metal": "node ./cli.mjs run --profile macos-debug --group rhi --backend metal",
+    "test:rhi:vulkan": "node ./cli.mjs run --profile macos-debug --group rhi --backend vulkan",
+    "test:dsl": "node ./cli.mjs run --profile macos-debug --group dsl --backend metal",
+    "test:dsl:metal": "node ./cli.mjs run --profile macos-debug --group dsl --backend metal",
+    "test:dsl:vulkan": "node ./cli.mjs run --profile macos-debug --group dsl --backend vulkan",
+    "test:render": "node ./cli.mjs run --profile macos-debug --group render --backend metal",
+    "test:render:metal": "node ./cli.mjs run --profile macos-debug --group render --backend metal",
+    "test:render:vulkan": "node ./cli.mjs run --profile macos-debug --group render --backend vulkan",
+    "test:uglc": "node ../uglc/node/cli.mjs run --group all",
+    "test:full": "npm run test:all && npm run test:uglc",
+    "report:latest": "node ./cli.mjs open-latest --profile macos-debug",
+    "report:list": "node ./cli.mjs list-runs --profile macos-debug"
+  }
+}

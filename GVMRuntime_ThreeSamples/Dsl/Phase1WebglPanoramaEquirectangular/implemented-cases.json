@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_panorama_equirectangular","implementationLevel":"strict-pass","dslEntry":"Phase1WebglPanoramaEquirectangularRenderer","hostTarget":"Phase1WebglPanoramaEquirectangular","scenePasses":["WebglPanoramaEquirectangularMainPass"],"renderSetType":null}]}

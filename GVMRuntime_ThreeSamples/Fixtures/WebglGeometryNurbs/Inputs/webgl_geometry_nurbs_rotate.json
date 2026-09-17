@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_nurbs",
+  "scenarioId": "rotated-input",
+  "frame": 61,
+  "target": "body > div:nth-of-type(2) > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "dragStart": [400, 250],
+    "dragEnd": [480, 250],
+    "targetRotationRadians": 1.6,
+    "settleFrames": 60
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 480,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointerup",
+      "frame": 0,
+      "x": 480,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

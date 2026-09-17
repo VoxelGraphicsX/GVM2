@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_pixel",
+  "scenarioId": "nondefault-pixel-edges",
+  "frame": 121,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pixelSize": 10,
+    "normalEdgeStrength": 0.75,
+    "depthEdgeStrength": 0.2,
+    "pixelAlignedPanning": false
+  },
+  "events": [
+    {
+      "type": "input",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(1) input",
+      "value": "10"
+    },
+    {
+      "type": "input",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(2) input",
+      "value": "0.75"
+    },
+    {
+      "type": "input",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(3) input",
+      "value": "0.2"
+    },
+    {
+      "type": "click",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(4) input[type=checkbox]",
+      "x": 6,
+      "y": 6
+    }
+  ]
+}

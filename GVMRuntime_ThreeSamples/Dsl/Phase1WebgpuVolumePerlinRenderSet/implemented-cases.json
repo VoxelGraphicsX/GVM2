@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_volume_perlin",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1WebgpuVolumePerlinRenderSetRenderer",
+      "hostTarget": "Phase1WebgpuVolumePerlinRenderSet",
+      "scenePasses": [
+        "WebgpuVolumePerlinScenePass"
+      ],
+      "renderSetType": "WebgpuVolumePerlinSceneRenderSet",
+      "strictReport": "build/three-r185-webgpu-compute-particles/formal-volume-perlin/cases/webgpu_volume_perlin/summary.json"
+    }
+  ]
+}

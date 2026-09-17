@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_interactive_buffergeometry",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglInteractiveBuffergeometryRenderer",
+      "hostTarget": "WebglInteractiveBuffergeometry",
+      "scenePasses": [
+        "WebglInteractiveBuffergeometryBackPass",
+        "WebglInteractiveBuffergeometryFrontPass",
+        "WebglInteractiveBuffergeometryLinePass"
+      ],
+      "renderSetType": "WebglInteractiveBuffergeometrySceneRenderSet",
+      "reportPath": "build/three-r185-next-run/interactive-buffergeometry-strict-20260818/summary.json",
+      "notes": "已完成 Three.js r185 webgl_interactive_buffergeometry 的 5000 个确定性三角形、固定 epoch 初始旋转、双面 Phong、CPU Raycaster 命中高亮线段和单 Scene RenderSet。Legacy/Experimental × Metal/Vulkan 共 36 条记录全部通过，覆盖 initial、animated、face-hit 三个场景；跨象限比较 36 条、稳定性比较 24 条，sceneRoots、RenderSet ABI、GPU DSL-only、inputReplay 和单采样契约均通过。最差统一指标：异常像素比例 0.059%、MAE 0.05368、P99 0、SSIM 0.997877。关键修复为按 r185 的 1700000000 秒确定性 epoch 计算 Euler XYZ（R_x×R_y）矩阵、按颜色管理还原 0xaaaaaa/0x444444 线性值，并保持双面 pass 的正确法线方向；不使用 MSAA。"
+    }
+  ]
+}

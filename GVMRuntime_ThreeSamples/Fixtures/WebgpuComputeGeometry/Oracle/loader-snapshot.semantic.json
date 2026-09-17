@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_compute_geometry",
+  "scenarioId": "loader-snapshot",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "aux-scene-one-mesh-9279-vertices-53052-indices",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "f37983c94876234bec7ad285ff90ead5a4b81c0c7c7a996a63289e439d808811",
+    "assetPath": "models/gltf/LeePerrySmith/LeePerrySmith.glb",
+    "assetSha256": "402b8a8ac9f03232e6d64b5962929703a069daf99d3c49ac8eb0e48bedc9c576",
+    "vertexCount": 9279,
+    "indexCount": 53052
+  }
+}

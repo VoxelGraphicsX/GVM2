@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_texture_hdr",
+  "scenarioId": "nondefault-exposure",
+  "frame": 1,
+  "target": ".lil-gui .controller.number",
+  "canonicalState": {
+    "exposure": 0.65
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 8,
+      "y": 8,
+      "pointerId": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

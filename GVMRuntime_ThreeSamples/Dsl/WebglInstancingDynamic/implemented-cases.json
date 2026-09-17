@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_instancing_dynamic",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglInstancingDynamicRenderer",
+      "hostTarget": "WebglInstancingDynamic",
+      "scenePasses": [
+        "WebglInstancingDynamicEnvironmentCapturePass",
+        "WebglInstancingDynamicMainLitPass"
+      ],
+      "screenPasses": [
+        "WebglInstancingDynamicPmremConvolutionPass",
+        "WebglInstancingDynamicNeutralResolvePass"
+      ],
+      "renderSetType": "WebglInstancingDynamicSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/wave5-formal-webgl-instancing-dynamic-jacobian/summary.json",
+      "notes": [
+        "The main Scene owns one RenderSet entity with 10000 instances; the independent RoomEnvironment Scene owns one RenderSet with eight entities.",
+        "The fixed r185 DFG edge, dielectric multiscattering, RoomEnvironment capture/convolution sequence, explicit sRGB mip chain, and Neutral tone mapping are private DSL work.",
+        "An analytic screen Jacobian selects the explicit texture LOD, preserving the upstream mip response while eliminating Vulkan implicit-derivative repeat drift.",
+        "All three scenarios pass Legacy/Experimental on Metal/Vulkan for three byte-stable repetitions with single-sample rendering and no MSAA simulation."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gvm.local/schemas/three-r185-manifest.schema.json",
+  "title": "GVM Three.js r185 Phase 1 Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "upstream", "samplePolicy", "counts", "examples"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release", "commit", "inventorySource", "officialExceptionSource"],
+      "properties": {
+        "release": { "const": "r185" },
+        "commit": { "const": "2431a09f46f34c560bc8e44b33be0e567723d5b9" },
+        "inventorySource": { "type": "string", "format": "uri" },
+        "officialExceptionSource": { "type": "string", "format": "uri" }
+      }
+    },
+    "samplePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "upstreamMsaaDoesNotExcludeExample",
+        "msaaEnabled",
+        "simulateMsaa",
+        "requireMsaaParity",
+        "description"
+      ],
+      "properties": {
+        "mode": { "const": "single-sample" },
+        "upstreamMsaaDoesNotExcludeExample": { "const": true },
+        "msaaEnabled": { "const": false },
+        "simulateMsaa": { "const": false },
+        "requireMsaaParity": { "const": false },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "excludedUpstream", "auditPopulation", "auditPending", "phase1Required", "deferredMissingCapability"],
+      "properties": {
+        "total": { "const": 588 },
+        "excludedUpstream": { "const": 77 },
+        "auditPopulation": { "const": 511 },
+        "auditPending": { "type": "integer", "minimum": 0, "maximum": 511 },
+        "phase1Required": { "type": "integer", "minimum": 0, "maximum": 511 },
+        "deferredMissingCapability": { "type": "integer", "minimum": 0, "maximum": 511 }
+      }
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 588,
+      "maxItems": 588,
+      "items": { "$ref": "#/$defs/example" }
+    }
+  },
+  "$defs": {
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "category", "upstreamPath", "status", "exclusion", "capabilityAudit",
+        "renderSetPolicy", "renderSetReasons", "sceneRoots", "renderableObjectCount",
+        "containsInstancing", "containsHierarchy", "containsLod", "containsDynamicObjects",
+        "containsMultipleMaterials", "containsGeometryGroups", "loaderRenderableObjectCount",
+        "scenePasses", "screenPasses", "renderSetType", "componentSchema", "dslShard",
+        "scenarios", "deferredEvidence"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+        "category": { "type": "string", "minLength": 1 },
+        "upstreamPath": { "type": "string", "pattern": "^examples/[a-z0-9_-]+\\.html$" },
+        "status": { "enum": ["excluded_upstream", "audit_pending", "phase1_required", "deferred_missing_capability"] },
+        "randomSeed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "exclusion": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reasonCode", "secondaryReasonCodes", "upstreamSourceEvidence"],
+              "properties": {
+                "reasonCode": { "type": "string", "minLength": 1 },
+                "secondaryReasonCodes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "upstreamSourceEvidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "format": "uri" } }
+              }
+            }
+          ]
+        },
+        "capabilityAudit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "gpuWorkDslOnly", "requiresNewPublicCapability", "requiredCapabilities", "availableCapabilities", "missingCapabilities", "evidence", "notes"],
+          "properties": {
+            "state": { "enum": ["not_applicable", "pending", "supported", "deferred"] },
+            "gpuWorkDslOnly": { "$ref": "#/$defs/nullableBoolean" },
+            "requiresNewPublicCapability": { "$ref": "#/$defs/nullableBoolean" },
+            "requiredCapabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "availableCapabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "missingCapabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "evidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "notes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "renderSetPolicy": { "enum": ["required", "not-required", null] },
+        "renderSetReasons": { "type": "array", "uniqueItems": true, "items": { "enum": ["instancing", "multiple_renderables", "hierarchy", "lod", "dynamic_objects", "multiple_materials", "geometry_groups", "loader_multiple_renderables"] } },
+        "sceneRoots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "renderSetRuntimeInstanceCount", "renderSetType"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "renderSetRuntimeInstanceCount": { "type": "integer", "minimum": 0 },
+              "renderSetType": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "renderableObjectCount": { "type": ["integer", "null"], "minimum": 0 },
+        "containsInstancing": { "$ref": "#/$defs/nullableBoolean" },
+        "containsHierarchy": { "$ref": "#/$defs/nullableBoolean" },
+        "containsLod": { "$ref": "#/$defs/nullableBoolean" },
+        "containsDynamicObjects": { "$ref": "#/$defs/nullableBoolean" },
+        "containsMultipleMaterials": { "$ref": "#/$defs/nullableBoolean" },
+        "containsGeometryGroups": { "$ref": "#/$defs/nullableBoolean" },
+        "loaderRenderableObjectCount": { "type": ["integer", "null"], "minimum": 0 },
+        "scenePasses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "renderClass", "sceneRoot", "renderSetBindingCount", "usesStandaloneGeometry", "usesExplicitDrawCount"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "renderClass": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+              "sceneRoot": { "type": "string", "minLength": 1 },
+              "renderSetBindingCount": { "type": "integer", "minimum": 0 },
+              "usesStandaloneGeometry": { "type": "boolean" },
+              "usesExplicitDrawCount": { "type": "boolean" }
+            }
+          }
+        },
+        "screenPasses": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "renderSetType": { "type": ["string", "null"] },
+        "componentSchema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "kind", "role"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "kind": { "enum": ["buffer", "texture"] },
+              "role": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "dslShard": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]+$" },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "frame", "inputReplay", "canonicalState"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9._-]+$" },
+              "kind": { "enum": ["initial-frame", "fixed-frame", "input-replay", "loader-snapshot", "export-round-trip"] },
+              "frame": { "type": "integer", "minimum": 0 },
+              "inputReplay": { "type": ["string", "null"] },
+              "canonicalState": { "type": ["string", "null"] },
+              "renderableObjectCount": { "type": "integer", "minimum": 0 },
+              "containsInstancing": { "type": "boolean" },
+              "scenePassInvocations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["sceneRoot", "scenePass", "invocationCount"],
+                  "properties": {
+                    "sceneRoot": { "type": "string", "minLength": 1 },
+                    "scenePass": { "type": "string", "minLength": 1 },
+                    "invocationCount": { "type": "integer", "minimum": 0 }
+                  }
+                }
+              },
+              "scenePassSequence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["sceneRoot", "scenePass"],
+                  "properties": {
+                    "sceneRoot": { "type": "string", "minLength": 1 },
+                    "scenePass": { "type": "string", "minLength": 1 },
+                    "entityOrdinal": { "type": "integer", "minimum": 0 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deferredEvidence": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reasonCode", "upstreamSourceEvidence", "missingCapability", "whyCurrentDslCannotExpressIt", "minimumFutureApi", "reentryTest"],
+              "properties": {
+                "reasonCode": { "type": "string", "minLength": 1 },
+                "upstreamSourceEvidence": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+                "missingCapability": { "type": "string", "minLength": 1 },
+                "whyCurrentDslCannotExpressIt": { "type": "string", "minLength": 1 },
+                "minimumFutureApi": { "type": "string", "minLength": 1 },
+                "reentryTest": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

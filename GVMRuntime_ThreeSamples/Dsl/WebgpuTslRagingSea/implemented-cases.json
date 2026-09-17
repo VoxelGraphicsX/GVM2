@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_tsl_raging_sea",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuTslRagingSeaRenderer",
+      "hostTarget": "WebgpuTslRagingSea",
+      "scenePasses": [
+        "WebgpuTslRagingSeaMainPass"
+      ],
+      "screenPasses": [
+        "WebgpuTslRagingSeaOutputPass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave3-raging-sea-strict-v3/summary.json",
+      "notes": "Dedicated 256x256 PlaneGeometry, MaterialX three-dimensional Perlin noise, bounded TSL wave octaves, fragment-stage finite-difference normals, exact DFG multiscatter standard lighting, emissive remap, ordinary indexed draw, single-sample output, and Inspector chrome. All four scenarios pass Legacy/Experimental on Metal/Vulkan for three repetitions."
+    }
+  ]
+}

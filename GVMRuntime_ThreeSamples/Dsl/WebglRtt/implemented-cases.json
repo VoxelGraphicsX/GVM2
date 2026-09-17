@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_rtt",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglRttRenderer",
+      "hostTarget": "WebglRtt",
+      "scenePasses": [
+        "WebglRttOffscreenScenePass",
+        "WebglRttMainSpheresPass"
+      ],
+      "screenPasses": [
+        "WebglRttFullscreenCopyPass"
+      ],
+      "renderSetType": "WebglRttSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-webgl-rtt-current-strict/summary.json",
+      "notes": "Dedicated two-Scene RTT implementation: sceneRTT owns one three-entity RenderSet, scene owns one twenty-five-entity RenderSet, and sceneScreen remains a fullscreen exemption. All rendering, RTT sampling, Phong shading, indexed-indirect draws, output conversion, and readback are DSL-owned and ordinary single-sample. Strict evidence: 36/36 quadrant runs, 36/36 cross-quadrant comparisons, and 24/24 stability comparisons passed; worst MAE 0.02116, P99 1, and SSIM 0.9999238613694479."
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_multiple_elements",
+  "scenarioId": "scrolled-cards",
+  "frame": 121,
+  "target": "#c",
+  "canvasWidth": null,
+  "canvasHeight": null,
+  "canonicalState": {
+    "scrollY": 570
+  },
+  "events": [
+    {
+      "type": "wheel",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "deltaY": 570,
+      "deltaMode": 0
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_extrude_shapes",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1GeometryRenderSet",
+      "hostTarget": "Phase1GeometryRenderSet",
+      "scenePasses": ["WebglGeometryExtrudeShapesMainPass"],
+      "renderSetType": "WebglGeometryExtrudeShapesSceneRenderSet",
+      "reportPath": "build/three-r185-extrude-shapes-single-formal/summary.json",
+      "notes": "CatmullRom/Shape/Extrude、bevel、geometry groups 和三对象单 RenderSet 已按单采样正式报告通过。"
+    }
+  ]
+}

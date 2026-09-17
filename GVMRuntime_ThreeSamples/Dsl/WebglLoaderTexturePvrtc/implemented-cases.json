@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_texture_pvrtc",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderTexturePvrtcRenderer",
+      "hostTarget": "WebglLoaderTexturePvrtc",
+      "scenePasses": [
+        "WebglLoaderTexturePvrtcOpaquePass",
+        "WebglLoaderTexturePvrtcTransparentPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderTexturePvrtcSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_loader_texture_pvrtc/formal-v3/strict-summary.json",
+      "notes": "专属八实体 RenderSet 已覆盖 PVR v2/v3 的 2/4 bpp RGB/RGBA、作者 mip、六面环境、固定动画以及不透明/透明 pass；initial-loader、canonical-loader、animated 在 Legacy/Experimental×Metal/Vulkan 各三次共 36 次执行、96 次比较通过，单采样，无 MSAA 模拟。"
+    }
+  ]
+}

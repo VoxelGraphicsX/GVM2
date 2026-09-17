@@ -1,0 +1,8 @@
+{
+  "modelVersion": "6.0.0",
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Entry module for the GVM OHOS XComponent sample host.",
+  "main": "index.ets",
+  "dependencies": {}
+}

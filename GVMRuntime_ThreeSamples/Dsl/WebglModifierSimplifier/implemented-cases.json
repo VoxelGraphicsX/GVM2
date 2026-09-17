@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_modifier_simplifier",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglModifierSimplifier",
+      "hostTarget": "WebglModifierSimplifier",
+      "scenePasses": [
+        "WebglModifierSimplifierScenePass"
+      ],
+      "renderSetType": "WebglModifierSimplifierSceneRenderSet",
+      "strictReport": "build/three-r185-strict-modifier/report/summary.json",
+      "notes": "已接入 SHA-锁定的 LeePerrySmith.glb；C++ 实现 r185 SimplifyModifier 的 progressive-mesh edge collapse，原始与 87.5% 顶点移除的 flatShading 简化网格共用一个 Scene RenderSet。DSL 负责标准材质的环境无关 PBR/Lambert 光照、深度测试和最终输出；initial-comparison、loader-topology、orbit-controls 三场景在 Legacy/Experimental × Metal/Vulkan 下三次稳定通过统一图像门禁。正式证据：build/three-r185-strict-modifier/report/summary.json。"
+    }
+  ]
+}

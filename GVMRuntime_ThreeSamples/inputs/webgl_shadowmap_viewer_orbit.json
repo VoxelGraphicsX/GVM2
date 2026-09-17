@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_shadowmap_viewer",
+  "scenarioId": "orbit",
+  "frame": 61,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "orbitStart": [400, 250],
+    "orbitEnd": [465, 205]
+  },
+  "events": [
+    {"type": "pointerdown", "frame": 0, "x": 400, "y": 250},
+    {"type": "pointermove", "frame": 0, "x": 465, "y": 205},
+    {"type": "pointerup", "frame": 0, "x": 465, "y": 205}
+  ]
+}

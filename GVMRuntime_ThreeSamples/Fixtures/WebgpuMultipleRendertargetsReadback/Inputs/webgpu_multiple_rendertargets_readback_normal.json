@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_multiple_rendertargets_readback",
+  "scenarioId": "normal-readback",
+  "frame": 62,
+  "target": "canvas:not([class])",
+  "events": [
+    {
+      "frame": 0,
+      "type": "mousemove",
+      "x": 400,
+      "y": 250
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuLightsDynamic",
+  "cases": [
+    {
+      "caseId": "webgpu_lights_dynamic",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebgpuLightsDynamicRenderer",
+      "hostTarget": "WebgpuLightsDynamicRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuLightsDynamicMainPass"
+      ],
+      "renderSetType": "WebgpuLightsDynamicSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom/WebgpuLightsDynamic/summary.json",
+      "notes": "已有单 Scene RenderSet 与动态灯光组件骨架，但 DynamicLighting 的真实增删灯事件、128 分段上游几何和完整光照累加尚未实现，除 initial 外的 oracle 也未锁定，当前 runner 缺有效 scene snapshot。按统一口径降为 scaffolded，不计语义完成。",
+      "screenPasses": [
+        "single-sample-downsample"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_morphtargets",
+  "scenarioId": "morph-gui",
+  "frame": 1,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "spherify": 0.65,
+    "twist": 0.4
+  },
+  "events": [
+    { "type": "pointermove", "frame": 0, "x": 400, "y": 250 }
+  ]
+}

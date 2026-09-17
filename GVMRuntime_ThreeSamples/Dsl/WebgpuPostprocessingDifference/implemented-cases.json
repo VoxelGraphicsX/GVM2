@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_difference",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuPostprocessingDifferenceRenderer",
+      "hostTarget": "WebgpuPostprocessingDifference",
+      "scenePasses": [
+        "WebgpuPostprocessingDifferenceMainPass"
+      ],
+      "screenPasses": [
+        "material-texture-explicit-mips",
+        "absolute-frame-difference-luminance-saturation",
+        "history-update"
+      ],
+      "renderSetType": "WebgpuPostprocessingDifferenceSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-next-run/webgpu-postprocessing-difference-strict-v2/summary.json",
+      "notes": "专属 DSL 场景、历史颜色纹理乒乓、真实 crate.gif sRGB 资产、NeutralToneMapping、OrbitControls 阻尼输入回放；Legacy/Experimental × Metal/Vulkan 四象限三次稳定及 48 条跨象限比较通过。采用单采样绘制，不启用或模拟 MSAA。"
+    }
+  ]
+}

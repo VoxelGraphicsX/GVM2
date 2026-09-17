@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_instance_sprites",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuInstanceSpritesRenderer",
+      "hostTarget": "WebgpuInstanceSprites",
+      "scenePasses": ["WebgpuInstanceSpritesMainPass"],
+      "screenPasses": ["snowflake-mipmap-generation", "deterministic-output-quantization"],
+      "renderSetType": "WebgpuInstanceSpritesSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-webgpu-instance-sprites-current-strict-final/summary.json",
+      "notes": "Dedicated one-entity, 10,000-instance Sprite implementation with RenderEntityID, RenderEntityInstanceID, TextureComponent sampling, per-instance rotation, attenuation toggle, pointer camera replay, exponential fog, ordinary single-sample output, and a deterministic DSL output quantizer. All 36 four-quadrant triple-run captures pass."
+    }
+  ]
+}

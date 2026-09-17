@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_lightprobe_cubecamera",
+  "scenarioId": "orbit-after-probe",
+  "frame": 1,
+  "target": "body > canvas",
+  "events": [
+    { "type": "click", "frame": 0, "x": 400, "y": 250 }
+  ],
+  "canonicalState": {
+    "cameraPosition": [0, 0, 30],
+    "probeCoefficientsFrozen": true
+  }
+}

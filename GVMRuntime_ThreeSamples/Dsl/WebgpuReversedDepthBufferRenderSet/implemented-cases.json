@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_reversed_depth_buffer",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuReversedDepthBufferRenderer",
+      "hostTarget": "WebgpuReversedDepthBufferRenderSet",
+      "scenePasses": [
+        "WebgpuReversedDepthBufferNormalPass",
+        "WebgpuReversedDepthBufferLogarithmicPass",
+        "WebgpuReversedDepthBufferReversedPass"
+      ],
+      "renderSetType": "WebgpuReversedDepthBufferSceneRenderSet",
+      "strictReport": "build/three-r185-reversed-depth-strict-v4b/summary.json"
+    }
+  ]
+}

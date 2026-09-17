@@ -1,0 +1,6 @@
+#ifndef UGLC_TEST_INVALID_LOCAL_INCLUDE_NON_HPP_HPP
+#define UGLC_TEST_INVALID_LOCAL_INCLUDE_NON_HPP_HPP
+
+#include "MissingLocalHeader.h"
+
+#endif

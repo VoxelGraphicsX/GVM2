@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_materials_transmission",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMaterialsTransmissionRenderer",
+      "hostTarget": "WebgpuMaterialsTransmission",
+      "scenePasses": [
+        "WebgpuMaterialsTransmissionBackPass",
+        "WebgpuMaterialsTransmissionFrontPass"
+      ],
+      "renderSetType": null,
+      "reportPath": "build/three-r185-wave12-transmission-canonical-clean-20260830/summary.json",
+      "notes": "Dedicated SphereGeometry, UltraHDR, explicit PMREM/DFG/screen mip paths, double-sided physical transmission, CanvasTexture alpha and ACES output are implemented. Renderer-surface capture excludes the upstream DOM Inspector chrome; the custom oracle uses the locked module-state script. The back/front viewport capture chain now mirrors Three r185's two transparent lighting passes. The canonical single-sample report passes Legacy/Experimental × Metal/Vulkan, three repetitions, cross-quadrant and lint gates; no MSAA or MSAA simulation is used."
+    }
+  ]
+}

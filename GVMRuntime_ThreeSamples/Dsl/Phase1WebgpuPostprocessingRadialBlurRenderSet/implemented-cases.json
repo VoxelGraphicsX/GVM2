@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_radial_blur",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuPostprocessingRadialBlurRenderer",
+      "hostTarget": "Phase1WebgpuPostprocessingRadialBlurRenderSet",
+      "scenePasses": [
+        "WebgpuPostprocessingRadialBlurMainPass"
+      ],
+      "renderSetType": "WebgpuPostprocessingRadialBlurSceneRenderSet",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgpu_postprocessing_radial_blur/summary.json"
+    }
+  ]
+}

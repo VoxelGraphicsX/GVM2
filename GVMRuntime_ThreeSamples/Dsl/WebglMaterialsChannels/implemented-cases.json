@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglMaterialsChannels",
+  "cases": [
+    {
+      "caseId": "webgl_materials_channels",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglMaterialsChannelsRenderer",
+      "hostTarget": "WebglMaterialsChannels",
+      "scenePasses": [
+        "WebglMaterialsChannelsFrontFacingPass",
+        "WebglMaterialsChannelsBackFacingPass"
+      ],
+      "renderSetType": "WebglMaterialsChannelsSceneRenderSet",
+      "renderSetPolicy": "required",
+      "reportPath": "build/three-r185-next-run/webgl-materials-channels/summary.json",
+      "notes": "已接入锁定 ninjaHead_Low.obj、normal.png、ao.jpg 和 displacement.jpg，CPU 仅负责 OBJ/图片解码、中心化缩放、相机和 previous-transform 数据；DSL 通过一个 Scene RenderSet 和两个 cull-mode RenderClass 实现 displacement、normal、velocity、Basic/RG/RGB/RGBA depth 与 Standard 分支。四个 Manifest 场景已具备 Legacy/Experimental 双生成和单采样读回；统一 oracle 阈值及三次稳定门禁仍待执行，不能计入 strict-pass。"
+    }
+  ]
+}

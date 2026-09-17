@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_camera","implementationLevel":"strict-pass","dslEntry":"WebglCameraRenderer","hostTarget":"WebglCamera","scenePasses":["WebglCameraActiveCameraPass","WebglCameraObserverCameraPass"],"renderSetType":"WebglCameraSceneRenderSet","reportPath":"build/three-r185-wave4-webgl-camera-strict-v1/summary.json"}]}

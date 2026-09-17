@@ -1,0 +1,882 @@
+{
+  "schemaVersion": 1,
+  "experimental": true,
+  "defaultPipeline": "LegacyAST",
+  "formalContractComplete": false,
+  "sourceRun": "20260905_221508_972__gvm-local__all",
+  "sourceSha256": "b02c4e60b83d0925b4fd93d5d87dcc177d933b06494fb86040f5ff51cc4b39a6",
+  "inspectedModules": 43,
+  "note": "This records concrete IR coverage. It does not redefine the formal DSL contract or infer GPU correctness from emitted intrinsics.",
+  "stages": [
+    {
+      "id": "compute",
+      "testIds": [
+        "experimental-uglir-compute-basic-msl-direct-spirv",
+        "experimental-uglir-evaluation-semantics"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "vertex",
+      "testIds": [
+        "experimental-uglir-stage-io-semantics",
+        "experimental-uglir-render-set-shader-abi"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "fragment",
+      "testIds": [
+        "experimental-uglir-render-basic-msl-direct-spirv",
+        "experimental-uglir-rgba32float-framebuffer"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "pixel-local",
+      "testIds": [
+        "experimental-uglir-pixel-local-deferred-screen"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "hull",
+      "testIds": [
+        "experimental-uglir-excluded-hull-domain"
+      ],
+      "status": "excluded-by-user",
+      "requiredForFormalSupport": false
+    },
+    {
+      "id": "domain",
+      "testIds": [
+        "experimental-uglir-excluded-hull-domain"
+      ],
+      "status": "excluded-by-user",
+      "requiredForFormalSupport": false
+    }
+  ],
+  "resources": [
+    {
+      "id": "uniform-storage-buffers",
+      "testIds": [
+        "experimental-uglir-buffer-layout-semantics",
+        "experimental-uglir-uniform-buffer-compute"
+      ]
+    },
+    {
+      "id": "sampled-storage-textures",
+      "testIds": [
+        "experimental-uglir-storage-texture-compute",
+        "experimental-uglir-texture2darray-gather",
+        "experimental-uglir-symbolic-resources"
+      ]
+    },
+    {
+      "id": "binding-render-set",
+      "testIds": [
+        "experimental-uglir-render-set-shader-abi",
+        "experimental-uglir-stage-io-semantics"
+      ]
+    }
+  ],
+  "blockingGaps": [
+    "Audit every formally promised DSL feature, format and legal layout; the inventory is not yet exhaustive.",
+    "Add GPU oracles for uncovered intrinsics, integer widths, all accepted layouts and precision behavior.",
+    "Complete native Vulkan device evidence, frozen ThreeSamples inputs, sustained correctness and three identical-candidate matrices."
+  ],
+  "intrinsics": [
+    {
+      "id": "intrinsic.discard_fragment",
+      "symbol": "DiscardFragment",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.clip",
+      "symbol": "Clip",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.group_memory_barrier",
+      "symbol": "GroupMemoryBarrier",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.group_memory_barrier_with_group_sync",
+      "symbol": "GroupMemoryBarrierWithGroupSync",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.device_memory_barrier",
+      "symbol": "DeviceMemoryBarrier",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.device_memory_barrier_with_group_sync",
+      "symbol": "DeviceMemoryBarrierWithGroupSync",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.all_memory_barrier",
+      "symbol": "AllMemoryBarrier",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.all_memory_barrier_with_group_sync",
+      "symbol": "AllMemoryBarrierWithGroupSync",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_add",
+      "symbol": "AtomicAdd",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_and",
+      "symbol": "AtomicAnd",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_or",
+      "symbol": "AtomicOr",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_min",
+      "symbol": "AtomicMin",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_max",
+      "symbol": "AtomicMax",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_load",
+      "symbol": "AtomicLoad",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_store",
+      "symbol": "AtomicStore",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.atomic_compare_exchange",
+      "symbol": "AtomicCompareExchange",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_get_lane_index",
+      "symbol": "WaveGetLaneIndex",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_get_lane_count",
+      "symbol": "WaveGetLaneCount",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_active_ballot",
+      "symbol": "WaveActiveBallot",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_active_count_bits",
+      "symbol": "WaveActiveCountBits",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_prefix_count_bits",
+      "symbol": "WavePrefixCountBits",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_prefix_sum",
+      "symbol": "WavePrefixSum",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_read_lane_at",
+      "symbol": "WaveReadLaneAt",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_read_lane_first",
+      "symbol": "WaveReadLaneFirst",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.wave_match",
+      "symbol": "WaveMatch",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.quad_read_lane_at",
+      "symbol": "QuadReadLaneAt",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.quad_read_across_x",
+      "symbol": "QuadReadAcrossX",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.quad_read_across_y",
+      "symbol": "QuadReadAcrossY",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.quad_read_across_diagonal",
+      "symbol": "QuadReadAcrossDiagonal",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.bitcast_asfloat",
+      "symbol": "BitcastAsFloat",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.bitcast_asuint",
+      "symbol": "BitcastAsUInt",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.bitcast_asint",
+      "symbol": "BitcastAsInt",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_abs",
+      "symbol": "MathAbs",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_acos",
+      "symbol": "MathAcos",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_all",
+      "symbol": "MathAll",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute",
+        "experimental-uglir-symbolic-value-types",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_any",
+      "symbol": "MathAny",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_asin",
+      "symbol": "MathAsin",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_atan",
+      "symbol": "MathAtan",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_atan2",
+      "symbol": "MathAtan2",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_ceil",
+      "symbol": "MathCeil",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_clamp",
+      "symbol": "MathClamp",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_cos",
+      "symbol": "MathCos",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_cross",
+      "symbol": "MathCross",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_ddx",
+      "symbol": "MathDdx",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_ddy",
+      "symbol": "MathDdy",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_distance",
+      "symbol": "MathDistance",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_dot",
+      "symbol": "MathDot",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_exp",
+      "symbol": "MathExp",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_exp2",
+      "symbol": "MathExp2",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_floor",
+      "symbol": "MathFloor",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_frac",
+      "symbol": "MathFrac",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_fmod",
+      "symbol": "MathFmod",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_firstbit_high",
+      "symbol": "MathFirstBitHigh",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_firstbit_low",
+      "symbol": "MathFirstBitLow",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_length",
+      "symbol": "MathLength",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_lerp",
+      "symbol": "MathLerp",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_log",
+      "symbol": "MathLog",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_log2",
+      "symbol": "MathLog2",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_max",
+      "symbol": "MathMax",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute",
+        "experimental-uglir-render-set-shader-abi"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_min",
+      "symbol": "MathMin",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute",
+        "experimental-uglir-render-set-shader-abi"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_modf",
+      "symbol": "MathModf",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_mul",
+      "symbol": "MathMul",
+      "testIds": [
+        "experimental-uglir-matrix-vector-mul-vulkan",
+        "experimental-uglir-symbolic-value-types"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_normalize",
+      "symbol": "MathNormalize",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_pow",
+      "symbol": "MathPow",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_reflect",
+      "symbol": "MathReflect",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_round",
+      "symbol": "MathRound",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_rsqrt",
+      "symbol": "MathRsqrt",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_saturate",
+      "symbol": "MathSaturate",
+      "testIds": [
+        "experimental-uglir-pixel-local-deferred-screen"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_sign",
+      "symbol": "MathSign",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_sin",
+      "symbol": "MathSin",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_sincos",
+      "symbol": "MathSincos",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-compute",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_sqrt",
+      "symbol": "MathSqrt",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_step",
+      "symbol": "MathStep",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_smoothstep",
+      "symbol": "MathSmoothstep",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_tan",
+      "symbol": "MathTan",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.math_transpose",
+      "symbol": "MathTranspose",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.uniform_buffer_read",
+      "symbol": "UniformBufferRead",
+      "testIds": [
+        "experimental-uglir-invalid-uniform-scalar"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.input_attachment_read",
+      "symbol": "InputAttachmentRead",
+      "testIds": [
+        "experimental-uglir-pixel-local-deferred-screen"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_read",
+      "symbol": "TextureRead",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-render-set-shader-abi",
+        "experimental-uglir-symbolic-resources"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_write",
+      "symbol": "TextureWrite",
+      "testIds": [
+        "experimental-uglir-native-half-spirv",
+        "experimental-uglir-storage-texture-compute",
+        "experimental-uglir-symbolic-resources"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_sample",
+      "symbol": "TextureSample",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-render-basic-msl-direct-spirv",
+        "experimental-uglir-static-variant-render"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_sample_level",
+      "symbol": "TextureSampleLevel",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-native-half-spirv",
+        "experimental-uglir-symbolic-resources",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_sample_grad",
+      "symbol": "TextureSampleGrad",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-wvm-regressions"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_gather",
+      "symbol": "TextureGather",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_gather_red",
+      "symbol": "TextureGatherRed",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_gather_green",
+      "symbol": "TextureGatherGreen",
+      "testIds": [
+        "experimental-uglir-texture2darray-gather"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_gather_blue",
+      "symbol": "TextureGatherBlue",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_gather_alpha",
+      "symbol": "TextureGatherAlpha",
+      "testIds": [],
+      "evidenceLevel": "uncovered",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    },
+    {
+      "id": "intrinsic.texture_get_dimensions",
+      "symbol": "TextureGetDimensions",
+      "testIds": [
+        "experimental-uglir-intrinsic-call-kinds-fragment",
+        "experimental-uglir-render-set-shader-abi",
+        "experimental-uglir-symbolic-resources"
+      ],
+      "evidenceLevel": "compiled-ir-observed",
+      "gpuOracleVerified": false,
+      "requiredForFullReplacement": true
+    }
+  ],
+  "scopeDecision": "The user explicitly excluded Hull and Domain on 2026-09-06. This changes the required scope, not the historical compilation observations or the experimental default."
+}

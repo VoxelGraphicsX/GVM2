@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglLoaderGcode",
+  "cases": [
+    {
+      "caseId": "webgl_loader_gcode",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderGcodeRenderer",
+      "hostTarget": "WebglLoaderGcodeRuntimeAdapter",
+      "scenePasses": ["WebglLoaderGcodeToolpathPass"],
+      "renderSetType": "WebglLoaderGcodeSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgl-loader-gcode-strict-20260818-rerun/summary.json",
+      "worstMetrics": {
+        "normalizedDistancePixelRatio": 0.00082,
+        "meanAbsoluteRgb": 0.04738666666666667,
+        "p99AbsoluteRgb": 0,
+        "luminanceSsim": 0.9990750576952113
+      },
+      "notes": "专属 GCodeLoader 状态机、benchy/test_m82/test_m83 锁定资产、两个 LineSegments 子对象单 Scene RenderSet、原生 LineList 线段路径和加载器结构快照已接入。5 个场景、4 象限、3 次重复全部通过统一画面阈值、跨象限比较、稳定性比较、RenderSet policy 与 GPU 边界门禁。"
+    }
+  ]
+}

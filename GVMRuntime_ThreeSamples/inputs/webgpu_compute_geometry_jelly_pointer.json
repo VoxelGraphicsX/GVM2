@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_compute_geometry","scenarioId":"jelly-input","frame":60,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"pointer":[400,250],"elasticity":0.4,"damping":0.94,"r185VisibleDeformation":false},"events":[{"type":"pointermove","frame":0,"x":400,"y":250,"settleMs":250}]}

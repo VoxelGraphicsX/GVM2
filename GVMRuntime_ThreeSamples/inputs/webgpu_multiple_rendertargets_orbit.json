@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_multiple_rendertargets","scenarioId":"orbit","frame":61,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"orbitStart":[400,250],"orbitEnd":[465,205]},"events":[{"type":"pointerdown","frame":0,"x":400,"y":250},{"type":"pointermove","frame":0,"x":465,"y":205},{"type":"pointerup","frame":0,"x":465,"y":205}]}

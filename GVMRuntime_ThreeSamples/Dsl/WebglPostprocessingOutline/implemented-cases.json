@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglPostprocessingOutline",
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_outline",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglPostprocessingOutlineRenderer",
+      "hostTarget": "WebglPostprocessingOutlineRuntimeAdapter",
+      "scenePasses": [
+        "WebglPostprocessingOutlineShadowPass",
+        "WebglPostprocessingOutlineMainFrontPass",
+        "WebglPostprocessingOutlineMainDoublePass",
+        "WebglPostprocessingOutlineNonselectedDepthPass",
+        "WebglPostprocessingOutlineSelectedMaskPass"
+      ],
+      "renderSetType": "WebglPostprocessingOutlineSceneRenderSet",
+      "reportPath": "build/three-r185-current-probes/webgl-postprocessing-outline-first/summary.json",
+      "notes": "已有专属 RenderSet、场景 pass 与屏幕后处理 DSL 骨架，但 2026-08-17 的真实 oracle 四象限复验表明 initial-loader 场景异常像素比例约 64.714%、MAE 73.29、P99 242、SSIM 0.284；运行时只记录 1 次自动 RenderSet draw，而 Manifest 要求 3 次场景几何 pass，componentSchema 与 pass 序列也不一致，其余交互场景尚不能运行。当前实现没有等价覆盖 r185 的 loader 场景、选择 mask、深度、边缘检测、模糊与 pattern 合成完整链路，按统一口径降为 scaffolded。",
+      "screenPasses": [
+        "explicit-pattern-mips",
+        "mask-downsample",
+        "edge-detection",
+        "half-resolution-separable-blur",
+        "quarter-resolution-separable-blur",
+        "pattern-edge-overlay",
+        "output-color-conversion",
+        "fxaa"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        }
+      ]
+    }
+  ]
+}

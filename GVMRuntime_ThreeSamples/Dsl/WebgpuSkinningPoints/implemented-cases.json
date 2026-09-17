@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_skinning_points",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuSkinningPointsRenderer",
+      "hostTarget": "WebgpuSkinningPoints",
+      "scenePasses": [
+        "WebgpuSkinningPointsMainPass"
+      ],
+      "screenPasses": [
+        "WebgpuSkinningPointsUpdatePass"
+      ],
+      "renderSetType": "WebgpuSkinningPointsSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgpu_skinning_points/formal-v1/summary.json",
+      "notes": "Dedicated one-entity RenderSet expands 16,340 Michelle vertices as point sprites, keeps current and previous point state in DSL-visible buffers, performs the point-state update in DSL Compute, uses single-sample depth-tested coverage, and records the exact locked Michelle loader semantics. Atomic publication remains pending the complete active batch."
+    }
+  ]
+}

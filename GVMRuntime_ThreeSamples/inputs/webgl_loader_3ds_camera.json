@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_3ds",
+  "scenarioId": "camera-input",
+  "frame": 1,
+  "target": "canvas[width=\"800\"][height=\"500\"]",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "azimuthDeltaRadians": -0.075,
+    "polarDeltaRadians": 0.0,
+    "radiusScale": 1.0
+  },
+  "events": [
+    {
+      "frame": 0,
+      "type": "pointerdown",
+      "x": 400,
+      "y": 250,
+      "button": 0,
+      "buttons": 1
+    },
+    {
+      "frame": 1,
+      "type": "pointermove",
+      "x": 430,
+      "y": 250,
+      "buttons": 1
+    },
+    {
+      "frame": 1,
+      "type": "pointerup",
+      "x": 430,
+      "y": 250,
+      "button": 0,
+      "buttons": 0
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_texture_canvas",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsTextureCanvasRenderer",
+      "hostTarget": "WebglMaterialsTextureCanvas",
+      "scenePasses": ["WebglMaterialsTextureCanvasScenePass"],
+      "screenPasses": [],
+      "renderSetType": "WebglMaterialsTextureCanvasSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-texture-canvas-formal-merged/summary.json",
+      "notes": "Canvas 纹理的 initial/painted 两个场景使用锁定的 Canvas2D 回放和片元解析覆盖；Legacy/Experimental × Metal/Vulkan 四象限三次稳定、跨象限比较、生成产物与统一图像门禁全部通过。"
+    }
+  ]
+}

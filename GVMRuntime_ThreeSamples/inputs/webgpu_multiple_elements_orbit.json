@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_multiple_elements",
+  "scenarioId": "card-orbit",
+  "frame": 121,
+  "target": "#c",
+  "canvasWidth": null,
+  "canvasHeight": null,
+  "canonicalState": {
+    "scrollY": 570,
+    "sceneIndex": 7,
+    "azimuthDeltaRadians": -0.35,
+    "polarDeltaRadians": 0.0
+  },
+  "events": [
+    {
+      "type": "wheel",
+      "frame": 0,
+      "x": 100,
+      "y": 100,
+      "deltaY": 570,
+      "deltaMode": 0,
+      "target": "#c"
+    },
+    {
+      "type": "pointerdown",
+      "frame": 1,
+      "x": 400,
+      "y": 250,
+      "button": 0,
+      "target": "#content .list-item:nth-child(9) > div:nth-child(1)"
+    },
+    {
+      "type": "pointermove",
+      "frame": 2,
+      "x": 511.4084601643268,
+      "y": 250,
+      "buttons": 1,
+      "target": "#content .list-item:nth-child(9) > div:nth-child(1)"
+    },
+    {
+      "type": "pointerup",
+      "frame": 3,
+      "x": 511.4084601643268,
+      "y": 250,
+      "button": 0,
+      "target": "#content .list-item:nth-child(9) > div:nth-child(1)"
+    }
+  ]
+}

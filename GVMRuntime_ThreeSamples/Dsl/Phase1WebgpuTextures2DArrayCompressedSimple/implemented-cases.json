@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_textures_2d-array_compressed",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1WebgpuTextures2DArrayCompressedSimpleRenderer",
+      "hostTarget": "Phase1WebgpuTextures2DArrayCompressedSimple",
+      "scenePasses": ["WebgpuTextures2DArrayCompressedMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-compressed-array-strict-v4/summary.json",
+      "notes": "锁定 KTX2 数组层、压缩纹理解码和层切换固定帧已通过四象限三次稳定门禁。"
+    }
+  ]
+}

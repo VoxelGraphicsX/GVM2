@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_texture_rotation",
+  "scenarioId": "uv-transform-orbit",
+  "frame": 1,
+  "target": "canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "offset": [0.2, 0.1],
+    "repeat": [0.75, 0.5],
+    "rotation": -0.6,
+    "center": [0.3, 0.7]
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250 },
+    { "type": "pointermove", "frame": 0, "x": 450, "y": 220 },
+    { "type": "pointerup", "frame": 0, "x": 450, "y": 220 }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglGeometrySplineEditor",
+  "cases": [
+    {
+      "caseId": "webgl_geometry_spline_editor",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglGeometrySplineEditorRenderer",
+      "hostTarget": "WebglGeometrySplineEditorRuntimeAdapter",
+      "scenePasses": [
+        "WebglGeometrySplineEditorShadowDepthPass",
+        "WebglGeometrySplineEditorMainColorPass",
+        "WebglGeometrySplineEditorControlOverlayPass"
+      ],
+      "renderSetType": "WebglGeometrySplineEditorSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom/WebglGeometrySplineEditor/summary.json",
+      "notes": "已有专属 RenderSet、Catmull-Rom 路径和控制对象结构，但 TransformControls、精确阴影、GUI 输入回放和导出 round-trip 尚未实现；当前 runner 未产生有效 scene snapshot。按统一口径降为 scaffolded，不计语义完成。",
+      "screenPasses": []
+    }
+  ]
+}

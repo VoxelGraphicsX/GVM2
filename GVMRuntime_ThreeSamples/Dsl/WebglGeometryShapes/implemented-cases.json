@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_shapes",
+      "implementationLevel": "semantic-complete",
+      "notes": "已完成 r185 ShapeGeometry/ExtrudeGeometry 轮廓、挤出侧面、线段与点标记三角形展开、93 个实体单 RenderSet、UV 网格纹理组件和 DSL Phong 光照；当前正式报告实际归属为 webgl_geometry_extrude_shapes，webgl_geometry_shapes 的专属 oracle 仍未通过统一阈值，因此保持语义实现待门禁，不把错配报告计为严格通过。",
+      "dslEntry": "WebglGeometryShapes",
+      "hostTarget": "WebglGeometryShapes",
+      "scenePasses": [
+        "WebglGeometryShapesMainPass"
+      ],
+      "renderSetType": "WebglGeometryShapesSceneRenderSet",
+      "reportPath": "build/three-r185-shapes-formal-current/summary.json"
+    }
+  ]
+}

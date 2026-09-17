@@ -1,0 +1,8 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "@GVM_MOBILE_SAMPLE_APP_LABEL@"
+    }
+  ]
+}

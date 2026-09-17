@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_compute_birds","scenarioId":"pointer-settings","frame":61,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"pointer":[520,210],"separation":24.0,"alignment":18.0,"cohesion":22.0},"events":[{"type":"pointermove","frame":0,"x":520,"y":210}]}

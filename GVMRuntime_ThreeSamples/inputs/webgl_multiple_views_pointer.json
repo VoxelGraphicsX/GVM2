@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_multiple_views",
+  "scenarioId": "pointer-camera",
+  "frame": 1,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": "pointer-x-200-updates-all-three-cameras",
+  "events": [
+    { "type": "mousemove", "frame": 0, "x": 600, "y": 250 }
+  ]
+}

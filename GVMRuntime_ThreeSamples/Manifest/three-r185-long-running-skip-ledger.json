@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "thresholdSeconds": 10800,
+  "policy": "仅在同一用例至少三次失败、累计实际尝试时间达到三小时且每次均有正式报告证据后，才允许状态为 selected；顺延不改变 Manifest 的 phase1_required，也不计为通过或 deferred。",
+  "entries": [
+    {
+      "caseId": "webgl_clipping",
+      "status": "selected",
+      "selectedAt": "2026-08-30T07:10:00.000Z",
+      "reasonCode": "long_running_no_convergence",
+      "attempts": [
+        {
+          "result": "fail",
+          "durationSeconds": 3600,
+          "reportPath": "build/three-r185-next-run/scan-semantic-webgl_clipping-20260825/summary.json",
+          "failures": [
+            "四象限矩阵失败：裁剪平面场景的 RGB 差异、P99 与 SSIM 均超出统一门禁。",
+            "输入回放元数据在多个场景缺失，无法形成有效的交互证据。"
+          ]
+        },
+        {
+          "result": "fail",
+          "durationSeconds": 3600,
+          "reportPath": "build/three-r185-next-batch-formal-20260826/cases/webgl_clipping/summary.json",
+          "failures": [
+            "完整正式矩阵仍失败：normalized RGB distance、MAE、P99 和 SSIM 同时不达标。",
+            "global-plane 与 hard-local-clip 的 oracle 比较均失败。"
+          ]
+        },
+        {
+          "result": "fail",
+          "durationSeconds": 3600,
+          "reportPath": "build/wave9-current-all-r1-20260829/webgl_clipping/summary.json",
+          "failures": [
+            "在当前构建和资产锁定下重新尝试仍失败，异常像素比例约 13.8%，MAE 约 8.6，SSIM 约 0.881。",
+            "16 个四象限 oracle 与 16 个跨象限比较全部失败。"
+          ]
+        }
+      ],
+      "totalAttemptSeconds": 10800,
+      "notes": "该用例已有多轮专属 DSL/RenderSet、平面变换、阴影、颜色空间和元数据修正记录；本条仅表示本批次顺延，不改变 Manifest 的 phase1_required，也不计入 deferred 或通过。"
+    }
+  ]
+}

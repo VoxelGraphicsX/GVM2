@@ -1,0 +1,41 @@
+if(APPLE)
+    target_compile_options(
+        GVMRHI
+        PRIVATE
+        $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
+    )
+endif()
+
+target_sources(
+    GVMRHI
+    PRIVATE
+        MAutoReleasePool.cpp
+        MBindGroup.cpp
+        MBindGroupLayout.cpp
+        MBlitPassEncoder.cpp
+        MBuffer.cpp
+        MCommandEncoder.cpp
+        MComputePassEncoder.cpp
+        MComputePipeline.cpp
+        MDiagnosticsOverlayShaders.cpp
+        MDevice.cpp
+        MEnumUtils.cpp
+        MInstance.cpp
+        MPipelineLayout.cpp
+        MQuerySet.cpp
+        MQueue.cpp
+        MRenderPassEncoder.cpp
+        MRenderPipeline.cpp
+        MSampler.cpp
+        MShaderModule.cpp
+        MSwapchain.cpp
+        MTexture.cpp
+        MTextureView.cpp
+        MUtilShaders/MBufferCopyMultipleRegionExecutor.cpp
+        MUtilShaders/MIndirectBufferConvertShaderExecutor.cpp
+        MUtilShaders/MQuadShaderExecutor.cpp
+        MUtilShaders/MRenderToSwapchainExecutor.cpp
+        MUtilShaders/MUtilShaders.cpp
+        MWriteBufferPool.cpp
+        Metal.cpp
+)

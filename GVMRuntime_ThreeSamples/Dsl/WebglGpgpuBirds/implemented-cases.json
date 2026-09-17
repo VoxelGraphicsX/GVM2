@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_gpgpu_birds",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGpgpuBirdsRenderer",
+      "hostTarget": "WebglGpgpuBirds",
+      "scenePasses": ["WebglGpgpuBirdsMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-webgl-gpgpu-birds-formal/summary.json",
+      "notes": "GPU flocking、双面鸟体、指针/GUI 回放和固定单采样输出已通过四象限三次稳定门禁。"
+    }
+  ]
+}

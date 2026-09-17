@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_interactive_cubes_ortho",
+      "implementationLevel": "strict-pass",
+      "notes": "已切换为专属 2000 个 BoxGeometry entity、正交轨道相机、r185 UUID 随机消耗相位和 DSL Lambert/命中高亮；已修正六面绕序、非均匀缩放法线矩阵、定向光方向和 Lambert 的 1/π 因子。当前 initial oracle 四象限均通过统一阈值（Metal MAE 约 0.051、SSIM 约 0.999988；Vulkan MAE 约 0.050、SSIM 约 0.999988），Legacy/Experimental 互比完全一致；但 animated/cube-hit 两场景、三次稳定、正式报告闭环仍未完成，保持 scaffolded。",
+      "dslEntry": "WebglInteractiveCubesOrtho",
+      "hostTarget": "WebglInteractiveCubesOrtho",
+      "scenePasses": [
+        "WebglInteractiveCubesOrthoScenePass"
+      ],
+      "renderSetType": "WebglInteractiveCubesOrthoSceneRenderSet",
+      "strictReport": "build/three-r185-cubes_ortho-strict-v1/summary.json",
+      "notes": "已完成正交相机版本的 2,000 个普通 BoxGeometry entity 单 Scene RenderSet：正交轨道矩阵、每帧 view-space DirectionalLight 变换、CPU 中心指针射线最近体命中和 DSL Lambert/emissive。initial、animated、cube-hit 三场景在 Legacy/Experimental×Metal/Vulkan 各三次共 36 次执行、96 次比较全部通过；单采样，无 MSAA 模拟。"
+    }
+  ]
+}

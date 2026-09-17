@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_instancing_morph",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuInstancingMorphRenderer",
+      "hostTarget": "WebgpuInstancingMorph",
+      "scenePasses": [
+        "WebgpuInstancingMorphShadowPass",
+        "WebgpuInstancingMorphMainPass"
+      ],
+      "renderSetType": "WebgpuInstancingMorphSceneRenderSet",
+      "screenPasses": [
+        "WebgpuInstancingMorphInspectorPass"
+      ],
+      "strictReport": "build/three-r185-wave5-gvm/webgpu_instancing_morph/formal-v1/summary.json",
+      "notes": [
+        "The dedicated Scene RenderSet contains one ground entity and one 1,024-instance Horse entity.",
+        "Every Horse instance reads RenderEntityID and RenderEntityInstanceID and evaluates all 15 frozen GLB morph targets.",
+        "The shadow and main Scene passes reuse the unique Set; the capture is intentionally single-sample with no MSAA emulation.",
+        "All three scenarios pass 36 oracle comparisons, 24 stability comparisons, and 36 cross-quadrant comparisons."
+      ]
+    }
+  ]
+}

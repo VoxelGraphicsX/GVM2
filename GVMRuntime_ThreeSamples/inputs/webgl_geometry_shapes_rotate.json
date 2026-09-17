@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_shapes",
+  "scenarioId": "rotated-input",
+  "frame": 61,
+  "target": "canvas[width=\"800\"][height=\"500\"]",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "azimuthDeltaRadians": -0.22,
+    "polarDeltaRadians": 0.0,
+    "radiusScale": 1.0
+  },
+  "events": [
+    {
+      "frame": 0,
+      "type": "pointerdown",
+      "x": 400,
+      "y": 250,
+      "button": 0,
+      "buttons": 1
+    },
+    {
+      "frame": 1,
+      "type": "pointermove",
+      "x": 417.507,
+      "y": 250,
+      "buttons": 1
+    },
+    {
+      "frame": 2,
+      "type": "pointerup",
+      "x": 417.507,
+      "y": 250,
+      "button": 0,
+      "buttons": 0
+    }
+  ]
+}

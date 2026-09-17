@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_instancing_raycast",
+  "scenarioId": "reduced-count",
+  "frame": 1,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "activeInstanceCount": 125
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 799, "y": 499 },
+    { "type": "pointerup", "frame": 0, "x": 799, "y": 499 }
+  ]
+}

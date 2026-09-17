@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_morphtargets_horse",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMorphtargetsHorseRenderer",
+      "hostTarget": "WebglMorphtargetsHorse",
+      "scenePasses": ["WebglMorphtargetsHorseMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-horse-strict-v2/summary.json",
+      "notes": "Dedicated Horse GLB primitive, fifteen relative POSITION morph targets, fixed one-second clip evaluation, flat MeshStandard lighting, deterministic camera, and ordinary single-sample rendering; all three scenarios pass the four quadrants for three stable repetitions."
+    }
+  ]
+}

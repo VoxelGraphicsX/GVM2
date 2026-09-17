@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_points_sprites",
+  "scenarioId": "texture-off",
+  "frame": 61,
+  "target": ".controller input[type=\"checkbox\"]",
+  "canonicalState": {
+    "texture": false
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 1,
+      "x": 6,
+      "y": 6
+    }
+  ]
+}

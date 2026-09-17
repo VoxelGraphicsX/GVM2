@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuPostprocessingSobel",
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_sobel",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebgpuPostprocessingSobelRenderer",
+      "hostTarget": "WebgpuPostprocessingSobelRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuPostprocessingSobelRoomBackPass",
+        "WebgpuPostprocessingSobelRoomFrontPass",
+        "WebgpuPostprocessingSobelMainPass"
+      ],
+      "renderSetType": "WebgpuPostprocessingSobelSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/three-r185-reports/webgpu-postprocessing-sobel-current/summary.json",
+      "notes": "已迁移到独立的多目标线性场景与屏幕后处理 DSL：scene 与 roomEnvironment 各自拥有一个 RenderSet，Scene pass 只负责几何，屏幕 pass 负责房间捕获、环境处理、Sobel 边缘、色彩转换和输出；Host 已锁定场景帧、单采样输出和动态 entity 快照。2026-08-10 已将真实上游资产 models/gltf/DragonAttenuation.glb 锁入 asset pack（SHA-256 dbac78de3fefb33ba744cfa703936892b6e2fc47b58d88acc52f4be39e5464be），四象限已能完成真实 GLB 解析与结构捕获。2026-08-11 保持 r185 RenderOutputNode 的 LinearToneMapping→sRGB→亮度九点 Sobel 顺序，并修正固定 OrbitControls 拖拽在 frame-1 的相机更新；48 次正式运行（4 场景×4 象限×3 重复）已记录，但 initial-loader 最佳 normalizedDistancePixelRatio=0.007310、P99=21、SSIM=0.971580，orbit-input 最佳 normalizedDistancePixelRatio=0.034570、MAE=4.1400、P99=128、SSIM=0.908448，未达到严格门禁，故不计通过。",
+      "screenPasses": [
+        "room-six-face-atlas-gutters",
+        "room-environment-explicit-pmrem",
+        "render-output",
+        "sobel-three-by-three-or-bypass"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        },
+        {
+          "name": "renderFlags",
+          "role": "scene-cull-material-phase"
+        }
+      ]
+    }
+  ]
+}

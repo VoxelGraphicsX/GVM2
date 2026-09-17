@@ -1,0 +1,15 @@
+{
+  "ActiveProfile": "gvm-local",
+  "Profiles": {
+    "gvm-local": {
+      "BuildDir": "build/macos-tests-debug-make",
+      "GVMRoot": "GVM",
+      "UGLHeadersDir": "GVM/UGLHeaders",
+      "DependencyRoot": "build/macos-tests-debug-make/_deps",
+      "UGLCExecutable": "build/macos-tests-debug-make/UGLC",
+      "HostCompiler": "c++",
+      "BuildJobs": null,
+      "AutoOpenReport": false
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_texture_hdr",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "512x768-rle-rgbe-exposure-metadata-one-rgba16float",
+  "result": {
+    "renderableObjectCount": 0,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "a340c268f59c2dc96dd27ee9287789dbd1a4b6ac60ba158a3c2c2048d08c9d76",
+    "assetPath": "textures/memorial.hdr",
+    "assetSha256": "18376b9219927b363127817900b1c170a0f752f52a63f5949655b4150e35061d",
+    "width": 512,
+    "height": 768,
+    "textureFormat": "rgba16float"
+  }
+}

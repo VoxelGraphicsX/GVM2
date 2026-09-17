@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_loader_texture_tga","implementationLevel":"strict-pass","dslEntry":"WebglLoaderTextureTgaRenderer","hostTarget":"WebglLoaderTextureTga","scenePasses":["WebglLoaderTextureTgaPhongPass"],"renderSetType":"WebglLoaderTextureTgaSceneRenderSet","strictReport":"build/three-r185-wave6-strict/webgl_loader_texture_tga/summary.json"}]}

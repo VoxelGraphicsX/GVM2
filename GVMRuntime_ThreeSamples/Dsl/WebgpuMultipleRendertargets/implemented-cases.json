@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_multiple_rendertargets",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMultipleRendertargets",
+      "hostTarget": "WebgpuMultipleRendertargets",
+      "scenePasses": [
+        "WebgpuMultipleRendertargetsScenePass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgpu_multiple_rendertargets/summary.json"
+    }
+  ]
+}

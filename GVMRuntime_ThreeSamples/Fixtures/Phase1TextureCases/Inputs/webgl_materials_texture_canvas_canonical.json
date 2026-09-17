@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_texture_canvas",
+  "scenarioId": "painted",
+  "target": "#drawing-canvas",
+  "canvasWidth": 128,
+  "canvasHeight": 128,
+  "frame": 30,
+  "events": [
+    { "type": "pointerdown", "x": 16, "y": 16 },
+    { "type": "pointermove", "x": 32, "y": 96 },
+    { "type": "pointermove", "x": 64, "y": 32 },
+    { "type": "pointermove", "x": 96, "y": 112 },
+    { "type": "pointermove", "x": 112, "y": 16 },
+    { "type": "pointerup", "x": 112, "y": 16 }
+  ]
+}

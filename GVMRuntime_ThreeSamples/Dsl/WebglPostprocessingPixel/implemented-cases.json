@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglPostprocessingPixel",
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_pixel",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingPixelRenderer",
+      "hostTarget": "WebglPostprocessingPixelRuntimeAdapter",
+      "scenePasses": [
+        "WebglPostprocessingPixelShadowPass",
+        "WebglPostprocessingPixelBeautyPass",
+        "WebglPostprocessingPixelNormalPass"
+      ],
+      "renderSetType": "WebglPostprocessingPixelSceneRenderSet",
+      "reportPath": "build/next20-diagnostic-20260828/webgl_postprocessing_pixel-formal/summary.json",
+      "notes": "已重建当前 Legacy/Experimental 二进制并闭环 beauty、normal、directional shadow、spot shadow、pixel edge composite 与 output conversion；initial、animated、nondefault-pixel-edges 三场景共 36 条四象限运行、36 条跨比较、24 条稳定性比较全部通过，单 RenderSet、四个 Scene 几何 pass、无 MSAA。正式证据为 build/next20-diagnostic-20260828/webgl_postprocessing_pixel-formal/summary.json；此前缺失的 animated/nondefault oracle 已从锁定的 r185 reference 包恢复。",
+      "screenPasses": [
+        "pixelated-depth-normal-edge-composite",
+        "output-color-conversion"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        }
+      ]
+    }
+  ]
+}

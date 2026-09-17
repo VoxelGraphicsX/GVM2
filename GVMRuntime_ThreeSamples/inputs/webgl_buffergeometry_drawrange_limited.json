@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_buffergeometry_drawrange",
+  "scenarioId": "limited-connections",
+  "frame": 61,
+  "target": ".lil-gui .controller:nth-child(4) input[type=checkbox]",
+  "canonicalState": {
+    "particleCount": 250,
+    "limitConnections": true,
+    "maxConnections": 8
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "x": 5,
+      "y": 5
+    }
+  ]
+}

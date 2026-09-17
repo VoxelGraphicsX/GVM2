@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_layers",
+  "scenarioId": "yellow-layer-only",
+  "frame": 121,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "red": false,
+    "yellow": true,
+    "green": false,
+    "cameraLayerMask": 2
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "x": 400,
+      "y": 250
+    }
+  ]
+}

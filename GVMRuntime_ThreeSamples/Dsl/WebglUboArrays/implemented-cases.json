@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_ubo_arrays",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglUboArraysRenderer",
+      "hostTarget": "WebglUboArrays",
+      "scenePasses": [
+        "WebglUboArraysScenePass"
+      ],
+      "renderSetType": "WebglUboArraysSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgl-ubo-arrays-fourth/summary.json",
+      "notes": "已建立专属 UBO 数组 DSL/Host：单 Scene 单 RenderSet、平面加 100 个 SphereGeometry 实体、固定 300 项灯光数组、三场景帧和单采样输出。正式四象限单轮结构契约已通过；画面对照仍失败（异常像素约 37.6%、MAE 约 33.4），Experimental Vulkan 在 300 灯片元循环上发生设备丢失，因此不计入严格通过。"
+    }
+  ]
+}

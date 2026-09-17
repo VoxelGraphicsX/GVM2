@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_glitch",
+  "scenarioId": "wild",
+  "frame": 1,
+  "target": "#wildGlitch",
+  "canonicalState": {
+    "consentAccepted": true,
+    "wildGlitch": true
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "target": "#startButton",
+      "x": 10,
+      "y": 10
+    },
+    {
+      "type": "click",
+      "frame": 1,
+      "target": "#wildGlitch",
+      "x": 1,
+      "y": 1
+    }
+  ]
+}

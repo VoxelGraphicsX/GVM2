@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_compute_reduce",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1WebgpuComputeReduceSimpleRenderer",
+      "hostTarget": "Phase1WebgpuComputeReduceSimple",
+      "scenePasses": [
+        "WebgpuComputeReduceLeftPass",
+        "WebgpuComputeReduceRightPass"
+      ],
+      "computePasses": [
+        "WebgpuComputeReduceResetPass",
+        "WebgpuComputeReduceNOverTwoPass",
+        "WebgpuComputeReduceWorkgroupPass",
+        "WebgpuComputeReduceSubgroupPass",
+        "WebgpuComputeReduceFinalizePass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave3-compute-reduce-strict-v1/summary.json",
+      "notes": "Two independent ordinary Scenes, exact pre-timeout r185 canvas composition, 262144-element storage, N/2 reduction, groupshared workgroup reduction, subgroupAdd synthesis from wave lane-count/read-lane primitives, fixed single-sample output, and three deterministic scenarios."
+    }
+  ]
+}

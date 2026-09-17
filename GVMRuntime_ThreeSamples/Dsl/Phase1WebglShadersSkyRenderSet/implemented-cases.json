@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_shaders_sky","implementationLevel":"strict-pass","dslEntry":"Phase1WebglShadersSkyRenderSet","hostTarget":"Phase1WebglShadersSkyRenderSet","scenePasses":["WebglShadersSkyScenePass"],"renderSetType":"WebglShadersSkySceneRenderSet","strictReport":"build/three-r185-sky-pair-strict-v2/cases/webgl_shaders_sky/summary.json"}]}

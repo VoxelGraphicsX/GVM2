@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_test_memory",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglTestMemoryRenderer",
+      "hostTarget": "WebglTestMemory",
+      "scenePasses": ["WebglTestMemoryScenePass"],
+      "renderSetType": "WebglTestMemorySceneRenderSet",
+      "strictReport": "build/three-r185-wave4-webgl-test-memory-strict-v1/summary.json"
+    }
+  ]
+}

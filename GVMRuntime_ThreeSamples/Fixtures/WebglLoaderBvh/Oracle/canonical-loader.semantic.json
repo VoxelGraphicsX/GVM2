@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_bvh",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "57-bones-86-tracks-592-frames",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "2f41d8955b6dc386c6dd27b95c630939a5b4c22ee418411cac126db8094d9818",
+    "assetPath": "models/bvh/pirouette.bvh",
+    "assetSha256": "bed46806d1c1e03d5165f9bfecadff0a57409522d5d3096b863484b5aef15eaa",
+    "boneCount": 57,
+    "motionFrameCount": 592,
+    "animationTrackCount": 86
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "misc_uv_tests",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "MiscUvTests",
+      "hostTarget": "MiscUvTests",
+      "scenePasses": [],
+      "screenPasses": ["MiscUvTestsMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-misc-uv-formal-v2/summary.json",
+      "notes": "已完成 Three.js r185 的九个 UV 调试场景：Plane、Sphere、Icosahedron、Octahedron、Cylinder、Box、Lathe、Torus 和 TorusKnot。C++ 仅负责几何/标签数据与滚动回放，GPU 轮廓、面编号、顶点标签、页面合成和最终 RGBA8 输出全部由私有 DSL 完成；不使用 MSAA，也不模拟 MSAA。正式报告 build/three-r185-misc-uv-formal-v2/summary.json：Legacy/Experimental × Metal/Vulkan 共 108 条记录，三次稳定、跨象限比较和 GPU 边界均通过；最差指标为异常像素比例 0.023%、MAE 0.514、P99 11、SSIM 0.995258。"
+    }
+  ]
+}

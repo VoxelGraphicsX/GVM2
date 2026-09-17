@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglLightsSpotlights",
+  "cases": [
+    {
+      "caseId": "webgl_lights_spotlights",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLightsSpotlightsRenderer",
+      "hostTarget": "WebglLightsSpotlightsRuntimeAdapter",
+      "scenePasses": [
+        "WebglLightsSpotlightsShadowDepthPass",
+        "WebglLightsSpotlightsOpaqueLitPass",
+        "WebglLightsSpotlightsHelperLinesPass"
+      ],
+      "renderSetType": "WebglLightsSpotlightsSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/three-r185-reports/webgl-lights-spotlights-strict-v1/summary.json",
+      "formalEvidence": "build/three-r185-wave8-custom-override/three-r185-reports/webgl-lights-spotlights-strict-v1/summary.json",
+      "notes": "已拆除 ThreeNextBatch 占位入口：CPU 生成 floor、box 和三组 SpotLightHelper 线段；三组聚光灯、RenderEntity/Instance 取数、阴影深度阶段、Lambert/Blinn-Phong 聚光照明和 helper alpha pass 均由专属 DSL 表达；五个实体复用一个 Scene RenderSet，场景绘制为单采样。2026-08-11 修正 SpotLight 方向（灯到 target）、第三盏灯初始 z=4.5、已有 LineList 线段拓扑、opaque/helper pass 的 depth Load 语义，并将阴影遮挡从底面测试修正为完整盒体 slab 相交；同时统一 capture metadata 的 single-sample policy 对象。已锁定 initial、tweened 和 orbit 输入回放；三场景共 36 条四象限三次 oracle 记录、36 条跨象限比较和 24 条同象限稳定性比较全部通过统一阈值，RenderSet policy、生成产物、GPU 边界和单采样 lint 全部通过。wave11 原子批次已通过，正式证据 build/three-r185-wave11-atomic-summary.json。",
+      "screenPasses": []
+    }
+  ]
+}

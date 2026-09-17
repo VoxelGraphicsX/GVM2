@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_postprocessing_radial_blur","scenarioId":"disabled-static","frame":1,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"weight":0.9,"decay":0.95,"exposure":5.0,"sampleCount":32,"blurEnabled":false,"animationEnabled":false},"events":[{"type":"pointermove","frame":0,"x":400,"y":250}]}

@@ -1,0 +1,24 @@
+# Defense in depth for source archives; Git tracking is controlled by .gitignore.
+GVMRuntime_AdvancedSamples/** export-ignore
+GVMRuntime_SampleAssets/** export-ignore
+.claude/** export-ignore
+.codex_backups/** export-ignore
+.vscode/** export-ignore
+.idea/** export-ignore
+.local/** export-ignore
+.cache/** export-ignore
+.ZipBackup/** export-ignore
+aibackup/** export-ignore
+AIDOC/** export-ignore
+AI_Analysis/** export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
+CONTRIBUTING.md export-ignore
+SECURITY.md export-ignore
+*.zip export-ignore
+build/** export-ignore
+build-*/** export-ignore
+build_*/** export-ignore
+**/.DS_Store export-ignore
+**/imgui.ini export-ignore
+GVMRuntime_Samples/*/UGLBin/** export-ignore

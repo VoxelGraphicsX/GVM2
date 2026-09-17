@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgpu_textures_partialupdate","implementationLevel":"strict-pass","dslEntry":"Phase1WebgpuTexturesPartialUpdateSimpleRenderer","hostTarget":"Phase1WebgpuTexturesPartialUpdateSimple","scenePasses":["WebgpuTexturesPartialUpdateMainPass","WebgpuTexturesPartialUpdateComputePass"],"renderSetType":null}]}

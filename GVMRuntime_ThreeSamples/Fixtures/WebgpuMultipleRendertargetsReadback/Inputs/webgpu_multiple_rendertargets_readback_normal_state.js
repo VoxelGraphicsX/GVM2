@@ -1,0 +1,12 @@
+options.selection = 'normal';
+renderer.setAnimationLoop(null);
+await renderer.init();
+torus.rotation.y = 0.41333333333333333;
+renderer.setMRT(sceneMRT);
+renderer.setRenderTarget(readbackTarget);
+await renderer.renderAsync(scene, camera);
+renderer.setMRT(null);
+renderer.setRenderTarget(null);
+quadMesh.material = readbackMaterial;
+await readback();
+await quadMesh.renderAsync(renderer);

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_read_float_buffer",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglReadFloatBufferRenderer",
+      "hostTarget": "WebglReadFloatBuffer",
+      "scenePasses": [
+        "WebglReadFloatBufferScenePass"
+      ],
+      "screenPasses": [
+        "WebglReadFloatBufferScreenPass"
+      ],
+      "renderSetType": "WebglReadFloatBufferSceneRenderSet",
+      "reportPath": "build/three-r185-read-float-runs-v1/summary.json"
+    }
+  ]
+}

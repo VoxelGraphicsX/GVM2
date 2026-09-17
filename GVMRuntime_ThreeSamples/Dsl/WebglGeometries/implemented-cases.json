@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglGeometries",
+  "cases": [
+    {
+      "caseId": "webgl_geometries",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometriesRenderer",
+      "hostTarget": "WebglGeometries",
+      "scenePasses": [
+        "WebglGeometriesBackPass",
+        "WebglGeometriesFrontPass"
+      ],
+      "renderSetType": "WebglGeometriesSceneRenderSet",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgl_geometries/summary.json"
+    }
+  ]
+}

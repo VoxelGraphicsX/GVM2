@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_interactive_points",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglInteractivePoints",
+      "hostTarget": "WebglInteractivePoints",
+      "scenePasses": ["WebglInteractivePointsMainPass"],
+      "renderSetType": "WebglInteractivePointsSceneRenderSet",
+      "strictReport": "build/three-r185-interactive-points-strict/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "@GVM_SOURCE_DIR@/CMakeLists.txt",
+      "arguments": "-DGVM_BUILD_SAMPLES=ON -DGVM_BUILD_SAMPLE_DESKTOP_BINARIES=OFF -DGVM_OHOS_BUILD_TEST01_XCOMPONENT=ON -DGVM_BUILD_TESTS=OFF -DGVM_BUILD_TESTS_RENDER=OFF -DGVM_RHI_ENABLE_VULKAN=ON -DGVM_BUILD_UGLC=OFF -DGVM_UGLC_EXECUTABLE=@GVM_MOBILE_UGLC_EXECUTABLE@",
+      "cppFlags": "",
+      "abiFilters": [
+        "arm64-v8a"
+      ]
+    }
+  },
+  "targets": [
+    {
+      "name": "default"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_lightprobe_cubecamera",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLightprobeCubecameraRenderer",
+      "hostTarget": "WebglLightprobeCubecamera",
+      "scenePasses": ["WebglLightprobeCubecameraSceneMainPass"],
+      "screenPasses": ["WebglLightprobeCubecameraBackgroundPass"],
+      "renderSetType": "WebglLightprobeCubecameraSceneRenderSet",
+      "strictReport": "build/three-r185-wave4-lightprobe-cubecamera-gate-v3/cases/webgl_lightprobe_cubecamera/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "phase": "three-r185-phase1",
+  "policy": "No public DSL, RenderSet, or RHI capability may be added during phase 1.",
+  "unsupportedPublicCapabilities": [
+    "multisample_resolve",
+    "complete_stencil_operations_and_reference",
+    "dsl_texture_cube",
+    "dsl_texture_cube_array",
+    "automatic_mipmap_generation",
+    "front_facing_builtin",
+    "point_size_builtin",
+    "sample_mask_builtin",
+    "blend_constant",
+    "occlusion_query",
+    "new_shader_stage",
+    "render_set_filter",
+    "render_set_sort",
+    "render_set_reorder",
+    "render_set_per_entity_pipeline",
+    "new_render_set_component_type",
+    "new_rhi_descriptor_encoder_or_query_api"
+  ],
+  "allowedImplementationWork": [
+    "sample_private_dsl_shaders",
+    "sample_private_render_set_types_and_components",
+    "legacy_or_experimental_bug_fix_for_existing_semantics",
+    "metal_or_vulkan_bug_fix_for_existing_rhi_contract",
+    "tests_diagnostics_and_static_lint",
+    "existing_render_set_behavior_fix"
+  ],
+  "deferredReasonCodes": [
+    "deferred_missing_dsl_capability",
+    "deferred_missing_renderset_capability",
+    "deferred_missing_renderset_ordering",
+    "deferred_missing_rhi_capability",
+    "deferred_missing_native_line_rasterization",
+    "deferred_unsupported_quadrant"
+  ]
+}

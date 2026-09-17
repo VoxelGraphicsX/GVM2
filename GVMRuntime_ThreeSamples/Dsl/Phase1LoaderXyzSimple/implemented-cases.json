@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "shard": "Phase1LoaderXyzSimple",
+  "cases": [
+    {
+      "caseId": "webgl_loader_xyz",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LoaderXyzSimpleRenderer",
+      "hostTarget": "Phase1LoaderXyzSimple",
+      "scenePasses": ["WebglLoaderXyzPointPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-loader-xyz-formal-current-v2/summary.json",
+      "notes": "XYZ loader 201 点解析、三角 billboard 展开、透视尺寸衰减和固定两秒旋转均通过四象限三次稳定；canonical-loader semantic sidecar 已锁定资产哈希。"
+    }
+  ]
+}

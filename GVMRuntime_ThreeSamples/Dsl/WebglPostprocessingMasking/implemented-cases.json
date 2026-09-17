@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_masking",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingMaskingRenderer",
+      "hostTarget": "WebglPostprocessingMasking",
+      "scenePasses": [
+        "WebglPostprocessingMaskingScene1MaskPass",
+        "WebglPostprocessingMaskingScene2MaskPass"
+      ],
+      "renderSetType": "WebglPostprocessingMaskingScene1RenderSet",
+      "strictReport": "build/three-r185-wave4-webgl-postprocessing-masking-strict-v1/summary.json"
+    }
+  ]
+}

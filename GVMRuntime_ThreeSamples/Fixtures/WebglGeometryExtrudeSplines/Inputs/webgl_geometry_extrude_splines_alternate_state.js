@@ -1,0 +1,10 @@
+params.spline = 'TorusKnot';
+params.scale = 4;
+params.extrusionSegments = 100;
+params.radiusSegments = 3;
+params.closed = true;
+params.animationView = true;
+params.lookAhead = false;
+params.cameraHelper = false;
+addTube();
+animateCamera();

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_compute_particles","scenarioId":"pointer-hit","frame":61,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"pointer":[455,335],"particleSize":0.12,"gravity":-0.006,"bounce":0.72,"friction":0.97},"events":[{"type":"pointermove","frame":0,"x":455,"y":335}]}

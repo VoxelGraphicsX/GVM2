@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_gpgpu_water",
+  "scenarioId": "canonical-loader-snapshot",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "duck-glb-one-scene-one-node-one-draco-primitive-one-embedded-texture-hdr-1024x512",
+  "result": {
+    "canonicalSceneSha256": "c22f69cfe259aab38ec3f5dfa1c3c94f9dd0c4dc2c47bc49bde16df81dc5916a",
+    "decoderWasmSha256": "a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac",
+    "decoderWrapperSha256": "8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6",
+    "embeddedTextureCount": 1,
+    "indexCount": 12636,
+    "nodeCount": 1,
+    "primitiveCount": 1,
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "sourceAssetSha256": "76c62e63a0aec09cd66f2e2c9452a6dcee428f2464dd2c6d845958a8f7f7cdd1",
+    "textureSha256": "d9b75fd8dc15a4b46d5a1b1f9cd9a31a1844fce9cdb24a9de6e61f27d5170124",
+    "vertexCount": 2277
+  }
+}

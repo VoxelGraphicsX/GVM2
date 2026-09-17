@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_buffergeometry_selective_draw",
+  "scenarioId": "culled",
+  "frame": 61,
+  "target": "#hideLines",
+  "canonicalState": {
+    "hideLinesClickCount": 1
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 1, "y": 1 },
+    { "type": "pointerup", "frame": 0, "x": 1, "y": 1 }
+  ]
+}

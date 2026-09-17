@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_procedural",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1WebglPostprocessingProceduralRenderer",
+      "hostTarget": "Phase1WebglPostprocessingProcedural",
+      "scenePasses": [],
+      "screenPasses": [
+        "WebglPostprocessingProceduralCoordinatePass",
+        "WebglPostprocessingProceduralPass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-postprocessing-procedural-state-formal/summary.json",
+      "notes": "纯屏幕后处理不触发 RenderSet；补齐 1D/2D 噪声 GUI 状态脚本后，三种噪声输入状态通过 Legacy/Experimental × Metal/Vulkan 四象限、跨象限与三次稳定门禁。"
+    }
+  ]
+}

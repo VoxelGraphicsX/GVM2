@@ -1,0 +1,42 @@
+{
+  "versions": {
+    "20.1.7": {
+      "darwin": {
+        "x86_64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/LLVM-20.1.7-macOS-X64.tar.xz",
+          "strip_prefix": "LLVM-20.1.7-macOS-X64",
+          "sha256": "ccf82ffe7e136ee49659cb57157856a7963d0950fac3d05aabba0db75bfba26f"
+        },
+        "arm64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/LLVM-20.1.7-macOS-ARM64.tar.xz",
+          "strip_prefix": "LLVM-20.1.7-macOS-ARM64",
+          "sha256": "6aa75de00575ad0663183b00f00f39992ded611b5136e57649ace1e6a53c0d16"
+        }
+      },
+      "linux": {
+        "x86_64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/LLVM-20.1.7-Linux-X64.tar.xz",
+          "strip_prefix": "LLVM-20.1.7-Linux-X64",
+          "sha256": "8494c98a774051a40bfe1187a2d6442f4bc107598998bbe1673d9bb1572cfd6f"
+        },
+        "arm64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/LLVM-20.1.7-Linux-ARM64.tar.xz",
+          "strip_prefix": "LLVM-20.1.7-Linux-ARM64",
+          "sha256": "832f2802a29457dc758f56e26e98558c6cd0e45fcd07186f540cb6e7f4e59385"
+        }
+      },
+      "windows": {
+        "x86_64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/clang%2Bllvm-20.1.7-x86_64-pc-windows-msvc.tar.xz",
+          "strip_prefix": "clang+llvm-20.1.7-x86_64-pc-windows-msvc",
+          "sha256": "34a66bb4891584b32d32bbe5f129e345899b255593dab2c359b730b92e304b3e"
+        },
+        "arm64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.7/clang%2Bllvm-20.1.7-aarch64-pc-windows-msvc.tar.xz",
+          "strip_prefix": "clang+llvm-20.1.7-aarch64-pc-windows-msvc",
+          "sha256": "4fac201fc680a1a9b4a21cf0f3be522dc31951d39d709a62a2827347ecffc72e"
+        }
+      }
+    }
+  }
+}

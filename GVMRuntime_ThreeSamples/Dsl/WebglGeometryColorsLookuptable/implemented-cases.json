@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_colors_lookuptable",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryColorsLookuptableRenderer",
+      "hostTarget": "WebglGeometryColorsLookuptable",
+      "scenePasses": ["WebglGeometryColorsLookuptableMainPass"],
+      "screenPasses": ["WebglGeometryColorsLookuptableLegendComputePass", "WebglGeometryColorsLookuptableLegendPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-lookuptable-strict-v2/summary.json"
+    }
+  ]
+}

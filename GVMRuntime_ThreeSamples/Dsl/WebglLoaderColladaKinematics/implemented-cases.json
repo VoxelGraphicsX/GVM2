@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_collada_kinematics",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderColladaKinematicsRenderer",
+      "hostTarget": "WebglLoaderColladaKinematics",
+      "scenePasses": [
+        "WebglLoaderColladaKinematicsRobotMainPass",
+        "WebglLoaderColladaKinematicsGridLinesPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderColladaKinematicsSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/wave5-formal-webgl-loader-collada-kinematics/summary.json",
+      "notes": "The locked ABB IRB52 DAE hierarchy, articulated joint replay, seven robot entities, expanded grid geometry, and both geometry passes reuse one dedicated Scene RenderSet. Three scenarios pass Legacy and Experimental on Metal and Vulkan for three stable single-sample repetitions."
+    }
+  ]
+}

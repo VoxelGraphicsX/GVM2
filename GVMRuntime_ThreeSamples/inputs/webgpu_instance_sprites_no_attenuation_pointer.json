@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_instance_sprites",
+  "scenarioId": "no-attenuation-pointer",
+  "frame": 61,
+  "target": "body",
+  "canonicalState": {
+    "sizeAttenuation": false,
+    "pointer": [650, 100]
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 650,
+      "y": 100,
+      "pointerId": 1,
+      "button": -1,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

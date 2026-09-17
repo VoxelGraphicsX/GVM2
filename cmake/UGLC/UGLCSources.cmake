@@ -1,0 +1,74 @@
+set(UGLC_CODEGEN_SOURCES
+    CodeGen/ASTMethodLookup.cpp
+    CodeGen/BaseAttributeEmitter.cpp
+    CodeGen/BaseASTVisitor.cpp
+    CodeGen/BaseDeclQuery.cpp
+    CodeGen/BaseExpressionTranslator.cpp
+    CodeGen/BaseShaderBindingResolver.cpp
+    CodeGen/BaseStatementTranslator.cpp
+    CodeGen/BaseTemplateArgumentEvaluator.cpp
+    CodeGen/BaseTypeNameEmitter.cpp
+    CodeGen/CodeWriter.cpp
+    CodeGen/DSLReservedIdentifierValidator.cpp
+    CodeGen/RenderSetLayoutInfo.cpp
+    CodeGen/PixelLocalFieldAnalysis.cpp
+    CodeGen/PixelLocalInputPlan.cpp
+    CodeGen/ShaderBackendRegistry.cpp
+    CodeGen/ShaderBufferLayoutValidator.cpp
+    CodeGen/ShaderCompilerRegistry.cpp
+    CodeGen/ShaderDeclarationEmissionPlanner.cpp
+    CodeGen/ShaderReferenceVisitor.cpp
+    CodeGen/SpaceManager.cpp
+    CodeGen/CPP/CPPBindGroupTypeConvertor.cpp
+    CodeGen/CPP/CPPFunctionConvertor.cpp
+    CodeGen/CPP/CPPHostClassValidator.cpp
+    CodeGen/CPP/CPPHostShaderOnlyGuard.cpp
+    CodeGen/CPP/CPPPixelLocalAnalysis.cpp
+    CodeGen/CPP/CPPRendererEmitter.cpp
+    CodeGen/CPP/CPPShaderArtifactEmitter.cpp
+    CodeGen/CPP/CPPStaticShaderVariantCollector.cpp
+    CodeGen/CPP/CPPTypeConvertor.cpp
+    CodeGen/CPP/CPPVertexFormatTypeConvertor.cpp
+    CodeGen/CPP/CPPVisitor.cpp
+    CodeGen/HLSLEmitter/UGLIRToHLSLEmitter.cpp
+    CodeGen/MSLEmitter/UGLIRToMSLEmitter.cpp
+    CodeGen/SPIRVEmitter/SPIRVInstructionBuilder.cpp
+    CodeGen/SPIRVEmitter/SPIRVModuleBuilder.cpp
+    CodeGen/SPIRVEmitter/SPIRVPreflight.cpp
+    CodeGen/SPIRVEmitter/SPIRVTypeSystem.cpp
+    CodeGen/SPIRVEmitter/SPIRVValidation.cpp
+    CodeGen/SPIRVEmitter/UGLIRToSPIRVEmitter.cpp
+    CodeGen/ShaderEmitter/UGLIRShaderBinaryEmitter.cpp
+    CodeGen/ShaderEmitter/PreparedShaderTranslationUnit.cpp
+    CodeGen/ShaderEmitter/UGLIRShaderModuleProvider.cpp
+    CodeGen/ShaderEmitter/UGLIRShaderSourceEmitter.cpp
+    CodeGen/UGLIR/UGLIRDump.cpp
+    CodeGen/UGLIR/UGLIRLowering.cpp
+    CodeGen/UGLIR/UGLIRNameUtils.cpp
+    CodeGen/UGLIR/UGLIRResourceUsage.cpp
+    CodeGen/UGLIR/UGLIRSourceVerifier.cpp
+    CodeGen/UGLIR/UGLIRTypeUtils.cpp
+    CodeGen/UGLIR/UGLIRVerifier.cpp
+    CodeGen/HLSL/HLSLTextureTypes.cpp
+)
+
+if(UGLC_ENABLE_LEGACY)
+    list(APPEND UGLC_CODEGEN_SOURCES
+        CodeGen/Legacy/HLSL/DxcShaderBinaryCompiler.cpp
+        CodeGen/Legacy/HLSL/HLSLAggregateInitializerEmitter.cpp
+        CodeGen/Legacy/HLSL/HLSLRecordEmitter.cpp
+        CodeGen/Legacy/HLSL/HLSLRenderInterfaceValidator.cpp
+        CodeGen/Legacy/HLSL/HLSLRenderSetEmitter.cpp
+        CodeGen/Legacy/HLSL/HLSLResourceBindingEmitter.cpp
+        CodeGen/Legacy/HLSL/HLSLShaderBuiltinTranslator.cpp
+        CodeGen/Legacy/HLSL/HLSLTextureMemberCallLowering.cpp
+        CodeGen/Legacy/HLSL/HLSLTypeConvertor.cpp
+        CodeGen/Legacy/HLSL/HLSLVisitor.cpp
+        CodeGen/Legacy/HLSL/HLSLVisitorLocalStorage.cpp
+        CodeGen/Legacy/MSL/MSLAttributeConvertor.cpp
+        CodeGen/Legacy/MSL/MSLShaderBuiltinTranslator.cpp
+        CodeGen/Legacy/MSL/MSLTypeConvertor.cpp
+        CodeGen/Legacy/MSL/MSLVisitor.cpp
+        CodeGen/Legacy/MSL/MSLWaveBuiltinAnalyzer.cpp
+    )
+endif()

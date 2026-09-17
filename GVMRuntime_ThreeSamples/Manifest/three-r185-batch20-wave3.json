@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "batchId": "three-r185-batch20-wave3",
+  "minimumCaseCount": 20,
+  "minimumNetNewCaseCount": 20,
+  "baselineStrictCaseCount": 77,
+  "baselineStrictCaseIdsPath": "Manifest/three-r185-strict-baseline-77.json",
+  "baselineStrictCaseIdsSha256": "2333311c6d1da7fdae29203ec9ffc147d1f81d160902c568dacb8f05e7cfb0c7",
+  "publicationMode": "atomic",
+  "upstreamMsaaPolicy": {
+    "mode": "single-sample-rendering",
+    "excludeExamples": false,
+    "simulateMsaa": false,
+    "requireMsaaParity": false,
+    "description": "Upstream MSAA requests remain in scope, but GVM uses one ordinary sample without MSAA emulation or supersampling."
+  },
+  "cases": [
+    {"caseId": "webgl_buffergeometry_custom_attributes_particles", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-particles-strict-standard/summary.json"},
+    {"caseId": "webgl_geometry_terrain_raycast", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-terrain-raycast-strict-v3/summary.json"},
+    {"caseId": "webgl_geometry_nurbs", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-nurbs-strict-v2/summary.json"},
+    {"caseId": "webgl_modifier_edgesplit", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-edgesplit-strict-v2/summary.json"},
+    {"caseId": "webgl_loader_texture_exr", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-exr-strict-v4/summary.json"},
+    {"caseId": "webgl_materials_matcap", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-matcap-strict-v2/summary.json"},
+    {"caseId": "webgl_materials_normalmap_object_space", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-normalmap-object-space-strict-v3/summary.json"},
+    {"caseId": "webgl_morphtargets_horse", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-horse-strict-v2/summary.json"},
+    {"caseId": "webgpu_compute_reduce", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-compute-reduce-strict-v1/summary.json"},
+    {"caseId": "webgpu_tsl_raging_sea", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-raging-sea-strict-v3/summary.json"},
+    {"caseId": "webgl_geometry_colors_lookuptable", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-lookuptable-strict-v2/summary.json"},
+    {"caseId": "webgl_materials_bumpmap", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-bumpmap-strict-v2/summary.json"},
+    {"caseId": "webgpu_materials_displacementmap", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-displacement-strict-v3/summary.json"},
+    {"caseId": "webgpu_materials_envmaps", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-webgpu-envmaps-strict-v3/summary.json"},
+    {"caseId": "webgpu_multiple_rendertargets_readback", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-mrt-readback-probe5/summary.json"},
+    {"caseId": "webgl_materials_normalmap", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-normalmap-strict-v3/summary.json"},
+    {"caseId": "webgl_shader_lava", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-lava-strict-v1/summary.json"},
+    {"caseId": "misc_animation_keys", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-misc-animation-keys-strict/summary.json"},
+    {"caseId": "webgl_buffergeometry_lines_indexed", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-lines-indexed-strict-v2/summary.json"},
+    {"caseId": "misc_uv_tests", "implementationLevel": "strict-pass", "reportPath": "build/three-r185-wave3-formal-misc-v4/summary.json"}
+  ],
+  "attemptedButNotPromoted": [
+    {"caseId": "webgl_geometry_extrude_splines", "implementationLevel": "semantic-complete", "reason": "Strict image comparison remains above the fixed abnormal-pixel threshold."},
+    {"caseId": "webgpu_materials_transmission", "implementationLevel": "semantic-complete", "reason": "Physical transmission image comparison has not reached the fixed strict thresholds."},
+    {"caseId": "webgpu_parallax_uv", "implementationLevel": "scaffolded", "reason": "The implementation has not reached example-specific semantic completeness."},
+    {"caseId": "webgl_interactive_points", "implementationLevel": "semantic-complete", "reason": "Texture mip and point-raster edge parity remains above the fixed abnormal-pixel threshold."}
+  ],
+  "replacementQueue": [
+    "webgl_camera",
+    "webgl_effects_ascii",
+    "webgl_geometry_terrain_raycast",
+    "webgl_interactive_buffergeometry",
+    "webgl_interactive_cubes_gpu",
+    "webgl_interactive_points",
+    "webgl_points_sprites",
+    "webgl_shadowmap_viewer"
+  ]
+}

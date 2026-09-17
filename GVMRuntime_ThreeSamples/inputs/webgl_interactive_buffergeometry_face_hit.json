@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_interactive_buffergeometry",
+  "scenarioId": "face-hit",
+  "frame": 61,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pointerX": 400,
+    "pointerY": 250,
+    "selectedObject": "raycaster-first-intersected-triangle"
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 400,
+      "y": 250
+    }
+  ]
+}

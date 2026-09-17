@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_instance_mesh","scenarioId":"reduced-count","frame":61,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"instanceCount":125},"events":[{"type":"pointermove","frame":0,"x":400,"y":250}]}

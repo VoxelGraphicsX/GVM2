@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_obj",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderObj",
+      "hostTarget": "WebglLoaderObj",
+      "scenePasses": [
+        "WebglLoaderObjScenePass"
+      ],
+      "renderSetType": "WebglLoaderObjSceneRenderSet",
+      "strictReport": "build/three-r185-loader-obj-strict-v2/summary.json",
+      "notes": "已完成 r185 male02.obj/male02.mtl 的真实加载：14 个 group 非索引三角展开、15012 个展开顶点、5 个 Phong 材质、3 个 JPEG 漫反射纹理和显式 sRGB mip 链。由于 GVM clip-space Y 反转，导入阶段确定性反转 OBJ 三角绕序以保持 Back-face culling 与 Three 的可见面一致；DSL 使用 RenderSet entity/instance builtin、纹理组件和 ambient+point Lambert（diffuse/π）。四象限 3 场景×4 管线后端×3 重复共 36 次执行、96 次 oracle/稳定/跨象限比较全部通过；单采样，无 MSAA 模拟。OBJ SHA-256=6e521dceb9cf5b0d9b375c607364f23c7a9db7d56a135f2a74c2da698b7671b3，MTL SHA-256=a1d2f6df681197208221b74e6c32d74207a38fb84119ed55452998ed24b0e8ce。"
+    }
+  ]
+}

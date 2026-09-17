@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_camera",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuCameraRenderer",
+      "hostTarget": "WebgpuCamera",
+      "scenePasses": [
+        "WebgpuCameraActiveCameraPass",
+        "WebgpuCameraActiveLinePass",
+        "WebgpuCameraActivePointPass",
+        "WebgpuCameraObserverCameraPass",
+        "WebgpuCameraObserverLinePass",
+        "WebgpuCameraObserverPointPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebgpuCameraSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave6-gvm/webgpu_camera/formal-v1/summary.json",
+      "notes": "The six hierarchy renderables, exact 212-value reference random prefix, perspective and orthographic cameras, helper lines, native-point-equivalent triangle expansion, and two half-frame submissions reuse one Scene RenderSet. Three scenarios pass Legacy and Experimental on Metal and Vulkan for three stable single-sample repetitions."
+    }
+  ]
+}

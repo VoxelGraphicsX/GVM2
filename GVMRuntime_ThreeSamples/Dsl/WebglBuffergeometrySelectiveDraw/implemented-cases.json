@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_selective_draw",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometrySelectiveDrawRenderer",
+      "hostTarget": "WebglBuffergeometrySelectiveDraw",
+      "scenePasses": ["WebglBuffergeometrySelectiveDrawMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "reportPath": "build/three-r185-native-line-formal-final/summary.json",
+      "notes": "Three.js r185 选择性 LineSegments 的全可见、动画、随机隐藏三场景均通过四象限、三次稳定、跨管线/跨后端比较；单采样渲染，不使用或模拟 MSAA。"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_interactive_raycasting_points",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglInteractiveRaycastingPoints",
+      "hostTarget": "WebglInteractiveRaycastingPoints",
+      "scenePasses": [
+        "WebglInteractiveRaycastingPointsScenePass"
+      ],
+      "renderSetType": "WebglInteractiveRaycastingPointsSceneRenderSet",
+      "reportPath": "build/three-r185-current-probes/webgl-interactive-raycasting-points-first/summary.json",
+      "notes": "已有专属 43 entity 单 RenderSet 与点 billboard／轨迹球结构，但 2026-08-17 的真实 oracle 复验表明 initial 场景异常像素比例约 23.906%、MAE 11.60、P99 160、SSIM 0.7569，运行时快照也缺少 sceneRoots；animated 与 point-trail 场景因当前 Host 场景契约不匹配直接退出。现有实现尚未覆盖上游核心随机流、相机动画、Raycaster 命中和动态轨迹语义，按统一口径降为 scaffolded，不计语义完成或严格通过。"
+    }
+  ]
+}

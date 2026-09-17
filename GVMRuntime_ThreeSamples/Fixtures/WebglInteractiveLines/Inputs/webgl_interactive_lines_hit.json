@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_interactive_lines",
+  "scenarioId": "line-hit",
+  "frame": 61,
+  "target": "body > div:nth-of-type(1) > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pointerX": 158,
+    "pointerY": 50
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 158,
+      "y": 50,
+      "pointerId": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

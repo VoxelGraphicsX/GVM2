@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_materials_envmaps",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMaterialsEnvmapsRenderer",
+      "hostTarget": "WebgpuMaterialsEnvmaps",
+      "scenePasses": ["WebgpuMaterialsEnvmapsMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-webgpu-envmaps-strict-v3/summary.json",
+      "notes": "桥接立方体、等距柱状反射/折射、背景和旋转同步场景已通过四象限三次稳定门禁。"
+    }
+  ]
+}

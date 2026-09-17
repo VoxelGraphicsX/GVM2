@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_matcap",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsMatcapRenderer",
+      "hostTarget": "WebglMaterialsMatcap",
+      "scenePasses": ["WebglMaterialsMatcapMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-wave3-matcap-strict-v2/summary.json",
+      "notes": "Dedicated Lee Perry Smith GLB, libjpeg-exact tangent normal decoding, EXR and dropped sRGB matcaps with explicit mip chains, GUI color/exposure state, ACES tone mapping, and ordinary single-sample rendering; all three scenarios passed the four-quadrant three-repeat strict gate."
+    }
+  ]
+}

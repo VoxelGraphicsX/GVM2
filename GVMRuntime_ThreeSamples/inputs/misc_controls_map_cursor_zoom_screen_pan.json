@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "caseId": "misc_controls_map",
+  "scenarioId": "cursor-zoom-screen-pan",
+  "frame": 30,
+  "target": "canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "zoomToCursor": true,
+    "screenSpacePanning": true
+  },
+  "events": [
+    { "type": "click", "frame": 0, "target": ".lil-gui .controller:nth-child(1) input[type=\"checkbox\"]", "x": 6, "y": 6 },
+    { "type": "click", "frame": 0, "target": ".lil-gui .controller:nth-child(2) input[type=\"checkbox\"]", "x": 6, "y": 6 },
+    { "type": "wheel", "frame": 1, "x": 600, "y": 220, "deltaY": -120, "deltaMode": 0 },
+    { "type": "pointerdown", "frame": 2, "x": 420, "y": 260, "pointerId": 1, "button": 0 },
+    { "type": "pointermove", "frame": 3, "x": 370, "y": 300, "pointerId": 1, "button": 0 },
+    { "type": "pointerup", "frame": 4, "x": 370, "y": 300, "pointerId": 1, "button": 0 }
+  ]
+}

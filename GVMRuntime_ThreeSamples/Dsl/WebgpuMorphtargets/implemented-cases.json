@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgpu_morphtargets","implementationLevel":"strict-pass","dslEntry":"WebgpuMorphtargetsRenderer","hostTarget":"WebgpuMorphtargets","scenePasses":["WebgpuMorphtargetsMainPass"],"renderSetType":"WebgpuMorphtargetsSceneRenderSet"}]}

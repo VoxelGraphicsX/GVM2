@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_custom_attributes_points3",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglCustomAttributesPoints3Renderer",
+      "hostTarget": "WebglCustomAttributesPoints3",
+      "scenePasses": ["WebglCustomAttributesPoints3MainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-repair-case-reports/webgl_custom_attributes_points3/summary.json",
+      "notes": "ball.png 资产锁定后，初始和一秒 billboard/fog 场景四象限三次稳定通过。"
+    }
+  ]
+}

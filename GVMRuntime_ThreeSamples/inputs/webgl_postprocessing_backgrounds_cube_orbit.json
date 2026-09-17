@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_backgrounds",
+  "scenarioId": "cube-main-orbit",
+  "frame": 2,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": { "pointerDrag": [22, 0], "texturePass": false, "cubeTexturePassOpacity": 0.7, "renderPass": true },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250, "button": 0 },
+    { "type": "pointermove", "frame": 0, "x": 422, "y": 250, "buttons": 1 },
+    { "type": "pointerup", "frame": 1, "x": 422, "y": 250, "button": 0 }
+  ]
+}

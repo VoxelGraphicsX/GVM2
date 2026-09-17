@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuMultipleCanvas",
+  "cases": [
+    {
+      "caseId": "webgpu_multiple_canvas",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuMultipleCanvasRenderer",
+      "hostTarget": "WebgpuMultipleCanvasRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuMultipleCanvasScene1Pass",
+        "WebgpuMultipleCanvasScene2Pass",
+        "WebgpuMultipleCanvasScene3Pass",
+        "WebgpuMultipleCanvasScene4Pass",
+        "WebgpuMultipleCanvasScene5Pass",
+        "WebgpuMultipleCanvasScene6Pass",
+        "WebgpuMultipleCanvasScene7Pass",
+        "WebgpuMultipleCanvasScene8Pass",
+        "WebgpuMultipleCanvasScene9Pass",
+        "WebgpuMultipleCanvasScene10Pass",
+        "WebgpuMultipleCanvasScene11Pass",
+        "WebgpuMultipleCanvasScene12Pass",
+        "WebgpuMultipleCanvasScene13Pass",
+        "WebgpuMultipleCanvasScene14Pass",
+        "WebgpuMultipleCanvasScene15Pass",
+        "WebgpuMultipleCanvasScene16Pass",
+        "WebgpuMultipleCanvasScene17Pass",
+        "WebgpuMultipleCanvasScene18Pass",
+        "WebgpuMultipleCanvasScene19Pass",
+        "WebgpuMultipleCanvasScene20Pass",
+        "WebgpuMultipleCanvasScene21Pass",
+        "WebgpuMultipleCanvasScene22Pass",
+        "WebgpuMultipleCanvasScene23Pass",
+        "WebgpuMultipleCanvasScene24Pass",
+        "WebgpuMultipleCanvasScene25Pass",
+        "WebgpuMultipleCanvasScene26Pass",
+        "WebgpuMultipleCanvasScene27Pass",
+        "WebgpuMultipleCanvasScene28Pass",
+        "WebgpuMultipleCanvasScene29Pass",
+        "WebgpuMultipleCanvasScene30Pass",
+        "WebgpuMultipleCanvasScene31Pass",
+        "WebgpuMultipleCanvasScene32Pass",
+        "WebgpuMultipleCanvasScene33Pass",
+        "WebgpuMultipleCanvasScene34Pass",
+        "WebgpuMultipleCanvasScene35Pass",
+        "WebgpuMultipleCanvasScene36Pass",
+        "WebgpuMultipleCanvasScene37Pass",
+        "WebgpuMultipleCanvasScene38Pass",
+        "WebgpuMultipleCanvasScene39Pass",
+        "WebgpuMultipleCanvasScene40Pass"
+      ],
+      "renderSetType": "WebgpuMultipleCanvasGroupedSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/three-r185-reports/webgpu-multiple-canvas-strict-v2/summary.json",
+      "notes": "已按独立 DOM/canvas Scene 保持 40 个专属 RenderSet 与 40 个场景 RenderClass；2026-08-11 已对齐 Box、Sphere(12×8)、r185 DodecahedronGeometry 和 Cylinder(12) 四类 CPU 几何、HSL/SRGB 颜色、HemisphereLight+DirectionalLight 漫反射、3 列 DOM 间距与 200×200 画布背景，并接入首画布 Orbit 固定输入。两场景共 24 条四象限三次 oracle 记录、16 条同象限稳定性比较和 24 条跨象限比较全部通过；capture metadata 已统一声明单采样且不启用/模拟 MSAA，RenderSet policy、生成产物 ABI、GPU 边界和单采样 lint 通过。Wave11 原子批次已通过，正式汇总证据为 build/three-r185-wave11-atomic/summary.json。",
+      "formalEvidence": "build/three-r185-wave8-custom-override/three-r185-reports/webgpu-multiple-canvas-strict-v2/summary.json",
+      "screenPasses": [
+        "multi-canvas-layout-composite"
+      ]
+    }
+  ]
+}
