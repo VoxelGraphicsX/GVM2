@@ -1,0 +1,36 @@
+{
+  "app": {
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "compileSdkVersion": @GVM_OHOS_HOST_SDK_VERSION@,
+        "compatibleSdkVersion": @GVM_OHOS_HOST_SDK_VERSION@,
+        "targetSdkVersion": @GVM_OHOS_HOST_SDK_VERSION@,
+        "runtimeOS": "OpenHarmony"
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_textures_anisotropy","scenarioId":"grazing-pointer-view","frame":1,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"mouseX":200,"mouseY":110},"events":[{"type":"pointermove","frame":0,"x":600,"y":360}]}

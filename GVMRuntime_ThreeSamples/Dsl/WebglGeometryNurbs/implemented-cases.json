@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglGeometryNurbs",
+  "cases": [
+    {
+      "caseId": "webgl_geometry_nurbs",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryNurbsRenderer",
+      "hostTarget": "WebglGeometryNurbs",
+      "scenePasses": [
+        "WebglGeometryNurbsOpaquePass",
+        "WebglGeometryNurbsTransparentControlLinePass"
+      ],
+      "renderSetType": "WebglGeometryNurbsSceneRenderSet",
+      "reportPath": "build/three-r185-current-wave8-r3-20260829/cases/webgl_geometry_nurbs/summary.json"
+    }
+  ]
+}

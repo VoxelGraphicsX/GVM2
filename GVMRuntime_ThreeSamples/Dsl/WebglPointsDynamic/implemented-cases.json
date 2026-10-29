@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_points_dynamic",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglPointsDynamic",
+      "hostTarget": "WebglPointsDynamic",
+      "scenePasses": [
+        "WebglPointsDynamicMainPass"
+      ],
+      "renderSetType": "WebglPointsDynamicSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/points-dynamic-oracle/summary.json",
+      "notes": "已接入锁定的 male02.obj 与 female02.obj，按上游 72 个克隆实体加一组 65×65 地面点场展开为三角形 billboard；相机、透视尺寸衰减、雾、sRGB 材质、动态旋转与 frame=360 collapse 均由专属 DSL/RenderSet 实现。2026-08-17 已锁定 initial、loader-snapshot、animated-collapse 三个正式 oracle，并补齐 loader semantic sidecar；initial/loader-snapshot 四象限单轮异常像素比例 0.01096、MAE 2.011、P99 24、SSIM 0.96909，animated-collapse 异常像素比例 0.21844、MAE 17.586、P99 234、SSIM 0.60676，仍未达到统一门禁，保持 semantic-complete。2026-08-18 复核动画步进，补齐与 r185 相同的 delta 上限 2.0；2026-08-25 将中间帧改为只推进 CPU 状态、目标帧提交 RenderSet 动态顶点，避免 360 帧重复上传导致 watchdog，最终单轮 initial/loader-snapshot 约 0.00989、MAE 2.307、P99 24、SSIM 0.96826，animated-collapse 约 0.01014、P99 21、SSIM 0.96991；动画状态已收敛但统一门禁仍未通过。"
+    }
+  ]
+}

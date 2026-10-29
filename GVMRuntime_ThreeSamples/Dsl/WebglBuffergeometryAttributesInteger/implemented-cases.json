@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_attributes_integer",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryAttributesIntegerRenderer",
+      "hostTarget": "WebglBuffergeometryAttributesInteger",
+      "scenePasses": [
+        "WebglBuffergeometryAttributesIntegerMainPass"
+      ],
+      "screenPasses": [
+        "WebglBuffergeometryAttributesIntegerResolvePass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-dual-smoke/webgl-buffergeometry-attributes-integer-stability-3/summary.json",
+      "notes": "单对象整数顶点属性用例；Legacy/Experimental ABI、oracle、稳定性和跨象限比较均已通过。"
+    }
+  ]
+}

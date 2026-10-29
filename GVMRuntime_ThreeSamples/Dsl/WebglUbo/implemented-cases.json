@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_ubo",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglUboRenderer",
+      "hostTarget": "WebglUbo",
+      "scenePasses": ["WebglUboScenePass"],
+      "renderSetType": "WebglUboSceneRenderSet",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_ubo/formal-v2/summary.json",
+      "notes": "Dedicated 200-entity Set-only UBO implementation. Strict evidence remains atomically unpublished until all 20 active batch cases pass."
+    }
+  ]
+}

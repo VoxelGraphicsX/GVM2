@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_custom_attributes",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglCustomAttributesRenderer",
+      "hostTarget": "WebglCustomAttributes",
+      "scenePasses": ["WebglCustomAttributesMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_custom_attributes/summary.json",
+      "notes": "单对象自定义 position/color attribute 与固定步长动画通过四象限门禁。"
+    }
+  ]
+}

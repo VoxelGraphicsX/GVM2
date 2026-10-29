@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_teapot",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryTeapotRenderer",
+      "hostTarget": "WebglGeometryTeapot",
+      "scenePasses": [
+        "WebglGeometryTeapotTeapotPass"
+      ],
+      "screenPasses": [
+        "WebglGeometryTeapotCubeBackgroundPass"
+      ],
+      "renderSetType": "WebglGeometryTeapotSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgl_geometry_teapot/summary.json",
+      "notes": [
+        "The logical Scene owns one RenderSet with one level-15 CPU-tessellated teapot entity and one instance.",
+        "Six pinned Pisa PNG faces and explicit sRGB mip levels live in the Scene TextureComponent; reflection and background sampling remain private DSL GPU work.",
+        "Cube-projected gradients select the same reflection mip response as Three r185 without adding TextureCube, automatic mipmap, or MSAA capabilities.",
+        "Both initial glossy and reflective GUI states pass Legacy/Experimental on Metal/Vulkan for three byte-stable single-sample repetitions."
+      ]
+    }
+  ]
+}

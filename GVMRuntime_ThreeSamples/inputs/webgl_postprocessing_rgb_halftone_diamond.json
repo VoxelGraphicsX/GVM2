@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_rgb_halftone",
+  "scenarioId": "diamond-multiply",
+  "frame": 121,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "shape": "diamond",
+    "scatter": 0.35,
+    "blending": 0.65,
+    "blendingMode": "multiply",
+    "greyscale": true
+  },
+  "events": [
+    { "type": "change", "frame": 0, "target": ".lil-gui .controller:nth-child(1) select", "value": "5" },
+    { "type": "input", "frame": 0, "target": ".lil-gui .controller:nth-child(6) input", "value": "0.35" },
+    { "type": "click", "frame": 0, "target": ".lil-gui .controller:nth-child(7) input[type=checkbox]", "x": 6, "y": 6 },
+    { "type": "input", "frame": 0, "target": ".lil-gui .controller:nth-child(8) input", "value": "0.65" },
+    { "type": "change", "frame": 0, "target": ".lil-gui .controller:nth-child(9) select", "value": "2" }
+  ]
+}

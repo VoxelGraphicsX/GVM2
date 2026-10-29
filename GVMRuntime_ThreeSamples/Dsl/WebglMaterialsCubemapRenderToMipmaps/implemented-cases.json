@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_cubemap_render_to_mipmaps",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglMaterialsCubemapRenderToMipmaps",
+      "hostTarget": "WebglMaterialsCubemapRenderToMipmaps",
+      "scenePasses": [
+        "WebglMaterialsCubemapRenderToMipmapsScenePass"
+      ],
+      "renderSetType": "WebglMaterialsCubemapRenderToMipmapsSceneRenderSet",
+      "implementationNotes": "Dedicated single-scene Set host now allocates the two original/rendered-mipmap entities and records the orbit replay; face rendering, filtering, and r185 oracle comparison remain pending."
+    }
+  ]
+}

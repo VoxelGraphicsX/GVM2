@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_collada",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderColladaRenderer",
+      "hostTarget": "WebglLoaderCollada",
+      "scenePasses": [
+        "WebglLoaderColladaMainPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderColladaSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/wave5-formal-webgl-loader-collada/summary.json",
+      "notes": "The locked elf.dae hierarchy, indexed mesh, four material textures, loader snapshot, root animation, and all Scene geometry are expressed by one dedicated RenderSet. Three scenarios pass Legacy and Experimental on Metal and Vulkan for three stable single-sample repetitions."
+    }
+  ]
+}

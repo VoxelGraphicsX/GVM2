@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_mdd",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LoaderMddRenderSet",
+      "hostTarget": "Phase1LoaderMddRenderSet",
+      "scenePasses": ["WebglLoaderMddNormalMorphPass"],
+      "renderSetType": "WebglLoaderMddSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-mdd-strict-final/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_points_waves",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPointsWavesRenderer",
+      "hostTarget": "WebglPointsWaves",
+      "scenePasses": ["WebglPointsWavesMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-webgl-points-waves-reports/summary.json",
+      "notes": "50x50 波面、固定帧和相机输入回放均使用普通单采样绘制，四象限三次稳定门禁通过。"
+    }
+  ]
+}

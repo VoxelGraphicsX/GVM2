@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "misc_animation_keys",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "MiscAnimationKeysRenderer",
+      "hostTarget": "MiscAnimationKeys",
+      "scenePasses": [
+        "MiscAnimationKeysAxesPass",
+        "MiscAnimationKeysBoxPass"
+      ],
+      "renderSetType": "MiscAnimationKeysSceneRenderSet",
+      "reportPath": "build/three-r185-wave3-misc-animation-keys-strict/summary.json"
+    }
+  ]
+}

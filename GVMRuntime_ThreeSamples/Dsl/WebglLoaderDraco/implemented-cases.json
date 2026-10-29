@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglLoaderDraco",
+  "cases": [
+    {
+      "caseId": "webgl_loader_draco",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderDracoRenderer",
+      "hostTarget": "WebglLoaderDraco",
+      "scenePasses": [
+        "WebglLoaderDracoShadowPass",
+        "WebglLoaderDracoMainPass"
+      ],
+      "renderSetType": "WebglLoaderDracoSceneRenderSet",
+      "strictReport": "build/three-r185-wave5-reports/webgl_loader_draco-strict/summary.json"
+    }
+  ]
+}

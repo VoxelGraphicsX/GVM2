@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_postprocessing_pixel",
+  "scenarioId": "strong-edges",
+  "frame": 121,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pixelSize": 10,
+    "normalEdgeStrength": 1.2,
+    "depthEdgeStrength": 0.8,
+    "pixelAlignedPanning": true
+  },
+  "events": [
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(1) input[type=range]",
+      "value": "10"
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(2) input[type=range]",
+      "value": "1.2"
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(3) input[type=range]",
+      "value": "0.8"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_lod",
+  "scenarioId": "fly-controls",
+  "frame": 120,
+  "target": "canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "movementSpeed": 1000,
+    "rollSpeed": 0.3141592653589793,
+    "keysHeld": ["KeyW", "KeyQ"],
+    "cameraPosition": [0, 0, -1000],
+    "rollRadians": 0.6283185307179586
+  },
+  "events": [
+    { "type": "keydown", "frame": 0, "key": "w", "code": "KeyW" },
+    { "type": "keydown", "frame": 0, "key": "q", "code": "KeyQ" },
+    { "type": "keyup", "frame": 120, "key": "w", "code": "KeyW" },
+    { "type": "keyup", "frame": 120, "key": "q", "code": "KeyQ" }
+  ]
+}

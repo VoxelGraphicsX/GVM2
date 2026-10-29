@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_depth_texture",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuDepthTexture",
+      "hostTarget": "WebgpuDepthTexture",
+      "scenePasses": [
+        "WebgpuDepthTextureScenePass",
+        "WebgpuDepthTextureScreenPass"
+      ],
+      "renderSetType": "WebgpuDepthTextureSceneRenderSet",
+      "reportPath": "build/three-r185-depth-orbit-formal-v5/summary.json",
+      "notes": "已实现 r185 TorusKnotGeometry（128×64）、50 个实体单 RenderSet、Depth32Float attachment 与独立全屏深度采样 pass；initial 与 orbit 输入回放均已完成 Legacy/Experimental × Metal/Vulkan 三次稳定、正式 Three oracle、跨象限比较和单采样策略门禁。"
+    }
+  ]
+}

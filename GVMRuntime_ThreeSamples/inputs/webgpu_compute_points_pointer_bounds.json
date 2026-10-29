@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgpu_compute_points","scenarioId":"pointer-bounds","frame":61,"target":"canvas:not([class])","canvasWidth":800,"canvasHeight":500,"canonicalState":{"pointer":[505,185],"xScale":0.85,"yScale":0.62,"reset":true},"events":[{"type":"mousemove","frame":0,"x":505,"y":185}]}

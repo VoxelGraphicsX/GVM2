@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglLoaderBvh",
+  "cases": [
+    {
+      "caseId": "webgl_loader_bvh",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderBvhRenderer",
+      "hostTarget": "WebglLoaderBvh",
+      "scenePasses": ["WebglLoaderBvhMainPass"],
+      "renderSetType": "WebglLoaderBvhSceneRenderSet",
+      "reportPath": "build/formal-loader-bvh-20260827c/summary.json",
+      "notes": "已接入锁定 pirouette.bvh，解析并校验 57 个骨骼节点、592 帧和 86 条动画轨道；C++ 只负责 BVHLoader 同序求值、GridHelper/SkeletonHelper 线段数据和输入相机，DSL 通过单 Scene RenderSet 的三角形线段展开输出。Legacy/Experimental × Metal/Vulkan 四象限、canonical loader 语义快照、三次稳定、跨象限比较和生成产物 lint 均已通过；普通单采样绘制，不启用或模拟 MSAA。"
+    }
+  ]
+}

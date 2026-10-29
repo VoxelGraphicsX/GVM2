@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_rtt",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuRttRenderer",
+      "hostTarget": "WebgpuRtt",
+      "scenePasses": [
+        "WebgpuRttScenePass"
+      ],
+      "screenPasses": [
+        "WebgpuRttCompositePass"
+      ],
+      "renderSetType": "WebgpuRttSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave6-gvm/webgpu_rtt/formal-v1/summary.json",
+      "notes": "Dedicated 24-vertex grouped BoxGeometry, one unique Scene RenderSet entity, SHA-locked NoColorSpace UV grid with explicit UNorm mip chain, ordinary single-sample RTT, exact TSL saturation/hue math, mouse replay, and target-frame transform pass all 36 four-quadrant triple-run captures. Atomic publication remains pending the other fifteen batch cases."
+    }
+  ]
+}

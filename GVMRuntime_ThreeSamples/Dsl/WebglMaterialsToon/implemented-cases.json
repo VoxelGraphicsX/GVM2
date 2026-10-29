@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglMaterialsToon",
+  "cases": [
+    {
+      "caseId": "webgl_materials_toon",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsToonRenderer",
+      "hostTarget": "WebglMaterialsToonRuntimeAdapter",
+      "scenePasses": [
+        "WebglMaterialsToonOutlinePass",
+        "WebglMaterialsToonMainPass"
+      ],
+      "renderSetType": "WebglMaterialsToonSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/runs/webgl-toon-formal/summary.json",
+      "notes": "专属 WebGL toon shard；221 个实体共用唯一 RenderSet，包含 Gentilis 字体解析与精确扫描带挤出几何、六级 gradient atlas、经典 WebGL 视空间 Toon 光照、动态点光源，以及 OutlineEffect 对全部可见 Scene mesh 的轮廓重绘。4 场景在 Legacy/Experimental × Metal/Vulkan 共 48 次运行、48 次跨象限比较和 32 次稳定性比较全部通过统一门禁；两个 Scene pass 的生成产物 ABI lint 均通过，全程普通单采样绘制。",
+      "screenPasses": []
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_interactive_cubes",
+      "implementationLevel": "strict-pass",
+      "notes": "已切换为专属 2000 个 BoxGeometry entity、单 Scene RenderSet、r185 xorshift/UUID 随机相位、透视轨道和 DSL Lambert/命中高亮；已修正六面绕序、非均匀缩放法线矩阵、定向光方向和 Lambert 的 1/π 因子。当前 initial oracle 四象限均通过统一阈值（Metal MAE 约 0.076、SSIM 约 0.999962；Vulkan MAE 约 0.079、SSIM 约 0.999960），Legacy/Experimental 互比通过；但 animated/cube-hit 两场景、三次稳定、正式报告闭环仍未完成，保持 scaffolded。",
+      "dslEntry": "WebglInteractiveCubes",
+      "hostTarget": "WebglInteractiveCubes",
+      "scenePasses": [
+        "WebglInteractiveCubesScenePass"
+      ],
+      "renderSetType": "WebglInteractiveCubesSceneRenderSet",
+      "strictReport": "build/three-r185-cubes-strict-v1/summary.json",
+      "notes": "已完成 2,000 个普通 BoxGeometry entity 的单 Scene RenderSet 实现：每实体 instanceCount=1、共享 vertex/index 组件、CPU 中心指针射线最近体命中、每帧 view-space DirectionalLight 变换、Lambert 光照和红色 emissive 命中状态。initial、animated、cube-hit 三场景在 Legacy/Experimental×Metal/Vulkan 各三次共 36 次执行、96 次比较全部通过；单采样，无 MSAA 模拟。"
+    }
+  ]
+}

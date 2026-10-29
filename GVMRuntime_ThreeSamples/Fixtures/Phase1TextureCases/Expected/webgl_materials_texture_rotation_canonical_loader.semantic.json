@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_texture_rotation",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "canonical-loaded-scene",
+  "result": {
+    "assetPath": "textures/uv_grid_opengl.jpg",
+    "assetSha256": "909d9a1eb2a5d5de9d221a5e8de4e9119d409decddf522d48896bd51523d354d",
+    "canonicalSceneSha256": "f70dba992c8f96fe367c7142c6954af349e2e396498d86930a451e45065c0283",
+    "geometryGroupCount": 6,
+    "indexCount": 36,
+    "mipLevelCount": 11,
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "textureHeight": 1024,
+    "textureWidth": 1024,
+    "vertexCount": 24
+  }
+}

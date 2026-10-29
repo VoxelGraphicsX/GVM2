@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_matcap",
+  "scenarioId": "custom-matcap",
+  "frame": 1,
+  "target": "canvas:not([class])",
+  "events": [
+    {
+      "frame": 0,
+      "type": "pointermove",
+      "x": 400,
+      "y": 250,
+      "buttons": 0,
+      "pointerId": 1,
+      "pointerType": "mouse"
+    }
+  ]
+}

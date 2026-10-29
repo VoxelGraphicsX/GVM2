@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_postprocessing_difference",
+  "scenarioId": "stationary-settled",
+  "frame": 60,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": { "speed": 0, "orbit": "none" },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250, "pointerId": 1, "button": 0, "buttons": 1, "isPrimary": true, "pointerType": "mouse" },
+    { "type": "pointerup", "frame": 0, "x": 400, "y": 250, "pointerId": 1, "button": 0, "buttons": 0, "isPrimary": true, "pointerType": "mouse" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_texture2darray_layerupdate",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglTexture2DArrayLayerUpdateRenderer",
+      "hostTarget": "WebglTexture2DArrayLayerUpdate",
+      "scenePasses": ["WebglTexture2DArrayLayerUpdateScenePass"],
+      "renderSetType": "WebglTexture2DArrayLayerUpdateSceneRenderSet",
+      "strictReport": "build/three-r185-wave4-layerupdate-strict-v5/cases/webgl_texture2darray_layerupdate/summary.json"
+    }
+  ]
+}

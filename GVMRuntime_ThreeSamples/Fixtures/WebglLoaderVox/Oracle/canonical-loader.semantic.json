@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_vox",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "one-greedy-mesh-150764-voxels-palette-colors",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "9a5061289e701e89ced41a7222f1fff6fd38427e200edbbe83c2ad919d99d17b",
+    "assetPath": "models/vox/monu10.vox",
+    "assetSha256": "acbe999679307a698b68fdec935a526a3b243006d20933e4ba22b72a0374ef90",
+    "voxelCount": 150764,
+    "quadCount": 5524,
+    "vertexCount": 22096,
+    "indexCount": 33144
+  }
+}

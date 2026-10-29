@@ -1,0 +1,1 @@
+linesMesh.visible = false;

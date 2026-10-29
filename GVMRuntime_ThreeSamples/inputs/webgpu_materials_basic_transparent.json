@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_materials_basic",
+  "scenarioId": "transparent-sorted",
+  "frame": 61,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "transparent": true,
+    "opacity": 0.5
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(4) input[type=checkbox]",
+      "x": 6,
+      "y": 6
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(5) input[type=range]",
+      "value": "0.5"
+    }
+  ]
+}

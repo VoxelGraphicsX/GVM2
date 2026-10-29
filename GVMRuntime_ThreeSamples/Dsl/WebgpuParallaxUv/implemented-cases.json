@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_parallax_uv",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuParallaxUvRenderer",
+      "hostTarget": "WebgpuParallaxUv",
+      "scenePasses": [
+        "WebgpuParallaxUvScenePass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/parallax-current-formal-run/summary.json",
+      "notes": "已完成 Three.js r185 webgpu_parallax_uv 专属实现：66 顶点/192 索引 CircleGeometry、6 个 SHA-256 锁定资产、RGBE/JPEG 解码、视差/Overlay/法线/粗糙度材质、HDR 背景、Reinhard 输出和 Inspector 叠加均由 DSL 表达。固定场景使用确定性的 OrbitControls 相机步进（普通捕获 2.0×Pi/1800、自动旋转 62×Pi/1800）及 Inspector 的非对称圆角和偏移阴影。Legacy/Experimental × Metal/Vulkan 四象限，4 场景、每场景 3 次稳定、跨管线/跨后端比较全部通过；当前正式报告：build/parallax-current-formal-run/summary.json。最差 canonical-assets 指标：MAE 0.8527、P99 6、异常像素比例 0.008%、SSIM 0.995030。未使用 MSAA 模拟、C++ GPU 旁路或私有阈值。"
+    }
+  ]
+}

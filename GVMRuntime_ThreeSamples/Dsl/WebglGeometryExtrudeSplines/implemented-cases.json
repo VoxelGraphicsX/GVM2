@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglGeometryExtrudeSplines",
+  "cases": [
+    {
+      "caseId": "webgl_geometry_extrude_splines",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglGeometryExtrudeSplinesRenderer",
+      "hostTarget": "WebglGeometryExtrudeSplines",
+      "scenePasses": [
+        "WebglGeometryExtrudeSplinesOpaquePass",
+        "WebglGeometryExtrudeSplinesTransparentWireframePass"
+      ],
+      "renderSetType": "WebglGeometryExtrudeSplinesSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/extrude-restored/summary.json",
+      "diagnosticReport": "build/three-r185-extrude-closed-v3/summary.json",
+      "notes": "四实体单 RenderSet、TubeGeometry、透明线框和 alternate-spline 输入已实现；透明 wireframe 同时保持 MeshBasicMaterial 的 FrontSide/cull 与默认 depthWrite 语义，并保持单采样原生 LineList。2026-08-25 复验 initial Metal/Vulkan 异常像素比例约 0.00232/0.00199，alternate-spline 约 0.00119，cull 状态调整未改变差异。透明度 0.25、0.35 和 depthWrite 变体均退化，最佳仍为正式 0.30 配置；差异集中在原生单像素线段的端点归属和跨后端覆盖，不能用阈值、mask 或 MSAA 模拟规避，仍超过统一阈值，暂不计严格通过。"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "cases": [{
+    "caseId": "webgl_materials_bumpmap",
+    "implementationLevel": "strict-pass",
+    "dslEntry": "WebglMaterialsBumpmapRenderer",
+    "hostTarget": "WebglMaterialsBumpmap",
+    "scenePasses": ["WebglMaterialsBumpmapShadowDepthPass", "WebglMaterialsBumpmapMainPass"],
+    "screenPasses": ["output-tone-map"],
+    "renderSetType": null,
+    "strictReport": "build/three-r185-wave3-bumpmap-strict-v2/summary.json"
+  }]
+}

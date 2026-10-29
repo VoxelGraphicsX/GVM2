@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_fog_height",
+  "scenarioId": "orbit",
+  "frame": 2,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "orbitDeltaPixels": [8, 0],
+    "density": 0.04,
+    "height": 2
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "button": 0
+    },
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 408,
+      "y": 250,
+      "buttons": 1
+    },
+    {
+      "type": "pointerup",
+      "frame": 0,
+      "x": 408,
+      "y": 250,
+      "button": 0
+    }
+  ]
+}

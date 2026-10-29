@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_sprites",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuSpritesRenderer",
+      "hostTarget": "WebgpuSprites",
+      "scenePasses": ["WebgpuSpritesScenePass"],
+      "renderSetType": "WebgpuSpritesSceneRenderSet",
+      "reportPath": "build/three-r185-wave4-webgpu-sprites-strict-v1/summary.json"
+    }
+  ]
+}

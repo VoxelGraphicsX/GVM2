@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryRenderer",
+      "hostTarget": "WebglBuffergeometry",
+      "scenePasses": [
+        "WebglBuffergeometryBackSidePass",
+        "WebglBuffergeometryFrontSidePass"
+      ],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-webgl-buffergeometry-current-strict/summary.json",
+      "notes": "单一 BufferGeometry 的双面材质 pass 已完成；当前统一 runner 正式报告覆盖 2 个场景、24 次四象限运行、24 次跨象限比较和 16 次稳定性比较；保持普通单采样，不使用 MSAA 或超采样替代。"
+    }
+  ]
+}

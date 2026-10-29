@@ -1,0 +1,42 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.gvm.samples.nativehost"
+    compileSdk @GVM_ANDROID_HOST_COMPILE_SDK@
+    ndkVersion "@GVM_ANDROID_HOST_NDK_VERSION@"
+
+    defaultConfig {
+        applicationId "com.gvm.samples.nativehost"
+        minSdk @GVM_ANDROID_HOST_MIN_SDK@
+        targetSdk @GVM_ANDROID_HOST_TARGET_SDK@
+        versionCode 1
+        versionName "1.0"
+
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments(
+                    "-DGVM_BUILD_SAMPLES=ON",
+                    "-DGVM_BUILD_SAMPLE_DESKTOP_BINARIES=OFF",
+                    "-DGVM_ANDROID_BUILD_TEST01_NATIVE=ON",
+                    "-DGVM_BUILD_TESTS=OFF",
+                    "-DGVM_BUILD_TESTS_RENDER=OFF",
+                    "-DGVM_RHI_ENABLE_VULKAN=ON",
+                    "-DGVM_BUILD_UGLC=OFF",
+                    "-DGVM_UGLC_EXECUTABLE=@GVM_MOBILE_UGLC_EXECUTABLE@"
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "@GVM_SOURCE_DIR@/CMakeLists.txt"
+        }
+    }
+}

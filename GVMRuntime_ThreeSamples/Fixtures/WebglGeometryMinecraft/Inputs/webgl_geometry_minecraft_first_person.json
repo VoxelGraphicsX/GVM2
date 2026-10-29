@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_minecraft",
+  "scenarioId": "first-person-input",
+  "frame": 61,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "events": [
+    {
+      "type": "keydown",
+      "frame": 1,
+      "key": "w",
+      "code": "KeyW"
+    },
+    {
+      "type": "keydown",
+      "frame": 1,
+      "key": "d",
+      "code": "KeyD"
+    },
+    {
+      "type": "keyup",
+      "frame": 31,
+      "key": "w",
+      "code": "KeyW"
+    },
+    {
+      "type": "keyup",
+      "frame": 31,
+      "key": "d",
+      "code": "KeyD"
+    }
+  ]
+}

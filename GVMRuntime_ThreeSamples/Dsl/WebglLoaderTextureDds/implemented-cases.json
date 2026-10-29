@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_texture_dds",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderTextureDdsRenderer",
+      "hostTarget": "WebglLoaderTextureDds",
+      "scenePasses": [
+        "WebglLoaderTextureDdsOpaquePass",
+        "WebglLoaderTextureDdsAlphaMaskPass",
+        "WebglLoaderTextureDdsAdditivePass",
+        "WebglLoaderTextureDdsAlphaPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderTextureDdsSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_loader_texture_dds/formal-v1/strict-summary.json",
+      "notes": "专属十三实体 RenderSet 已解码 r185 固定的十四个 DDS 资产，覆盖 BC1/BC2/BC3/BC6H、未压缩 RGB/RGBA、作者提供的 mip 和三个六面环境；initial-loader、canonical-loader、animated 在 Legacy/Experimental×Metal/Vulkan 各三次共 36 次执行、96 次比较通过，单采样，无 MSAA 模拟。"
+    }
+  ]
+}

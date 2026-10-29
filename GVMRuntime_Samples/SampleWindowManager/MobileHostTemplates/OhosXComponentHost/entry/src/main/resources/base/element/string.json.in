@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "GVM OHOS sample host"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "@GVM_MOBILE_SAMPLE_APP_LABEL@ entry ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "@GVM_MOBILE_SAMPLE_APP_LABEL@"
+    }
+  ]
+}

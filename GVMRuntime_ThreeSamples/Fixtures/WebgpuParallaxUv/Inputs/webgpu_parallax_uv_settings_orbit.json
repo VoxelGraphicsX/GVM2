@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_parallax_uv",
+  "scenarioId": "settings-orbit",
+  "frame": 61,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "backgroundBlurriness": 0.8,
+    "parallaxScale": 0.25,
+    "uvScale": 4.5,
+    "orbitDelta": [56, -28]
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250, "pointerId": 1 },
+    { "type": "pointermove", "frame": 0, "x": 456, "y": 222, "pointerId": 1 },
+    { "type": "pointerup", "frame": 0, "x": 456, "y": 222, "pointerId": 1 }
+  ]
+}

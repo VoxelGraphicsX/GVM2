@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_channels",
+  "scenarioId": "velocity-ortho-back",
+  "frame": 3,
+  "target": "canvas[width=\"800\"][height=\"500\"]",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "material": "velocity",
+    "camera": "ortho",
+    "side": "back"
+  },
+  "events": [
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(1) select",
+      "value": "velocity"
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(2) select",
+      "value": "ortho"
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".lil-gui.root > .children > .controller:nth-child(3) select",
+      "value": "back"
+    }
+  ]
+}

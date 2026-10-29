@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_texture_ktx",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderTextureKtxRenderer",
+      "hostTarget": "WebglLoaderTextureKtx",
+      "scenePasses": [
+        "WebglLoaderTextureKtxOpaquePass",
+        "WebglLoaderTextureKtxNormalPass",
+        "WebglLoaderTextureKtxTransparentPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderTextureKtxSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_loader_texture_ktx/formal-v1/summary.json",
+      "notes": "Dedicated nine-entity KTX1 Scene with one unique RenderSet, authored mip chains, native BC1/BC3/BC5/ETC1/EAC decoding, PowerVR reference PVRTC decoding, ImageIO ASTC decoding, three material-state passes, and 36 strict executions. Atomic publication remains pending the other active batch cases."
+    }
+  ]
+}

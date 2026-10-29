@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_morphtargets","implementationLevel":"strict-pass","dslEntry":"WebglMorphtargetsRenderer","hostTarget":"WebglMorphtargets","scenePasses":["WebglMorphtargetsMainPass"],"renderSetType":"WebglMorphtargetsSceneRenderSet"}]}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_cubemap_refraction",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsCubemapRefraction",
+      "hostTarget": "WebglMaterialsCubemapRefraction",
+      "scenePasses": [
+        "WebglMaterialsCubemapRefractionMainPass"
+      ],
+      "renderSetType": "WebglMaterialsCubemapRefractionSceneRenderSet",
+      "strictReport": "build/refraction-formal-linted-20260831/summary.json",
+      "reportPath": "build/refraction-formal-linted-20260831/summary.json",
+      "implementationNotes": "已接入 Lucy100k.ply 的 Three computeVertexNormals 平滑顶点法线、Park3Med 六面 JPEG、单 Scene RenderSet、背景与折射两段 DSL pass，并补齐 mouse-camera 输入回放文件。正式报告已完成 initial-loader、canonical-loader、mouse-camera 三场景的 Legacy/Experimental × Metal/Vulkan 三次稳定运行、跨象限比较和 RenderSet/GPU 边界检查；36 条象限、36 条跨比较和 24 条稳定比较全部通过统一阈值，单采样策略明确关闭 MSAA。"
+    }
+  ]
+}

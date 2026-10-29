@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgl_materials_texture_anisotropy","scenarioId":"mouse-camera","frame":61,"target":"canvas[style*=\"position: relative\"]","canvasWidth":800,"canvasHeight":500,"canonicalState":{"mouseX":220,"mouseY":130},"events":[{"type":"pointermove","frame":0,"x":620,"y":380}]}

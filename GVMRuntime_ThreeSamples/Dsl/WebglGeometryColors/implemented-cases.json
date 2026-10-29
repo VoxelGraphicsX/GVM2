@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_colors",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglGeometryColorsRenderer",
+      "hostTarget": "WebglGeometryColors",
+      "scenePasses": [
+        "WebglGeometryColorsShadowPass",
+        "WebglGeometryColorsOpaquePass",
+        "WebglGeometryColorsTransparentWireframePass"
+      ],
+      "screenPasses": ["WebglGeometryColorsShadowTextureComputePass"],
+      "renderSetType": "WebglGeometryColorsSceneRenderSet",
+      "notes": "已具备专属九 entity RenderSet、阴影与透明线框 pass；已补齐 camera-input replay SHA-256 元数据并锁定资产内容。2026-08-25 使用当前单采样原生 LineList 与 CPU IcosahedronGeometry 复验，四象限初始/动画异常像素比例约 0.24624、MAE 14.11、P99 125、SSIM 0.756，差异主要集中在 Three WebGL wireframe 线覆盖及单采样光栅化，仍保持 scaffolded，不计严格通过；不启用或模拟 MSAA。"
+    }
+  ]
+}

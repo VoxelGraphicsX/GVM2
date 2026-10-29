@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "caseId": "misc_controls_trackball",
+  "scenarioId": "orthographic-key-modes",
+  "frame": 30,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "orthographicCamera": true,
+    "interaction": "orthographic-key-a-s-d-rotate-zoom-pan-fixed-30-step-state"
+  },
+  "events": [
+    { "type": "click", "frame": 0, "target": ".lil-gui input[type=\"checkbox\"]", "x": 6, "y": 6 },
+    { "type": "keydown", "frame": 1, "key": "a", "code": "KeyA" },
+    { "type": "pointerdown", "frame": 1, "x": 400, "y": 250, "pointerId": 1, "button": 0 },
+    { "type": "pointermove", "frame": 2, "x": 450, "y": 215, "pointerId": 1, "button": 0 },
+    { "type": "pointerup", "frame": 3, "x": 450, "y": 215, "pointerId": 1, "button": 0 },
+    { "type": "keyup", "frame": 3, "key": "a", "code": "KeyA" },
+    { "type": "keydown", "frame": 4, "key": "s", "code": "KeyS" },
+    { "type": "pointerdown", "frame": 4, "x": 400, "y": 250, "pointerId": 1, "button": 0 },
+    { "type": "pointermove", "frame": 5, "x": 400, "y": 220, "pointerId": 1, "button": 0 },
+    { "type": "pointerup", "frame": 6, "x": 400, "y": 220, "pointerId": 1, "button": 0 },
+    { "type": "keyup", "frame": 6, "key": "s", "code": "KeyS" },
+    { "type": "keydown", "frame": 7, "key": "d", "code": "KeyD" },
+    { "type": "pointerdown", "frame": 7, "x": 400, "y": 250, "pointerId": 1, "button": 0 },
+    { "type": "pointermove", "frame": 8, "x": 360, "y": 280, "pointerId": 1, "button": 0 },
+    { "type": "pointerup", "frame": 9, "x": 360, "y": 280, "pointerId": 1, "button": 0 },
+    { "type": "keyup", "frame": 9, "key": "d", "code": "KeyD" }
+  ]
+}

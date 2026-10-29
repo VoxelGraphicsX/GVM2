@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_drawrange",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryDrawrangeRenderer",
+      "hostTarget": "WebglBuffergeometryDrawrange",
+      "scenePasses": [
+        "WebglBuffergeometryDrawrangeBoxLinePass",
+        "WebglBuffergeometryDrawrangeNativeLinePass",
+        "WebglBuffergeometryDrawrangeMainPass"
+      ],
+      "renderSetType": "WebglBuffergeometryDrawrangeSceneRenderSet",
+      "reportPath": "build/three-r185-drawrange-fixed-repeat3-final/summary.json",
+      "diagnosticReport": "build/three-r185-drawrange-fixed-repeat3-final/summary.json",
+      "notes": "同一 Scene RenderSet 按 Three.js 透明对象排序执行 BoxHelper、连接线、点云三个 DSL pass；连接端点保留上游逐粒子更新时的 Float32 快照。固定种子 0x18500003，单样本、Legacy/Experimental 与 Metal/Vulkan 复验均通过。"
+    }
+  ]
+}

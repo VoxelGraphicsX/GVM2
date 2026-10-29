@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_gpgpu_water",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGpgpuWaterRenderer",
+      "hostTarget": "WebglGpgpuWater",
+      "scenePasses": [
+        "WebglGpgpuWaterShadowPass",
+        "WebglGpgpuWaterOpaquePass",
+        "WebglGpgpuWaterBackPass",
+        "WebglGpgpuWaterFrontPass",
+        "WebglGpgpuWaterWireframePass"
+      ],
+      "renderSetType": "WebglGpgpuWaterSceneRenderSet",
+      "strictReport": "build/three-r185-batch20-water-current/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_effects_ascii",
+  "scenarioId": "trackball",
+  "frame": 121,
+  "target": "body > div:last-of-type",
+  "canvasWidth": null,
+  "canvasHeight": null,
+  "canonicalState": "trackball-camera-over-ascii-grid",
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250, "button": 0 },
+    { "type": "pointermove", "frame": 1, "x": 470, "y": 210, "button": -1, "buttons": 1 },
+    { "type": "pointerup", "frame": 2, "x": 470, "y": 210, "button": 0 }
+  ]
+}

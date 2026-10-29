@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgl_math_orientation_transform","scenarioId":"lookat-enabled","frame":121,"target":"canvas","canvasWidth":800,"canvasHeight":500,"canonicalState":{"useLookAt":true},"events":[{"type":"click","frame":0,"target":".lil-gui input[type=\"checkbox\"]","x":6,"y":6}]}

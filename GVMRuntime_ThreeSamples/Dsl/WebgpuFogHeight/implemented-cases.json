@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_fog_height",
+      "implementationLevel": "strict-pass",
+      "notes": "已实现 r185 100 个 BoxGeometry 实例的唯一 RenderSet、实例矩阵、MeshPhong/Blinn-Phong 光照、TSL 指数平方高度雾、非默认 GUI 状态和 OrbitControls 固定回放；Legacy/Experimental × Metal/Vulkan 三场景、三次稳定、oracle、跨象限、RenderSet/GPU 边界和单样本门禁全部通过。",
+      "dslEntry": "WebgpuFogHeight",
+      "hostTarget": "WebgpuFogHeight",
+      "scenePasses": [
+        "WebgpuFogHeightMainPass"
+      ],
+      "renderSetType": "WebgpuFogHeightSceneRenderSet",
+      "reportPath": "build/three-r185-wave7-strict/webgpu_fog_height/summary.json"
+    }
+  ]
+}

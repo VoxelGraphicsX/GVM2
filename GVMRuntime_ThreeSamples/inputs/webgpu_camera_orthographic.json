@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_camera",
+  "scenarioId": "orthographic",
+  "frame": 1,
+  "target": "body",
+  "events": [
+    {
+      "type": "keydown",
+      "frame": 0,
+      "key": "o",
+      "code": "KeyO"
+    }
+  ]
+}

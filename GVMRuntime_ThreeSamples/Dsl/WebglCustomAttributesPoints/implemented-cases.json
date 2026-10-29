@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_custom_attributes_points",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglCustomAttributesPointsRenderer",
+      "hostTarget": "WebglCustomAttributesPoints",
+      "scenePasses": ["WebglCustomAttributesPointsMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_custom_attributes_points/summary.json",
+      "notes": "点属性、尺寸和颜色由普通 RenderClass 展开，初始与动画三次稳定通过。"
+    }
+  ]
+}

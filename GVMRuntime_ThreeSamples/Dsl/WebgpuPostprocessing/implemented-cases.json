@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebgpuPostprocessingRenderer",
+      "hostTarget": "WebgpuPostprocessing",
+      "scenePasses": [
+        "WebgpuPostprocessingMainPass",
+        "WebgpuPostprocessingDotScreenPass",
+        "WebgpuPostprocessingRgbShiftPass",
+        "WebgpuPostprocessingOutputPass"
+      ],
+      "renderSetType": "WebgpuPostprocessingSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgpu-postprocessing-oracle/summary.json",
+      "notes": "Dedicated 100-entity WebGPU SphereGeometry Scene, flat MeshPhong, screen-size DotScreen TSL at scale 0.3, RGB shift 0.001, and output conversion are implemented with ordinary single-sample textures. The deterministic prefix now reproduces the r185 reference randomState=611699768; the generated metadata records this state for audit. 2026-08-25 四象限单轮复验仍为 initial 异常像素比例 0.00810、MAE 0.396、P99 1、SSIM 0.996143，animated 旧证据为 0.00845、MAE 0.403、P99 1、SSIM 0.993883；随机流已闭合但画面仍未达到不可放宽的异常像素与 SSIM 门禁，保持 semantic-complete。"
+    }
+  ]
+}

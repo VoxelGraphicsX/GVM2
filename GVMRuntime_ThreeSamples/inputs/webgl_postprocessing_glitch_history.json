@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_glitch",
+  "scenarioId": "deterministic-trigger-history",
+  "frame": 240,
+  "target": "#startButton",
+  "canonicalState": {
+    "consentAccepted": true,
+    "wildGlitch": false
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "target": "#startButton",
+      "x": 10,
+      "y": 10
+    }
+  ]
+}

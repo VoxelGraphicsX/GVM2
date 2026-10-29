@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_math_obb",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMathObbRenderer",
+      "hostTarget": "WebglMathObbRuntimeAdapter",
+      "scenePasses": [
+        "WebglMathObbMainPass",
+        "WebglMathObbWireframePass"
+      ],
+      "renderSetType": "WebglMathObbSceneRenderSet",
+      "notes": "已完成 Three.js r185 OBB SAT、确定性随机流、四个场景状态、命中框增删/重分配、Lambert 与线框 Set-only pass。正式证据覆盖 4 场景 × Legacy/Experimental × Metal/Vulkan × 3 次，48 条 RGBA oracle、48 条跨象限比较和 32 条稳定性比较，单采样策略、RenderSet/GPU 边界 lint 全部通过。",
+      "strictReport": "build/three-r185-next-run/math-obb-formal-20260825/summary.json",
+      "screenPasses": [
+        "information-overlay"
+      ]
+    }
+  ]
+}

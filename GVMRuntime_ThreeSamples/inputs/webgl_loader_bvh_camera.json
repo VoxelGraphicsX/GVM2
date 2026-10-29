@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_bvh",
+  "scenarioId": "camera-input",
+  "frame": 61,
+  "target": "body > canvas",
+  "canonicalState": "canonical-orbit-after-animation",
+  "events": [
+    { "type": "pointermove", "frame": 0, "x": 400, "y": 250 },
+    { "type": "pointerdown", "frame": 0, "button": 0, "x": 400, "y": 250 },
+    { "type": "pointermove", "frame": 1, "x": 440, "y": 230 },
+    { "type": "pointerup", "frame": 1, "button": 0, "x": 440, "y": 230 }
+  ]
+}

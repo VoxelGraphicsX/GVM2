@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglLightsRectarealight",
+  "cases": [
+    {
+      "caseId": "webgl_lights_rectarealight",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglLightsRectarealightRenderer",
+      "hostTarget": "WebglLightsRectarealightRuntimeAdapter",
+      "scenePasses": [
+        "WebglLightsRectarealightOpaqueLtcPass",
+        "WebglLightsRectarealightHelperLinesPass",
+        "WebglLightsRectarealightHelperBackfacesPass"
+      ],
+      "screenPasses": [
+        "checker-texture-compute"
+      ],
+      "renderSetType": "WebglLightsRectarealightSceneRenderSet",
+      "reportPath": "build/three-r185-webgl-lights-rectarealight-current-single/summary.json",
+      "notes": "已拆除 ThreeNextBatch 占位入口：CPU 生成 200×16 TorusKnot、floor 与三个 RectAreaLightHelper 的前后实体，共八个 entity 复用唯一 Scene RenderSet；专属 DSL 实现四样本矩形区域光、helper 前后面透明 pass、光源旋转回放和明确单采样输出。已修正 helper 继承灯光本地 XY 平面、面板填充、源相机/光源布局以及透明 pass 对前一 pass 深度的 Load 语义；按 r185 CanvasTexture 的 2×2 黑白图、Repeat=400、Nearest 作为 floor roughnessMap 接入 TextureComponent 和 DSL sampler。2026-08-11 首场景 Legacy Metal 单轮比较改善到 normalizedDistancePixelRatio 0.092990、MAE 6.221120、P99 107、SSIM 0.761645，仍受 LTC/标准材质反射、helper 原生线光栅化和正式三次稳定门禁阻塞，不计严格通过。"
+    }
+  ]
+}

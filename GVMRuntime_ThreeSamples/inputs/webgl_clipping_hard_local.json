@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_clipping",
+  "scenarioId": "hard-local-clip",
+  "frame": 121,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": { "alphaToCoverage": false, "localEnabled": true, "localShadows": false, "localPlane": 1.1 },
+  "events": [
+    { "type": "click", "frame": 1, "target": "input[aria-labelledby=\"lil-gui-name-1\"]", "x": 5, "y": 5 },
+    { "type": "click", "frame": 1, "target": "input[aria-labelledby=\"lil-gui-name-3\"]", "x": 5, "y": 5 },
+    { "type": "change", "frame": 1, "target": "input[aria-labelledby=\"lil-gui-name-4\"]", "value": "1.1" }
+  ]
+}

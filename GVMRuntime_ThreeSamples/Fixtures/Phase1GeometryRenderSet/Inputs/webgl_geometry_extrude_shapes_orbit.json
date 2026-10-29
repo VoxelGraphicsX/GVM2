@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_extrude_shapes",
+  "scenarioId": "orbit-input",
+  "frame": 61,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "control": "TrackballControls",
+    "dragStart": [400, 250],
+    "dragEnd": [480, 210],
+    "settleFrames": 60
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 480,
+      "y": 210,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointerup",
+      "frame": 0,
+      "x": 480,
+      "y": 210,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

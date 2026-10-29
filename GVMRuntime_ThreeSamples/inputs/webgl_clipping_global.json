@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_clipping",
+  "scenarioId": "global-plane",
+  "frame": 121,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": { "globalEnabled": true, "globalPlane": -0.2 },
+  "events": [
+    { "type": "click", "frame": 1, "target": "input[aria-labelledby=\"lil-gui-name-5\"]", "x": 5, "y": 5 },
+    { "type": "change", "frame": 1, "target": "input[aria-labelledby=\"lil-gui-name-6\"]", "value": "-0.2" }
+  ]
+}

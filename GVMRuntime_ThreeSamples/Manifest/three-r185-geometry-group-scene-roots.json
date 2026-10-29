@@ -1,0 +1,1345 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "three-r185-root-scoped-builtin-geometry-groups",
+  "upstreamCommit": "2431a09f46f34c560bc8e44b33be0e567723d5b9",
+  "scope": {
+    "auditedExamples": 511,
+    "preCorrectionGroupedExamples": 135,
+    "preCorrectionUngroupedExamples": 376,
+    "ungroupedWithoutConstructorCandidate": 309,
+    "maskedConstructorCandidates": 67,
+    "falseToTrueCorrections": 57,
+    "excludedAfterFlowAnalysis": 10,
+    "existingTrueRootCorrections": 1,
+    "correctedReviews": 58,
+    "correctedGroupedSceneRoots": 60
+  },
+  "decisionSource": {
+    "sourcePath": "GVMRuntime_ThreeSamples/Manifest/three-r185-builtin-geometry-group-decisions.json",
+    "sha256": "694f62d716ce78b545a0f6b105969241e6a5697602b1f3817528152dea234c73"
+  },
+  "sourceFiles": [
+    {
+      "sourcePath": "build/three.core.js",
+      "sha256": "3718df126d69c125362a03340913204470d8c50238605150e57f808840fb7759"
+    },
+    {
+      "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+      "sha256": "55f466192cc84298755a424c5e040345006b2ee1455589b3b54126c2ea4123f4"
+    },
+    {
+      "sourcePath": "examples/jsm/geometries/TextGeometry.js",
+      "sha256": "edf69c1cd6087c84d020156d1adbb29b40b098e4cbe8da4c0c36bbadc58dceac"
+    },
+    {
+      "sourcePath": "examples/jsm/loaders/VRMLLoader.js",
+      "sha256": "731e9e9e993f81d6a641862ec68d6d329be17274880544aa8da245fc6b189361"
+    },
+    {
+      "sourcePath": "examples/jsm/loaders/usd/USDComposer.js",
+      "sha256": "cf6471010d14151c4664c46382eb5a0677483df0b633b229f4d20755c9e2b4ed"
+    },
+    {
+      "sourcePath": "examples/jsm/modifiers/TessellateModifier.js",
+      "sha256": "a73eae3ff6562b3d25713a2bb1c56693f63abfc29b78add6bf3ac8831835525f"
+    },
+    {
+      "sourcePath": "examples/jsm/objects/Sky.js",
+      "sha256": "1dd7ee025607f425e15d5d9fe9850502905c837f1110c49b376a2501399dbf56"
+    },
+    {
+      "sourcePath": "examples/jsm/objects/SkyMesh.js",
+      "sha256": "a44cb7c543d04b2690b0079b8b473da9a36660629b2eb091f7eab8b4111d7b7a"
+    },
+    {
+      "sourcePath": "examples/jsm/postprocessing/CubeTexturePass.js",
+      "sha256": "3cc339151ad8deb69cbe7fab5c9d70d3190afc1446554256f4149791f7ff438f"
+    },
+    {
+      "sourcePath": "examples/jsm/utils/BufferGeometryUtils.js",
+      "sha256": "5c552223a9309883743b80538d6e9cdb45e3227f30d3ec56fb2c39b46e78d595"
+    },
+    {
+      "sourcePath": "examples/misc_exporter_gltf.html",
+      "sha256": "509b912e2508834c2b8320d0c69f388a81731b5ec9a30458066ba07316365ad3"
+    },
+    {
+      "sourcePath": "examples/misc_uv_tests.html",
+      "sha256": "888f7719c7eb6d600bf7e1b6e8656a62127c83e2785c8c42f0c07015e2272556"
+    },
+    {
+      "sourcePath": "examples/webgl_buffergeometry_drawrange.html",
+      "sha256": "943ded3f7eab696cdb76af7b2b44c7560e010b8f8f836ad450035aeb56375efe"
+    },
+    {
+      "sourcePath": "examples/webgl_custom_attributes_points2.html",
+      "sha256": "f8550792d1801617a32520bfbeb22d443dcca9ce8143c6b1e0e98c9199eaaf51"
+    },
+    {
+      "sourcePath": "examples/webgl_custom_attributes_points3.html",
+      "sha256": "c77afb177de54ada7f0a58bb8c9c1198d96aaa114dbaac456e3fdc0210bebcfc"
+    },
+    {
+      "sourcePath": "examples/webgl_geometry_shapes.html",
+      "sha256": "8c29395a7d7f3eca80383bff1a260408edf26a64ef9426af32e2de60f536b051"
+    },
+    {
+      "sourcePath": "examples/webgl_geometry_spline_editor.html",
+      "sha256": "fb552fe113bb287d28d563dbf579245138edadc869370240991d88ab50fb164c"
+    },
+    {
+      "sourcePath": "examples/webgl_geometry_terrain_raycast.html",
+      "sha256": "f583b757839640cdb45daaf7896e656ca1bbd6fbc5fb2ab680bf9a9531725a1f"
+    },
+    {
+      "sourcePath": "examples/webgl_geometry_text_shapes.html",
+      "sha256": "0468d42e536566602bdd72162738238c1bdd3ac0463c29bd2fa88e80b68a1249"
+    },
+    {
+      "sourcePath": "examples/webgl_geometry_text_stroke.html",
+      "sha256": "3110bd4c88d46084a779703454cc24fc4fcc243bb5253ff049c2969ededaf9b7"
+    },
+    {
+      "sourcePath": "examples/webgl_instancing_dynamic.html",
+      "sha256": "1bb7cdf50e4d63065ec00435aa3f912fbc6329ffdfa104118ca557cf91593d92"
+    },
+    {
+      "sourcePath": "examples/webgl_interactive_cubes.html",
+      "sha256": "665b23cfd57c4363ae69d86cfbe9e07b15438f93d875ee48005b36e4a4908390"
+    },
+    {
+      "sourcePath": "examples/webgl_interactive_cubes_gpu.html",
+      "sha256": "4600fff76bad6097f29b4d7bbdfd2e36dd7527a7ce8bf98062021b5a04d1084c"
+    },
+    {
+      "sourcePath": "examples/webgl_interactive_cubes_ortho.html",
+      "sha256": "a91c33252326f0caa79147c992c56774818425f698a3fb8936ed912063d364ce"
+    },
+    {
+      "sourcePath": "examples/webgl_interactive_voxelpainter.html",
+      "sha256": "dec8afd0c945a59e0b333751930ea4bb2e60c7e44946f6ccb67aa38aafe00a9f"
+    },
+    {
+      "sourcePath": "examples/webgl_lensflares.html",
+      "sha256": "ec2fd25859734cfd383ebaa299ccd0892c9d7f3ab1da52f5e71787ce3898f429"
+    },
+    {
+      "sourcePath": "examples/webgl_lightprobes.html",
+      "sha256": "a0e4589a732ec5570def7764a63a2763c05e71e58b4907fa1a7513135da8907f"
+    },
+    {
+      "sourcePath": "examples/webgl_lightprobes_complex.html",
+      "sha256": "d0932c9242695c86228aaaf93471873997037e68ce539b4d751986888c291245"
+    },
+    {
+      "sourcePath": "examples/webgl_lights_physical.html",
+      "sha256": "c7b5631cfc3a67f1aaa09483eacc4271e36e3b2d38cd7c63d1a04d1480b970f0"
+    },
+    {
+      "sourcePath": "examples/webgl_lights_rectarealight.html",
+      "sha256": "82eb161f2519b78e4421e8378fc0fae82c2dbd3ca57d2043503d35846119dc91"
+    },
+    {
+      "sourcePath": "examples/webgl_lights_spotlights.html",
+      "sha256": "81fde3f358975457db976ba426fd167bae80f3c44592e6182b5cbf1dc36347e4"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_imagebitmap.html",
+      "sha256": "3616505634c77365a36f6d7a4c6445357df244df8aa14daa13509a827ec33d24"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_mdd.html",
+      "sha256": "1f2ac7b4f32ea19d433762c8cadb1e3f85bc2303fefdfb75b55ef32556ebb0ad"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_nrrd.html",
+      "sha256": "8b7a3ce401dfb916364d0424f4cb4b555f23daba408a6b83765d1ae8911508fd"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_pdb.html",
+      "sha256": "ed16fe831ea2d161e870f594e7d4113d01aad05f7fe9f3c653d40181910f5bb6"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_svg.html",
+      "sha256": "c0dbe3673ea93e298bc267f823a1a478ab85bb42975a16a74843478df610eb52"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_texture_dds.html",
+      "sha256": "8d0a9a218a6f668b92706cb9a8a79dcfb3ca0736208ef39f6edab9a7af7e300e"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_texture_ktx.html",
+      "sha256": "f5bbdb355bb7b95823457dc5ae1afae3f6be5aa19f4eb3ec6c9ca31532ef84d9"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_texture_pvrtc.html",
+      "sha256": "7b7005a70fd899a28c83173efdd53a26a41af4da759f2be15c96d48d895e8bfe"
+    },
+    {
+      "sourcePath": "examples/webgl_loader_texture_tga.html",
+      "sha256": "71ada14e4ae1f42fc9c95af6820cc70349255d17db431a6bd1cccd40a0f2ebf5"
+    },
+    {
+      "sourcePath": "examples/webgl_materials_cubemap_render_to_mipmaps.html",
+      "sha256": "be81d353ef03d8d4c7efe1adbac629fe7bbddfec95801a2eb829dd609b4fdabc"
+    },
+    {
+      "sourcePath": "examples/webgl_materials_toon.html",
+      "sha256": "9b0536f345ae2c333086f4d45bfc7c65ba67363ed1bba5c0838539b8fd51672f"
+    },
+    {
+      "sourcePath": "examples/webgl_materials_video.html",
+      "sha256": "590ea6ecc34feb9d59a5b8ff196a4cb992e2c8d20922f5ed659acdb6e9ab52bb"
+    },
+    {
+      "sourcePath": "examples/webgl_modifier_tessellation.html",
+      "sha256": "559d7576c65db4110128b3e6f40dfbbcba2fb9ac610385ef55994ad32e1bb3ed"
+    },
+    {
+      "sourcePath": "examples/webgl_shadow_contact.html",
+      "sha256": "6a777a477d3b4c27699f19f93d3f9885918c3e691dd5769306b7e3aa190a097d"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_csm.html",
+      "sha256": "7c90fec9c3d9146177e7b7d8bd345ad5f1e9f146c35db2e9bb7970edd8b22f8d"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_pcss.html",
+      "sha256": "ee9ab3469599c14c93a149775ec10c388a52ce7e6b81c68951183d11b90ca2f8"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_performance.html",
+      "sha256": "d3fb96960319e9d096fabae591323eb304844bc060961c31d29a272af3ab2415"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_pointlight.html",
+      "sha256": "f1587169950db76ac320cd8328d8caeee16b2116e4860e57622d486cc13c25c4"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_viewer.html",
+      "sha256": "905e1858f3386306c8b06cfc566d34f561a3d292693de7e779a1b7694d8b91a9"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmap_vsm.html",
+      "sha256": "c404df3b225269212fbf62cc5354352bc5d7f960227f8fbe60a9bd1cbeed9cdc"
+    },
+    {
+      "sourcePath": "examples/webgl_shadowmesh.html",
+      "sha256": "22879e329cd53abec90fa2ba15b87d9deeae56fe24888fa814d399214fce98e6"
+    },
+    {
+      "sourcePath": "examples/webgl_tsl_shadowmap.html",
+      "sha256": "bb76403130c73d93a1e4ee1937e862ddbc4269eca45fb829898e770593f5c451"
+    },
+    {
+      "sourcePath": "examples/webgpu_compute_particles_rain.html",
+      "sha256": "8cf56491a15a01626bd2c6ab335e82075e0248057293671f3a432f898a8be79f"
+    },
+    {
+      "sourcePath": "examples/webgpu_compute_particles_snow.html",
+      "sha256": "816d19a1ac0eb1e428d392b6e930389a1cdfb1876b0010e262ec8d7607ff9687"
+    },
+    {
+      "sourcePath": "examples/webgpu_compute_texture_3d.html",
+      "sha256": "51d7e2c52dc941fd1327280ad9a86a23aa3d122b08eda37b81a02ce00c5e641c"
+    },
+    {
+      "sourcePath": "examples/webgpu_lensflares.html",
+      "sha256": "3ce5c0b8a250225622625de4f0cba1381afaed8fecea5c23353a8faff5faeba7"
+    },
+    {
+      "sourcePath": "examples/webgpu_materials_toon.html",
+      "sha256": "8ea6e01ec9b7288be3138177184e7b2cafa7ad7ffd0ade0d14cd73812c9a2bc1"
+    },
+    {
+      "sourcePath": "examples/webgpu_multisampled_renderbuffers.html",
+      "sha256": "8f6f076db5eb18b56f9166eb341447cff72406ccd9daefbc800423249cc39126"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadow_contact.html",
+      "sha256": "d6e8a01f7afbf115728df3fcc8db444e642be058714a0ac9e662f53d4f727da9"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadowmap.html",
+      "sha256": "e287522aa4fe4dc8b96244566cae1e87c658608020d84eaa61e522426a94b959"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadowmap_array.html",
+      "sha256": "2fea47164f41edce8464135ea01466b509bb5799595f84483d596ac54af43561"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadowmap_csm.html",
+      "sha256": "6d16d611e6252a1457a6ec01bdbc5b014a523292598f8671b3f88984a403fcf7"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadowmap_pointlight.html",
+      "sha256": "944ee1dc170b7b93f80e9c81479198efde97149e3acd9e6a6df666e09f47e1c0"
+    },
+    {
+      "sourcePath": "examples/webgpu_shadowmap_vsm.html",
+      "sha256": "e2c079c3d1c40ce77c520098757d28b4f2cfc5c16d4c9310cc25290526084709"
+    }
+  ],
+  "constructorContracts": [
+    {
+      "contract": "BoxGeometry adds one group for every generated plane.",
+      "evidence": [
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 29459,
+          "excerpt": "class BoxGeometry extends BufferGeometry {"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 29619,
+          "excerpt": "scope.addGroup( groupStart, groupCount, materialIndex );"
+        }
+      ]
+    },
+    {
+      "contract": "CylinderGeometry and ConeGeometry retain torso and cap groups.",
+      "evidence": [
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 30019,
+          "excerpt": "class CylinderGeometry extends BufferGeometry {"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 30189,
+          "excerpt": "scope.addGroup( groupStart, groupCount, 0 );"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 30345,
+          "excerpt": "class ConeGeometry extends CylinderGeometry {"
+        }
+      ]
+    },
+    {
+      "contract": "ExtrudeGeometry adds separate lid and side groups.",
+      "evidence": [
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 34712,
+          "excerpt": "class ExtrudeGeometry extends BufferGeometry {"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 35306,
+          "excerpt": "scope.addGroup( start, verticesArray.length / 3 - start, 0 );"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 35330,
+          "excerpt": "scope.addGroup( start, verticesArray.length / 3 - start, 1 );"
+        }
+      ]
+    },
+    {
+      "contract": "ShapeGeometry adds groups only for an Array of shapes.",
+      "evidence": [
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 36278,
+          "excerpt": "if ( Array.isArray( shapes ) === false ) {"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 36288,
+          "excerpt": "this.addGroup( groupStart, groupCount, i ); // enables MultiMaterial support"
+        }
+      ]
+    },
+    {
+      "contract": "TextGeometry inherits ExtrudeGeometry group construction.",
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/geometries/TextGeometry.js",
+          "line": 30,
+          "excerpt": "class TextGeometry extends ExtrudeGeometry {"
+        }
+      ]
+    },
+    {
+      "contract": "BufferGeometry.toNonIndexed copies every source group.",
+      "evidence": [
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 19386,
+          "excerpt": "const groups = this.groups;"
+        },
+        {
+          "sourcePath": "build/three.core.js",
+          "line": 19391,
+          "excerpt": "geometry2.addGroup( group.start, group.count, group.materialIndex );"
+        }
+      ]
+    },
+    {
+      "contract": "mergeGeometries defaults to a group-free result while mergeVertices clones source groups.",
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/utils/BufferGeometryUtils.js",
+          "line": 133,
+          "excerpt": "function mergeGeometries( geometries, useGroups = false ) {"
+        },
+        {
+          "sourcePath": "examples/jsm/utils/BufferGeometryUtils.js",
+          "line": 766,
+          "excerpt": "const result = geometry.clone();"
+        }
+      ]
+    },
+    {
+      "contract": "TessellateModifier creates a replacement BufferGeometry without copying groups.",
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/modifiers/TessellateModifier.js",
+          "line": 306,
+          "excerpt": "const geometry2 = new BufferGeometry();"
+        }
+      ]
+    }
+  ],
+  "geometryGroupSceneRootEvidence": [
+    {
+      "id": "webgl_geometry_shapes",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_geometry_shapes.html",
+          "line": 107,
+          "excerpt": "geometry = new THREE.ExtrudeGeometry( shape, extrudeSettings );",
+          "constructor": "ExtrudeGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_geometry_spline_editor",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_geometry_spline_editor.html",
+          "line": 59,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 20, 20, 20 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_geometry_terrain_raycast",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_geometry_terrain_raycast.html",
+          "line": 112,
+          "excerpt": "const geometryHelper = new THREE.ConeGeometry( 20, 100, 3 );",
+          "constructor": "ConeGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_geometry_text_shapes",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_geometry_text_shapes.html",
+          "line": 76,
+          "excerpt": "const geometry = new THREE.ShapeGeometry( shapes );",
+          "constructor": "ShapeGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_geometry_text_stroke",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_geometry_text_stroke.html",
+          "line": 124,
+          "excerpt": "const geometry = new THREE.ShapeGeometry( shapes );",
+          "constructor": "ShapeGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_instancing_dynamic",
+      "sceneRoots": [
+        "scene",
+        "roomEnvironment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_instancing_dynamic.html",
+          "line": 83,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        },
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_interactive_cubes",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_interactive_cubes.html",
+          "line": 65,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_interactive_cubes_gpu",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_interactive_cubes_gpu.html",
+          "line": 199,
+          "excerpt": "new THREE.BoxGeometry(),",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_interactive_cubes_ortho",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_interactive_cubes_ortho.html",
+          "line": 67,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_interactive_voxelpainter",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_interactive_voxelpainter.html",
+          "line": 65,
+          "excerpt": "const rollOverGeo = new THREE.BoxGeometry( 50, 50, 50 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lensflares",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lensflares.html",
+          "line": 69,
+          "excerpt": "const geometry = new THREE.BoxGeometry( s, s, s );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lightprobes",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lightprobes.html",
+          "line": 106,
+          "excerpt": "const tallBox = new THREE.Mesh( new THREE.BoxGeometry( 1.2, 2.5, 1.2 ), objectMaterial );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lightprobes_complex",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lightprobes_complex.html",
+          "line": 63,
+          "excerpt": "const room = new THREE.Mesh( new THREE.BoxGeometry( 16, 5, 8 ), wallMaterial );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lightprobes_sponza",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/objects/Sky.js",
+          "line": 60,
+          "excerpt": "super( new BoxGeometry( 1, 1, 1 ), material );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lights_physical",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lights_physical.html",
+          "line": 215,
+          "excerpt": "const boxGeometry = new THREE.BoxGeometry( 0.5, 0.5, 0.5 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lights_spotlights",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lights_spotlights.html",
+          "line": 49,
+          "excerpt": "const geoBox = new THREE.BoxGeometry( 0.3, 0.1, 0.2 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_lights_rectarealight",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_lights_rectarealight.html",
+          "line": 78,
+          "excerpt": "const geoFloor = new THREE.BoxGeometry( 2000, 0.1, 2000 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_gltf_animation_pointer",
+      "sceneRoots": [
+        "roomEnvironment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_gltf_compressed",
+      "sceneRoots": [
+        "environment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_gltf_dispersion",
+      "sceneRoots": [
+        "environment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_gltf_sheen",
+      "sceneRoots": [
+        "roomEnvironment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_imagebitmap",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_imagebitmap.html",
+          "line": 79,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_mdd",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_mdd.html",
+          "line": 58,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_pdb",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_pdb.html",
+          "line": 153,
+          "excerpt": "const boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_texture_dds",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_texture_dds.html",
+          "line": 48,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 2, 2, 2 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_texture_ktx",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_texture_ktx.html",
+          "line": 82,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 200, 200, 200 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_texture_pvrtc",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_texture_pvrtc.html",
+          "line": 46,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 200, 200, 200 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_texture_tga",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_loader_texture_tga.html",
+          "line": 53,
+          "excerpt": "const geometry = new THREE.BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_loader_vrml",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/loaders/VRMLLoader.js",
+          "line": 2146,
+          "excerpt": "const geometry = new BoxGeometry( size.x, size.y, size.z );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_materials_alphahash",
+      "sceneRoots": [
+        "environment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_materials_toon",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_materials_toon.html",
+          "line": 121,
+          "excerpt": "const textGeo = new TextGeometry( name, {",
+          "constructor": "TextGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_materials_video",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_materials_video.html",
+          "line": 121,
+          "excerpt": "geometry = new THREE.BoxGeometry( xsize, ysize, xsize );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadow_contact",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadow_contact.html",
+          "line": 88,
+          "excerpt": "new THREE.BoxGeometry( 0.4, 0.4, 0.4 ),",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_performance",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_performance.html",
+          "line": 173,
+          "excerpt": "const textGeo = new TextGeometry( 'THREE.JS', {",
+          "constructor": "TextGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_pointlight",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_pointlight.html",
+          "line": 95,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 30, 30, 30 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_viewer",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_viewer.html",
+          "line": 110,
+          "excerpt": "geometry = new THREE.BoxGeometry( 3, 3, 3 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_vsm",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_vsm.html",
+          "line": 151,
+          "excerpt": "const cylinderGeometry = new THREE.CylinderGeometry( 0.75, 0.75, 7, 32 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmesh",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmesh.html",
+          "line": 118,
+          "excerpt": "const lightHolderGeometry = new THREE.CylinderGeometry( 0.05, 0.05, 0.13 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_csm",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_csm.html",
+          "line": 135,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 10, 10, 10 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_shadowmap_pcss",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_shadowmap_pcss.html",
+          "line": 224,
+          "excerpt": "const column = new THREE.Mesh( new THREE.BoxGeometry( 1, 4, 1 ), groundMaterial );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgl_tsl_shadowmap",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgl_tsl_shadowmap.html",
+          "line": 119,
+          "excerpt": "const cylinderGeometry = new THREE.CylinderGeometry( 0.75, 0.75, 7, 32 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_compute_particles_rain",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_compute_particles_rain.html",
+          "line": 249,
+          "excerpt": "collisionBox = new THREE.Mesh( new THREE.BoxGeometry( 30, 1, 15 ), new THREE.MeshStandardMaterial() );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_compute_particles_snow",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_compute_particles_snow.html",
+          "line": 243,
+          "excerpt": "const coneGeometry = new THREE.ConeGeometry( radius * 0.95, radius * 1.25, 32 );",
+          "constructor": "ConeGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_compute_texture_3d",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_compute_texture_3d.html",
+          "line": 204,
+          "excerpt": "mesh = new THREE.Mesh( new THREE.BoxGeometry( 10, 10, 10 ), material );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_generator_building",
+      "sceneRoots": [
+        "scene",
+        "envScene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/objects/SkyMesh.js",
+          "line": 51,
+          "excerpt": "super( new BoxGeometry( 1, 1, 1 ), material );",
+          "constructor": "BoxGeometry"
+        },
+        {
+          "sourcePath": "examples/jsm/objects/SkyMesh.js",
+          "line": 51,
+          "excerpt": "super( new BoxGeometry( 1, 1, 1 ), material );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_geometry_loft",
+      "sceneRoots": [
+        "roomEnvironment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_instance_path",
+      "sceneRoots": [
+        "roomEnvironment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_lensflares",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_lensflares.html",
+          "line": 78,
+          "excerpt": "const geometry = new THREE.BoxGeometry( s, s, s );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_materials_alphahash",
+      "sceneRoots": [
+        "environment"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/jsm/environments/RoomEnvironment.js",
+          "line": 42,
+          "excerpt": "const geometry = new BoxGeometry();",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_materials_toon",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_materials_toon.html",
+          "line": 142,
+          "excerpt": "const textGeo = new TextGeometry( name, {",
+          "constructor": "TextGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_multisampled_renderbuffers",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_multisampled_renderbuffers.html",
+          "line": 99,
+          "excerpt": "const geometryBox = new THREE.BoxGeometry( 7, 7, 7, 12, 12, 12 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadow_contact",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadow_contact.html",
+          "line": 84,
+          "excerpt": "new THREE.BoxGeometry( 0.4, 0.4, 0.4 ),",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadowmap",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadowmap.html",
+          "line": 119,
+          "excerpt": "const cylinderGeometry = new THREE.CylinderGeometry( 0.75, 0.75, 7, 32 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadowmap_array",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadowmap_array.html",
+          "line": 163,
+          "excerpt": "const columnGeometry = new THREE.CylinderGeometry( 0.8, 1, 1, 16 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadowmap_csm",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadowmap_csm.html",
+          "line": 158,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 10, 10, 10 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadowmap_pointlight",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadowmap_pointlight.html",
+          "line": 104,
+          "excerpt": "const geometry = new THREE.BoxGeometry( 30, 30, 30 );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    },
+    {
+      "id": "webgpu_shadowmap_vsm",
+      "sceneRoots": [
+        "scene"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/webgpu_shadowmap_vsm.html",
+          "line": 162,
+          "excerpt": "const cylinderGeometry = new THREE.CylinderGeometry( 0.75, 0.75, 7, 32 );",
+          "constructor": "CylinderGeometry"
+        }
+      ]
+    },
+    {
+      "id": "misc_exporter_gltf",
+      "sceneRoots": [
+        "scene2"
+      ],
+      "evidence": [
+        {
+          "sourcePath": "examples/misc_exporter_gltf.html",
+          "line": 467,
+          "excerpt": "object = new THREE.Mesh( new THREE.BoxGeometry( 100, 100, 100 ), material );",
+          "constructor": "BoxGeometry"
+        }
+      ]
+    }
+  ],
+  "excludedCandidates": [
+    {
+      "id": "webgl_loader_nrrd",
+      "reasonCode": "invisible_proxy_not_rendered",
+      "explanation": "The BoxGeometry belongs to the permanently invisible volume proxy; BoxHelper renders its own group-free line geometry.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_loader_nrrd.html",
+        "line": 70,
+        "excerpt": "const geometry = new THREE.BoxGeometry( volume.xLength, volume.yLength, volume.zLength );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_loader_svg",
+      "reasonCode": "single_shape_has_no_group",
+      "explanation": "Each ShapeGeometry receives one Shape, while r185 only adds ShapeGeometry groups for an Array of shapes.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_loader_svg.html",
+        "line": 195,
+        "excerpt": "const geometry = new THREE.ShapeGeometry( shape );",
+        "constructor": "ShapeGeometry"
+      }
+    },
+    {
+      "id": "webgl_loader_usdz",
+      "reasonCode": "canonical_asset_does_not_use_builtin_primitive",
+      "explanation": "The reachable USD primitive constructors are not exercised by saeukkang.usdz, whose canonical topology is one authored triangle Mesh.",
+      "candidateEvidence": {
+        "sourcePath": "examples/jsm/loaders/usd/USDComposer.js",
+        "line": 1193,
+        "excerpt": "geometry = new BoxGeometry( size, size, size );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_materials_cubemap_render_to_mipmaps",
+      "reasonCode": "transient_filter_mesh_not_logical_scene",
+      "explanation": "The box is passed directly to CubeCamera as a transient cubemap filter root and is replaced by the accepted private DSL screen/compute equivalent.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_materials_cubemap_render_to_mipmaps.html",
+        "line": 131,
+        "excerpt": "const geometry = new THREE.BoxGeometry( 5, 5, 5 );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_modifier_tessellation",
+      "reasonCode": "modifier_replacement_drops_groups",
+      "explanation": "TessellateModifier returns a new BufferGeometry and does not copy the TextGeometry groups.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_modifier_tessellation.html",
+        "line": 106,
+        "excerpt": "let geometry = new TextGeometry( 'THREE.JS', {",
+        "constructor": "TextGeometry"
+      }
+    },
+    {
+      "id": "webgl_postprocessing_backgrounds",
+      "reasonCode": "screen_background_pass_exemption",
+      "explanation": "CubeTexturePass owns the internal box and is explicitly classified as a pure fullscreen background pass.",
+      "candidateEvidence": {
+        "sourcePath": "examples/jsm/postprocessing/CubeTexturePass.js",
+        "line": 74,
+        "excerpt": "new BoxGeometry( 10, 10, 10 ),",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_buffergeometry_drawrange",
+      "reasonCode": "box_only_supplies_helper_bounds",
+      "explanation": "The BoxGeometry Mesh is only BoxHelper input and is never rendered; BoxHelper creates independent group-free line geometry.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_buffergeometry_drawrange.html",
+        "line": 110,
+        "excerpt": "const helper = new THREE.BoxHelper( new THREE.Mesh( new THREE.BoxGeometry( r, r, r ) ) );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_custom_attributes_points2",
+      "reasonCode": "merge_geometries_without_groups",
+      "explanation": "mergeGeometries uses its default useGroups=false and produces the final group-free Points geometry.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_custom_attributes_points2.html",
+        "line": 91,
+        "excerpt": "let boxGeometry = new THREE.BoxGeometry( 0.8 * radius, 0.8 * radius, 0.8 * radius, 10, 10, 10 );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "webgl_custom_attributes_points3",
+      "reasonCode": "positions_copied_to_new_geometry",
+      "explanation": "Only BoxGeometry positions are copied into a new group-free BufferGeometry used by the Points object.",
+      "candidateEvidence": {
+        "sourcePath": "examples/webgl_custom_attributes_points3.html",
+        "line": 123,
+        "excerpt": "let boxGeometry1 = new THREE.BoxGeometry( radius, 0.1 * radius, 0.1 * radius, 50, 5, 5 );",
+        "constructor": "BoxGeometry"
+      }
+    },
+    {
+      "id": "misc_uv_tests",
+      "reasonCode": "cpu_canvas_data_only",
+      "explanation": "The geometries feed UVsDebug CPU canvas data and never become Three Scene renderables.",
+      "candidateEvidence": {
+        "sourcePath": "examples/misc_uv_tests.html",
+        "line": 80,
+        "excerpt": "test( 'new THREE.CylinderGeometry( 25, 75, 100, 10, 5 )', new THREE.CylinderGeometry( 25, 75, 100, 10, 5 ) );",
+        "constructor": "CylinderGeometry"
+      }
+    }
+  ]
+}

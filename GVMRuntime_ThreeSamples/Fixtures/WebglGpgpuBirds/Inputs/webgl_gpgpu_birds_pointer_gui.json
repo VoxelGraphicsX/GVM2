@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_gpgpu_birds",
+  "scenarioId": "pointer-and-gui",
+  "frame": 1,
+  "target": "body > div:nth-of-type(2) > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "viewportWidth": 800,
+    "viewportHeight": 500,
+    "separation": 28,
+    "alignment": 17,
+    "cohesion": 31,
+    "freedom": 0.75,
+    "pointerFrame": 1,
+    "pointerX": 200,
+    "pointerY": 250,
+    "predatorX": -0.25,
+    "predatorY": 0
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 1,
+      "x": 200,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

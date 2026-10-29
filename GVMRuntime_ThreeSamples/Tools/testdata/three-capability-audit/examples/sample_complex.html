@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+	<body>
+		<script type="module">
+			import { createFixtureObject } from './jsm/fixture/SceneFactory.js';
+			// import { missingFixture } from './jsm/fixture/Missing.js';
+			let scene;
+			scene = new THREE.Scene();
+			const group = new THREE.Group();
+			const geometry = new THREE.BoxGeometry();
+			geometry.addGroup( 0, 3, 0 );
+			const firstMaterial = new THREE.MeshBasicMaterial();
+			const secondMaterial = new THREE.MeshStandardMaterial();
+			const mesh = new THREE.InstancedMesh( geometry, firstMaterial, 3 );
+			group.add( mesh );
+			const lod = new THREE.LOD();
+			lod.addLevel( mesh, 10 );
+			const model = createFixtureObject();
+			model.remove( mesh );
+			const renderTarget = new THREE.RenderTarget();
+			renderTarget.samples = 4;
+			const fragmentShader = `if ( gl_FrontFacing ) { color = frontColor; }`;
+			// const ignoredShader = `gl_PointSize = 4.0`;
+		</script>
+	</body>
+</html>

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgl_texture2darray_layerupdate","scenarioId":"transfer-layer","frame":1,"target":"canvas","canvasWidth":800,"canvasHeight":500,"canonicalState":{"srcLayer":4,"destLayer":1,"operation":"transfer"},"events":[{"type":"pointermove","frame":0,"x":400,"y":250}]}

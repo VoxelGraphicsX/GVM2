@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_attributes_none",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryAttributesNoneRenderer",
+      "hostTarget": "WebglBuffergeometryAttributesNone",
+      "scenePasses": ["WebglBuffergeometryAttributesNoneScenePass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-batch20-wave4-gates/shader-cases-repeat1/summary.json",
+      "notes": "无顶点属性几何的四次普通 Draw、旋转帧和跨管线比较通过统一图像阈值。"
+    }
+  ]
+}

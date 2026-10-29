@@ -1,0 +1,19 @@
+{
+  "name": "uglc-test-runner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:all": "node ./cli.mjs run --group all",
+    "test:smoke": "node ./cli.mjs run --group smoke",
+    "test:render-feature": "node ./cli.mjs run --group render-feature",
+    "test:regressions": "node ./cli.mjs run --group regressions",
+    "test:diagnostics": "node ./cli.mjs run --group diagnostics",
+    "test:whitebox": "node ./cli.mjs run --group whitebox",
+    "build:clean-uglc": "node ./clean-uglc-target.mjs",
+    "build:clean-uglc:dry": "node ./clean-uglc-target.mjs --dry-run true",
+    "config:print-effective": "node ./cli.mjs print-effective-config",
+    "report:latest": "node ./cli.mjs open-latest",
+    "report:list": "node ./cli.mjs list-runs",
+    "case:list": "node ./cli.mjs list-cases"
+  }
+}

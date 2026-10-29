@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_normalmap_object_space",
+  "scenarioId": "canonical-loader",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "canonical-loaded-scene",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "129c45249f176ec1c5028544b1b1e6d0df3e76f498ddbe8bf317dbe7bac3d5f0",
+    "assetSha256": "d8c00c742b59137695245eefeef0e217d6e33c64eeaeb1904ff39f6b31542639",
+    "vertexCount": 11378,
+    "indexCount": 58446,
+    "baseColorSize": "2048x2048",
+    "normalMapSize": "2048x2048",
+    "normalMapType": "object-space",
+    "doubleSided": true
+  }
+}

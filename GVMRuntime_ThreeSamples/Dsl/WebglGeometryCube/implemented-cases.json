@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_cube",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryCubeRenderer",
+      "hostTarget": "WebglGeometryCube",
+      "scenePasses": ["WebglGeometryCubeScenePass"],
+      "screenPasses": [],
+      "renderSetType": "WebglGeometryCubeSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_geometry_cube/summary.json",
+      "notes": "单 Scene 唯一 RenderSet 复用 cube geometry groups；初始和旋转场景四象限三次稳定通过。"
+    }
+  ]
+}

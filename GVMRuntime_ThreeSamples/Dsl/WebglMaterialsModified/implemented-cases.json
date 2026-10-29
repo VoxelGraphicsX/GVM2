@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_modified",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsModifiedRenderer",
+      "hostTarget": "WebglMaterialsModified",
+      "scenePasses": ["WebglMaterialsModifiedMainPass"],
+      "renderSetType": "WebglMaterialsModifiedSceneRenderSet",
+      "reportPath": "build/three-r185-wave6-strict/webgl_materials_modified/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_ply",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LoaderPlyRenderSetRenderer",
+      "hostTarget": "Phase1LoaderPlyRenderSet",
+      "scenePasses": [
+        "WebglLoaderPlyShadowDepthPass",
+        "WebglLoaderPlyLitPass"
+      ],
+      "renderSetType": "WebglLoaderPlySceneRenderSet",
+      "strictReport": "build/three-r185-webgl-loader-ply-current-strict/summary.json",
+      "notes": "PLY loader、双 shadow depth 与主光照 pass 共用唯一 Scene RenderSet；当前统一 runner 正式报告覆盖 3 个场景、36 次四象限运行、36 次跨象限比较和 24 次稳定性比较。"
+    }
+  ]
+}

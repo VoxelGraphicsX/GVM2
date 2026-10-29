@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_masking",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuPostprocessingMaskingRenderer",
+      "hostTarget": "WebgpuPostprocessingMasking",
+      "scenePasses": [
+        "WebgpuPostprocessingMaskingBasePass",
+        "WebgpuPostprocessingMaskingBoxPass",
+        "WebgpuPostprocessingMaskingTorusPass"
+      ],
+      "renderSetType": "WebgpuPostprocessingMaskingSceneRenderSet",
+      "reportPath": "build/three-r185-wave4-webgpu-postprocessing-masking-strict-v2/summary.json",
+      "notes": "Dedicated WebGPU base, grouped-box RenderSet mask, ordinary torus mask, two pinned photographs, ordered mix, output conversion, and deterministic Inspector chrome are implemented with ordinary single-sample rendering. Both scenarios pass all four Legacy/Experimental Metal/Vulkan quadrants for three repetitions."
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  hygiene:
+    name: Static hygiene
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check tracked source distribution
+        run: node tests/runners/node/check-source-distribution.mjs
+
+  install-smoke:
+    name: Install/export smoke
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        logging: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Select Xcode 16.4
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+          xcrun clang++ --version
+      - name: Configure
+        run: |
+          cmake -S . -B build/gvm-install-check-${{ matrix.logging }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGVM_BUILD_TESTS=OFF \
+            -DGVM_BUILD_SAMPLES=OFF \
+            -DGVM_BUILD_UGLC=ON \
+            -DGVM_INSTALL=ON \
+            -DGVM_RHI_ENABLE_LOGGING=${{ matrix.logging }}
+      - name: Build
+        run: cmake --build build/gvm-install-check-${{ matrix.logging }} --target all -j 3
+      - name: Install
+        run: cmake --install build/gvm-install-check-${{ matrix.logging }} --prefix build/gvm-install-prefix-${{ matrix.logging }}
+      - name: Downstream generated-code consumer
+        run: |
+          resource_dir=$(sed -n 's/^GVM_UGLC_RESOURCE_DIR:PATH=//p' build/gvm-install-check-${{ matrix.logging }}/CMakeCache.txt)
+          cmake -S tests/install \
+            -B build/gvm-smoke-consumer-${{ matrix.logging }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$PWD/build/gvm-install-prefix-${{ matrix.logging }}" \
+            -DGVM_UGLC_EXECUTABLE="$PWD/build/gvm-install-check-${{ matrix.logging }}/UGLC" \
+            -DGVM_UGLC_RESOURCE_DIR="$resource_dir"
+          cmake --build build/gvm-smoke-consumer-${{ matrix.logging }} --parallel 3
+          ctest --test-dir build/gvm-smoke-consumer-${{ matrix.logging }} --output-on-failure
+      - name: Verify shared dependency configuration and rejection
+        run: >-
+          node tests/install/check-dependencies.mjs
+          --consumer-build build/gvm-smoke-consumer-${{ matrix.logging }}
+      - name: Verify parent fmt reuse in source and installed consumers
+        if: matrix.logging == 'ON'
+        run: |
+          cmake -S tests/fmt -B build/gvm-fmt-source \
+            -DCMAKE_BUILD_TYPE=Release -DGVM_TEST_SOURCE_DIR="$PWD"
+          cmake --build build/gvm-fmt-source --parallel 3
+          ctest --test-dir build/gvm-fmt-source --output-on-failure
+          cmake -S tests/fmt -B build/gvm-fmt-installed \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$PWD/build/gvm-install-prefix-ON"
+          cmake --build build/gvm-fmt-installed --parallel 3
+          ctest --test-dir build/gvm-fmt-installed --output-on-failure
+
+  tests:
+    name: Legacy ${{ matrix.legacy }} / GVM ${{ matrix.backend }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        legacy: ['OFF', 'ON']
+        backend: [metal, vulkan]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Select Xcode 16.4
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+          xcrun clang++ --version
+      - name: Install Vulkan runtime
+        if: matrix.backend == 'vulkan'
+        timeout-minutes: 10
+        run: |
+          sdk_version=1.4.341.1
+          sdk_download="${RUNNER_TEMP}/gvm-vulkan-sdk"
+          mkdir -p "$sdk_download"
+          sdk_archive="$sdk_download/vulkansdk-macos-${sdk_version}.zip"
+          curl --fail --location --retry 3 --max-time 300 \
+            "https://sdk.lunarg.com/sdk/download/${sdk_version}/mac/vulkansdk-macos-${sdk_version}.zip?Human=true" \
+            --output "$sdk_archive"
+          printf '%s  %s\n' \
+            '632cbe96c8ed6ed00c6ce25e3a7738c466134f76586e1c51f1419410d7f9042e' \
+            "$sdk_archive" | shasum -a 256 --check
+          ditto -x -k "$sdk_archive" "$sdk_download"
+          sudo "$sdk_download/vulkansdk-macOS-${sdk_version}.app/Contents/MacOS/vulkansdk-macOS-${sdk_version}" \
+            --root "$sdk_download/installed" --accept-licenses --default-answer --confirm-command \
+            install com.lunarg.vulkan.core com.lunarg.vulkan.usr
+          sudo rm -rf "$sdk_download"
+      - name: Verify Vulkan runtime
+        if: matrix.backend == 'vulkan'
+        timeout-minutes: 2
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+
+          summary = subprocess.check_output(
+              ['/usr/local/bin/vulkaninfo', '--summary'], text=True, timeout=60)
+          instance = re.search(r'Vulkan Instance Version:\s*(\d+)\.(\d+)', summary)
+          if not instance or tuple(map(int, instance.groups())) < (1, 3):
+              raise SystemExit('The Vulkan loader must support Vulkan 1.3 or newer.')
+          for device in re.split(r'\bGPU\d+:', summary)[1:]:
+              version = re.search(r'apiVersion\s*=\s*(\d+)\.(\d+)', device)
+              if (re.search(r'driverID\s*=\s*DRIVER_ID_MOLTENVK\b', device)
+                      and version and tuple(map(int, version.groups())) >= (1, 3)):
+                  print('Vulkan 1.3 loader and MoltenVK device are available.')
+                  break
+          else:
+              raise SystemExit('No MoltenVK device supporting Vulkan 1.3 was found.')
+          PY
+      - name: Configure isolated test build
+        run: |
+          cmake -S . -B build/compiler-tests \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DGVM_BUILD_SAMPLES=OFF \
+            -DGVM_BUILD_ADVANCED_SAMPLES=OFF \
+            -DGVM_BUILD_THREE_SAMPLES=OFF \
+            -DGVM_BUILD_TESTS=ON \
+            -DUGLC_ENABLE_LEGACY=${{ matrix.legacy }}
+      - name: Build compiler and backend tests
+        id: build
+        run: cmake --build build/compiler-tests --parallel 3
+      - name: Verify test registration and execution guards
+        run: node --test tests/runners/uglc/node/uglir-contract.test.mjs tests/runners/node/execution-contract.test.mjs tests/runners/uglc/node/readiness-metrics.test.mjs tests/runners/uglc/node/candidate-audit.test.mjs tests/runners/shared/output-policy.test.mjs tests/runners/shared/report-redaction.test.mjs
+      - name: Run UGLC tests
+        run: >-
+          node tests/runners/uglc/node/cli.mjs run --group all
+          --build-dir build/compiler-tests --no-build true --no-open-report true
+      - name: Run GVM tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >-
+          node tests/runners/node/cli.mjs run --profile macos-debug --group all
+          --build-dir build/compiler-tests --backend ${{ matrix.backend }} --no-open-report true
+
+  native-vulkan-candidate:
+    name: Native Vulkan candidate evidence
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: [self-hosted, linux, vulkan-gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Configure UGLIR build on native hardware
+        run: |
+          cmake -S . -B build/native-vulkan-candidate \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DGVM_BUILD_SAMPLES=OFF \
+            -DGVM_BUILD_ADVANCED_SAMPLES=OFF \
+            -DGVM_BUILD_THREE_SAMPLES=OFF \
+            -DGVM_BUILD_TESTS=ON \
+            -DUGLC_ENABLE_LEGACY=ON
+      - name: Build
+        id: build
+        run: cmake --build build/native-vulkan-candidate --parallel 3
+      - name: Run complete compiler suite
+        run: >-
+          node tests/runners/uglc/node/cli.mjs run --group all
+          --build-dir build/native-vulkan-candidate --no-build true --no-open-report true
+      - name: Run complete native Vulkan backend suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >-
+          node tests/runners/node/cli.mjs run --profile vulkan-debug --group all --backend vulkan
+          --build-dir build/native-vulkan-candidate --no-open-report true

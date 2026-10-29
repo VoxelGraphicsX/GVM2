@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_colors",
+  "scenarioId": "camera-input",
+  "frame": 61,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pointerX": 100,
+    "pointerY": -75,
+    "cameraUpdateCount": 62
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 500,
+      "y": 325,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

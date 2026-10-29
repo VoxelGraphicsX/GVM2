@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_multiple_scenes_comparison",
+  "scenarioId": "orbit",
+  "frame": 2,
+  "target": ".container",
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250 },
+    { "type": "pointermove", "frame": 0, "x": 500, "y": 250 },
+    { "type": "pointerup", "frame": 0, "x": 500, "y": 250 }
+  ]
+}

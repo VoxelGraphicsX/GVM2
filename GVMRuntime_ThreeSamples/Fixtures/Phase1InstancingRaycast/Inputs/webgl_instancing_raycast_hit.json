@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_instancing_raycast",
+  "scenarioId": "ray-hit",
+  "frame": 60,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "mouse": [400, 250],
+    "orbitDrag": [10, -5],
+    "activeInstanceCount": 1000
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250 },
+    { "type": "pointermove", "frame": 0, "x": 410, "y": 245 },
+    { "type": "pointerup", "frame": 0, "x": 410, "y": 245 }
+  ]
+}

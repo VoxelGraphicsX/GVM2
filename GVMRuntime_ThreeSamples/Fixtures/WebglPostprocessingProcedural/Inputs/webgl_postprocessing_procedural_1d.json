@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_procedural",
+  "scenarioId": "noise-1d",
+  "frame": 1,
+  "target": ".lil-gui .controller.option select",
+  "canonicalState": {
+    "procedure": "noiseRandom1D"
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 65, "y": 9.5 },
+    { "type": "pointerup", "frame": 0, "x": 65, "y": 9.5 }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_instancing",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryInstancingRenderer",
+      "hostTarget": "WebglBuffergeometryInstancing",
+      "scenePasses": [
+        "WebglBuffergeometryInstancingMainPass"
+      ],
+      "renderSetType": "WebglBuffergeometryInstancingSceneRenderSet",
+      "strictReport": "build/three-r185-instancing-state-formal/summary.json",
+      "notes": "实例化几何通过单 Scene RenderSet 的 entity/instance builtin 绘制；补齐 count=12500 GUI 状态脚本后的单采样 Oracle，四象限画面、跨象限和三次稳定均通过。"
+    }
+  ]
+}

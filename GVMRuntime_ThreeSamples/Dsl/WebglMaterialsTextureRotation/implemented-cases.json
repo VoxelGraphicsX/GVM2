@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_texture_rotation",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglMaterialsTextureRotationRenderer",
+      "hostTarget": "WebglMaterialsTextureRotation",
+      "scenePasses": ["WebglMaterialsTextureRotationMainPass"],
+      "screenPasses": [],
+      "renderSetType": "WebglMaterialsTextureRotationSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-texture-rotation-state-formal/summary.json",
+      "notes": "uv grid 资产、canonical loader snapshot 和带状态脚本的 UV transform/orbit 输入三场景，Legacy/Experimental × Metal/Vulkan 四象限、跨象限与三次稳定均通过。"
+    }
+  ]
+}

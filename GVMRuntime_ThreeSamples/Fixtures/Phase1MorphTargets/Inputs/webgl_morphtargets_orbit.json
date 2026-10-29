@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_morphtargets",
+  "scenarioId": "orbit-input",
+  "frame": 2,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "cameraPosition": [
+      -8.334171783286887,
+      -4.81753674101715,
+      2.7079365641784348
+    ]
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 400, "y": 250 },
+    { "type": "pointermove", "frame": 0, "x": 500, "y": 210 },
+    { "type": "pointerup", "frame": 0, "x": 500, "y": 210 }
+  ]
+}

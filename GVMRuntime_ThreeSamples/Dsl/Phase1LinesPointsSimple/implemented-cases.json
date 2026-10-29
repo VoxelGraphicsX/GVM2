@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_points_billboards",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LinesPointsSimpleRenderer",
+      "hostTarget": "Phase1LinesPointsSimple",
+      "scenePasses": [
+        "WebglPointsBillboardsMainPass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgl_points_billboards/summary.json",
+      "notes": "10000 个点按固定随机流展开为普通 RenderClass 三角形 billboard；disc 纹理六级 mip、透视尺寸衰减、关闭衰减 GUI、HSL 动画、alphaTest 和单采样输出在 Legacy/Experimental × Metal/Vulkan 三次稳定 oracle 门禁中全部通过。"
+    }
+  ]
+}

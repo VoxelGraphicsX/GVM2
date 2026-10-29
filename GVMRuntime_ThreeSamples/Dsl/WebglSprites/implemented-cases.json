@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_sprites",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglSpritesRenderer",
+      "hostTarget": "WebglSprites",
+      "scenePasses": ["WebglSpritesWorldPass", "WebglSpritesHudPass"],
+      "renderSetType": "WebglSpritesSceneRenderSet",
+      "strictReport": "build/three-r185-wave4-webgl-sprites-strict-v3/summary.json"
+    }
+  ]
+}

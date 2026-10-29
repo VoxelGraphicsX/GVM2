@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_materials_cubemap",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglMaterialsCubemapRenderer",
+      "hostTarget": "WebglMaterialsCubemap",
+      "scenePasses": [
+        "WebglMaterialsCubemapBackgroundPass",
+        "WebglMaterialsCubemapMainPass"
+      ],
+      "renderSetType": "WebglMaterialsCubemapSceneRenderSet",
+      "renderSetPolicy": "required",
+      "reportPath": "build/three-r185-next-run/webgl-materials-cubemap-current-20260825/summary.json",
+      "implementationNotes": "已完成专属单 Scene RenderSet：C++ 锁定解析 r185 WaltHead.obj，生成三个实体、相机/Orbit 状态和六面 SwedishRoyalCastle JPEG 的显式 sRGB mip 链；DSL 通过 RenderSet TextureComponent 实现背景方向重建、Lambert、反射/折射和单采样输出。2026-08-25 四象限单轮复验显示 initial-loader 异常像素比例约 0.67010、MAE 52.88、SSIM 0.2146，orbit 约 0.96869、MAE 97.87、SSIM 0.2030；canonical-loader 缺少 semantic oracle。当前仍未满足统一差异阈值，严格状态保留为 semantic-complete，禁止计入 strict-pass。"
+    }
+  ]
+}

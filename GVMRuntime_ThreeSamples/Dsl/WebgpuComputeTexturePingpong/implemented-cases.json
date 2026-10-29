@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgpu_compute_texture_pingpong","implementationLevel":"strict-pass","dslEntry":"WebgpuComputeTexturePingpongRenderer","hostTarget":"WebgpuComputeTexturePingpong","scenePasses":["WebgpuComputeTexturePingpongMainPass"],"renderSetType":null}]}

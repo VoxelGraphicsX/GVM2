@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_materials_toon",
+  "scenarioId": "orbit",
+  "frame": 61,
+  "target": "body > div > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "dragStart": [400, 250],
+    "dragEnd": [460, 220]
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 460,
+      "y": 220,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 1,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    },
+    {
+      "type": "pointerup",
+      "frame": 0,
+      "x": 460,
+      "y": 220,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

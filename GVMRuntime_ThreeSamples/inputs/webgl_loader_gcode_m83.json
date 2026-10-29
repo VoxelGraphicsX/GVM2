@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_loader_gcode",
+  "scenarioId": "relative-extrusion",
+  "frame": 1,
+  "target": "canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {"asset": "test_m83", "extrusionMode": "relative"},
+  "events": [
+    {"type": "pointermove", "frame": 0, "x": 400, "y": 250, "pointerId": 1, "button": 0, "buttons": 0, "isPrimary": true, "pointerType": "mouse"}
+  ]
+}

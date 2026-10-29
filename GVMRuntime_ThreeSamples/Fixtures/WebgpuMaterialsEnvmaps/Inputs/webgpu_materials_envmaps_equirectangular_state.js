@@ -1,0 +1,11 @@
+params.Type = 'Equirectangular';
+params.Refraction = true;
+params.backgroundRotationX = false;
+params.backgroundRotationY = false;
+params.backgroundRotationZ = false;
+params.syncMaterial = false;
+scene.background = textureEquirec;
+sphereMaterial.envMap = textureEquirec;
+textureEquirec.mapping = THREE.EquirectangularRefractionMapping;
+textureCube.mapping = THREE.CubeRefractionMapping;
+sphereMaterial.needsUpdate = true;

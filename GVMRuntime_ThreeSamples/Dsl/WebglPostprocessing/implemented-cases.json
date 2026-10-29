@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingRenderer",
+      "hostTarget": "WebglPostprocessing",
+      "scenePasses": [
+        "WebglPostprocessingMainPass",
+        "WebglPostprocessingDotScreenPass",
+        "WebglPostprocessingRgbShiftPass",
+        "WebglPostprocessingOutputPass"
+      ],
+      "renderSetType": "WebglPostprocessingSceneRenderSet",
+      "reportPath": "build/three-r185-postprocessing-inline-formal/summary.json",
+      "notes": "Dedicated 100-entity SphereGeometry Scene, flat MeshPhong, linear fog, DotScreenShader, RGBShiftShader and output conversion. The DSL compensates for the UGLC backend screen-Y convention while preserving Three.js texture sampling. The formal report contains 24 records: two scenarios, four quadrants and three stable repetitions."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_instancing_performance",
+  "scenarioId": "loader-snapshot",
+  "frame": 0,
+  "kind": "loader-snapshot",
+  "canonicalState": "suzanne-buffergeometry-505-vertices-2901-indices",
+  "result": {
+    "renderableObjectCount": 1,
+    "sceneRootCount": 1,
+    "canonicalSceneSha256": "d82ef568aeb378cedd05ac9e8b7fb36f7f4ad8d6017e6db685944e4b8dc692b0",
+    "assetPath": "models/json/suzanne_buffergeometry.json",
+    "assetSha256": "8aa6f692a08b2ec0991b7903914cfa3154e2f553a4ca72ca3fb5d7e6c16f839f",
+    "vertexCount": 505,
+    "indexCount": 2901
+  }
+}

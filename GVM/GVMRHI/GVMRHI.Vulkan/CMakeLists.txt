@@ -1,0 +1,65 @@
+target_sources(
+    GVMRHI
+    PRIVATE
+        VKArgumentTable.cpp
+        VKArgumentResources.cpp
+        VKArguments.cpp
+        VKBindGroup.cpp
+        VKBindGroupLayout.cpp
+        VKBindingUtils.cpp
+        VKBlitPassEncoder.cpp
+        VKBuffer.cpp
+        VKBufferRangeStateUtils.cpp
+        VKCommandEncoder.cpp
+        VKTaskDependencyResolverDiagnostics.cpp
+        VKTaskDependencyResolver.cpp
+        VKComputePassEncoder.cpp
+        VKComputePassDiagnostics.cpp
+        VKComputePipeline.cpp
+        VKDescriptorChurnCounters.cpp
+        VKDeviceCapabilities.cpp
+        VKDescriptorManager.cpp
+        VKDescriptorPoolStore.cpp
+        VKDevice.cpp
+        VKEnumUtils.cpp
+        VKInstance.cpp
+        VKLogging.cpp
+        VKPendingReadbackTracker.cpp
+    VKReadback.cpp
+        VKPixelLocalLayoutPolicy.cpp
+        VKPipelineCache.cpp
+        VKPipelineLayout.cpp
+        VKPresentManager.cpp
+        VKQueueDiagnostics.cpp
+        VKQueue.cpp
+        VKQueueCommandContextPool.cpp
+        VKQuerySet.cpp
+        VKRenderPassEncoder.cpp
+        VKRenderPassReplayDiagnostics.cpp
+        VKRenderPassFramebufferCache.cpp
+        VKRenderPassHashUtils.cpp
+        VKRenderPipeline.cpp
+        VKResourceLifetime.cpp
+        VKResourceRegistry.cpp
+        VKResourceStateDB.cpp
+        VKRetireManager.cpp
+        VKSampler.cpp
+        VKShaderModule.cpp
+        VKShaderReflection.cpp
+        VKSubmissionManager.cpp
+        VKSyncUtils.cpp
+        VKSwapchain.cpp
+        VKTexture.cpp
+        VKTextureSubresourceUtils.cpp
+        VKTextureView.cpp
+        VKTransientDescriptorAllocator.cpp
+        VKUploadAllocator.cpp
+        Vulkan.cpp
+        Volk.cpp
+        VmaImpl.cpp
+)
+
+if(GVM_RHI_ENABLE_DIAGNOSTICS_OVERLAY)
+    target_sources(GVMRHI PRIVATE VKDiagnosticsOverlayShaders.cpp)
+endif()
+

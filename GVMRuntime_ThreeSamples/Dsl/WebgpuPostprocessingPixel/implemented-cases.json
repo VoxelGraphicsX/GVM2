@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuPostprocessingPixel",
+  "cases": [
+    {
+      "caseId": "webgpu_postprocessing_pixel",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebgpuPostprocessingPixelRenderer",
+      "hostTarget": "WebgpuPostprocessingPixelRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuPostprocessingPixelDirectionalShadowPass",
+        "WebgpuPostprocessingPixelSpotShadowPass",
+        "WebgpuPostprocessingPixelMainPass"
+      ],
+      "renderSetType": "WebgpuPostprocessingPixelSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgpu-postprocessing-pixel-current-final-20260825/summary.json",
+      "notes": "已完成四个 r185 场景的专属实现：按 BoxGeometry.buildPlane() 精确生成 Box/Plane/Icosahedron CPU 几何、唯一 Scene RenderSet、directional/spot shadow 与主 MRT 三个 Scene pass、nearest pixelation edge composite、GUI effect state、Orbit 输入回放和普通单采样输出。已修正 PixelationPassNode 的 pass 链：低分辨率 Scene/Depth/Normal 纹理只作为采样源，边缘判断在全分辨率 fullscreen attachment 上执行，再进入颜色转换；采样阶段遵循上游 nearest sampler 的原始 fullscreen UV，不重复量化，也没有引入 MSAA 或模拟采样。2026-08-25 正式单轮复验中 initial/animated 四象限通过；strong-edges 异常像素比例 0.002750、P99 23、SSIM 0.988342，unaligned-orbit 约 0.002290、P99 17、SSIM 0.994940。后续受控复验中将深度差异临时放大至 2.0 倍仍为 0.001000、P99 19、SSIM 0.992044，放大至 2.2 倍反而退化到 0.002000；摄像机正负 0.25 的符号探针也显示负号为唯一接近参考的方向。上述探针均已恢复，不作为正式实现或私有阈值，故继续保持 semantic-complete。",
+      "screenPasses": [
+        "nearest-checker-sampling",
+        "pixel-color-depth-normal-edge-composite",
+        "output-color-conversion"
+      ],
+      "componentSchema": [
+        {
+          "name": "vertices",
+          "role": "vertex"
+        },
+        {
+          "name": "indices",
+          "role": "index"
+        },
+        {
+          "name": "objects",
+          "role": "object"
+        },
+        {
+          "name": "instances",
+          "role": "instance"
+        },
+        {
+          "name": "materials",
+          "role": "material"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "shard": "MiscControlsTrackball",
+  "cases": [
+    {
+      "caseId": "misc_controls_trackball",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "MiscControlsTrackballRenderer",
+      "hostTarget": "MiscControlsTrackball",
+      "scenePasses": [
+        "MiscControlsTrackballSceneMainPass"
+      ],
+      "renderSetType": "MiscControlsTrackballSceneRenderSet",
+      "strictReport": "build/three-r185-wave8-case-reports/misc_controls_trackball/summary.json",
+      "notes": "专属 500-instance ConeGeometry 单 Scene 单 RenderSet；透视与正交投影、TrackballControls 旋转／缩放／平移、A/S/D 键模式、相机 up/target/zoom 固定状态、平面 Phong、双方向光、环境光和 Exp2 雾全部完成。4 场景 × 4 象限 × 3 次共 48 次运行、48 条跨象限比较和 32 条稳定性比较严格通过。"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_multiple_canvas",
+  "scenarioId": "first-canvas-orbit",
+  "frame": 1,
+  "target": "#content .list-item:nth-of-type(2) canvas",
+  "canvasWidth": 200,
+  "canvasHeight": 200,
+  "canonicalState": {
+    "sceneIndex": 0,
+    "azimuthDeltaRadians": -0.35,
+    "polarDeltaRadians": 0.0
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 0,
+      "x": 100,
+      "y": 100,
+      "button": 0
+    },
+    {
+      "type": "pointermove",
+      "frame": 1,
+      "x": 111.14084601643234,
+      "y": 100,
+      "buttons": 1
+    },
+    {
+      "type": "pointerup",
+      "frame": 1,
+      "x": 111.14084601643234,
+      "y": 100,
+      "button": 0
+    }
+  ]
+}

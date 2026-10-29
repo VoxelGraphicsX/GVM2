@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_instancing_morph",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglInstancingMorphRenderer",
+      "hostTarget": "WebglInstancingMorph",
+      "scenePasses": [
+        "WebglInstancingMorphVsmShadowPass",
+        "WebglInstancingMorphMainLitPass"
+      ],
+      "screenPasses": [
+        "WebglInstancingMorphVsmHorizontalBlurPass",
+        "WebglInstancingMorphVsmVerticalBlurPass"
+      ],
+      "renderSetType": "WebglInstancingMorphSceneRenderSet",
+      "strictReport": "build/wave5-formal-webgl-instancing-morph-flat-attribute/summary.json",
+      "notes": [
+        "The dedicated Scene RenderSet owns ground and one 1,024-instance Horse entity.",
+        "The WebGL implementation consumes frozen GLB vertex colors and the exact staged Three random stream.",
+        "The sample remains single-sample and uses the frozen 512-square, eight-tap r185 VSM chain.",
+        "Indexed Horse triangles are expanded during CPU import so flat normals are deterministic without derivative helper-lane races."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebgpuLightsSelective",
+  "cases": [
+    {
+      "caseId": "webgpu_lights_selective",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuLightsSelectiveRenderer",
+      "hostTarget": "WebgpuLightsSelectiveRuntimeAdapter",
+      "scenePasses": [
+        "WebgpuLightsSelectiveMainPass"
+      ],
+      "renderSetType": "WebgpuLightsSelectiveSceneRenderSet",
+      "reportPath": "build/three-r185-webgpu-lights-selective-strict-final/summary.json",
+      "notes": "严格通过：4 个场景完成 Legacy/Experimental × Metal/Vulkan 四象限各三次，共 48/48 运行通过，48/48 跨象限比较与 32/32 稳定性比较通过。实现使用唯一 Scene RenderSet、7 个 entity、显式纹理 mip、选择性点光源、标准材质、范围雾和单采样输出；修正了右侧 MeshStandardNodeMaterial 默认 roughness=1.0 的语义错误。",
+      "screenPasses": [
+        "asset-texture-explicit-mips",
+        "single-sample-downsample"
+      ]
+    }
+  ]
+}

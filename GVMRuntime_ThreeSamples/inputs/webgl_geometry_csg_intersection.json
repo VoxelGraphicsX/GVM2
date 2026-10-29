@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_csg",
+  "scenarioId": "intersection",
+  "frame": 61,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "operation": "INTERSECTION",
+    "wireframe": true,
+    "useGroups": true
+  },
+  "events": [
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".lil-gui .controller:nth-child(1) select",
+      "value": "INTERSECTION"
+    },
+    {
+      "type": "click",
+      "frame": 0,
+      "target": ".lil-gui .controller:nth-child(2) input[type=checkbox]",
+      "x": 6,
+      "y": 6
+    }
+  ]
+}

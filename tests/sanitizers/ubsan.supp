@@ -1,0 +1,4 @@
+# metal-cpp's NS::SharedPtr releases its pointee unconditionally; an empty or moved-from pointer relies
+# on Objective-C nil messaging being a no-op. metal-cpp already marks the SharedPtr members
+# no_sanitize("undefined"), but the NS::Referencing::release() call it makes is still instrumented.
+null:third_party/Metal/Metal.hpp

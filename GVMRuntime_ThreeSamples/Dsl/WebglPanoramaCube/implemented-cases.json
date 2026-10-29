@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgl_panorama_cube","implementationLevel":"strict-pass","dslEntry":"WebglPanoramaCubeRenderer","hostTarget":"WebglPanoramaCube","scenePasses":["WebglPanoramaCubeMainPass"],"renderSetType":"WebglPanoramaCubeSceneRenderSet","strictReport":"build/three-r185-wave6-strict/webgl_panorama_cube/summary.json"}]}

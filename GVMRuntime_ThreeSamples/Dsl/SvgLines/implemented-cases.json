@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "svg_lines",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "SvgLinesRenderer",
+      "hostTarget": "SvgLines",
+      "scenePasses": [
+        "SvgLinesStrokePass"
+      ],
+      "renderSetType": "SvgLinesSceneRenderSet",
+      "strictReport": "build/three-r185-wave5-gvm/svg_lines/formal-v1/summary.json",
+      "notes": "Dedicated four-entity RenderSet implementation has complete strict evidence; publication remains atomic with the other nineteen wave-five cases."
+    }
+  ]
+}

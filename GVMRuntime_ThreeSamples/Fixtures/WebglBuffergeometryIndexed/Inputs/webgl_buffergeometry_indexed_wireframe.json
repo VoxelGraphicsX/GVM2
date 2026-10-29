@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_buffergeometry_indexed",
+  "scenarioId": "wireframe",
+  "frame": 61,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "wireframe": true
+  },
+  "events": [
+    { "type": "pointerdown", "frame": 0, "x": 799, "y": 499 },
+    { "type": "pointerup", "frame": 0, "x": 799, "y": 499 }
+  ]
+}

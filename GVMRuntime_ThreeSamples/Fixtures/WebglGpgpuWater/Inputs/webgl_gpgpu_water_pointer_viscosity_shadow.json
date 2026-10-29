@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_gpgpu_water",
+  "scenarioId": "pointer-viscosity-shadow",
+  "frame": 120,
+  "target": "body > div:nth-of-type(2) > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "viscosity": 0.97,
+    "shadow": true,
+    "ducksEnabled": true,
+    "pointerActiveFrames": [10, 29]
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 10,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1
+    },
+    {
+      "type": "pointerdown",
+      "frame": 10,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1
+    },
+    {
+      "type": "pointermove",
+      "frame": 20,
+      "x": 500,
+      "y": 250,
+      "pointerId": 1
+    },
+    {
+      "type": "pointerup",
+      "frame": 30,
+      "x": 500,
+      "y": 250,
+      "pointerId": 1
+    }
+  ]
+}

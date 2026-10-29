@@ -1,0 +1,6 @@
+# Metal completion handlers run on Metal-owned GCD threads after their command buffer completes.
+# Metal orders every write made before MTL::CommandBuffer::commit() before the handler runs, but that
+# edge passes through uninstrumented Metal, GPU and kernel code, so ThreadSanitizer reports each
+# pre-commit write that a handler reads as a data race. Suppress only reports that have a frame inside
+# Metal's completion-handler dispatch.
+race:MTLDispatchListApply

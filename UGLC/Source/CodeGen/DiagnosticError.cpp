@@ -1,0 +1,1 @@
+#include <CodeGen/DiagnosticError.hpp>

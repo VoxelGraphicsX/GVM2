@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_postprocessing_fxaa",
+  "scenarioId": "disabled",
+  "frame": 1,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "enabled": false,
+    "animated": false
+  },
+  "events": [
+    {
+      "type": "click",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel input[type=checkbox]:checked",
+      "x": 6,
+      "y": 6
+    }
+  ]
+}

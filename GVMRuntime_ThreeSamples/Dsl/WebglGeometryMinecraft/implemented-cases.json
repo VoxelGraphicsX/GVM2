@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_minecraft",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryMinecraftRenderer",
+      "hostTarget": "WebglGeometryMinecraft",
+      "scenePasses": ["WebglGeometryMinecraftMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-webgl-geometry-minecraft-reports/summary.json",
+      "notes": "固定随机流、Atlas 纹理和首帧/动画/第一人称输入均已完成单采样四象限三次稳定门禁。"
+    }
+  ]
+}

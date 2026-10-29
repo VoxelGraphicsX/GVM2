@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_compute_texture",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuComputeTextureRenderer",
+      "hostTarget": "WebgpuComputeTexture",
+      "scenePasses": [
+        "WebgpuComputeTexturePlanePass"
+      ],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-batch20-compute-current/summary.json"
+    }
+  ]
+}

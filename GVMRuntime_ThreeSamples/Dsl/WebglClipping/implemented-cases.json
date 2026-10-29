@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglClipping",
+  "cases": [
+    {
+      "caseId": "webgl_clipping",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglClippingRenderer",
+      "hostTarget": "WebglClipping",
+      "scenePasses": [
+        "WebglClippingShadowDepthPass",
+        "WebglClippingFrontPass",
+        "WebglClippingBackPass"
+      ],
+      "renderSetType": "WebglClippingSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgl-clipping/summary.json",
+      "notes": "已完成 r185 TorusKnot 与地面两实体单 Scene RenderSet、三段 DSL 场景 pass、局部/全局裁剪、双面 Phong 和固定输入回放；Legacy/Experimental 已生成并通过 Vulkan 读回及 ABI lint。当前尚未完成 Three oracle 四象限三次稳定门禁，且单采样策略不启用或模拟 MSAA。"
+    }
+  ]
+}

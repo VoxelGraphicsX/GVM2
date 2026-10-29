@@ -1,0 +1,10 @@
+renderer.setAnimationLoop(null);
+await renderer.init();
+torus.rotation.y = 0.4;
+renderer.setMRT(sceneMRT);
+renderer.setRenderTarget(renderTarget);
+await renderer.renderAsync(scene, camera);
+renderer.setMRT(null);
+renderer.setRenderTarget(null);
+quadMesh.material = material;
+await quadMesh.renderAsync(renderer);

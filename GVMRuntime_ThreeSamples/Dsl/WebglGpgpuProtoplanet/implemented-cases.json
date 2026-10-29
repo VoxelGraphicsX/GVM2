@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_gpgpu_protoplanet",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGpgpuProtoplanetRenderer",
+      "hostTarget": "WebglGpgpuProtoplanet",
+      "scenePasses": ["WebglGpgpuProtoplanetMainPass"],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-webgl-gpgpu-protoplanet-reports/summary.json",
+      "notes": "固定 N-body Compute、圆形粒子展开、重启 GUI 状态和单采样输出已通过四象限三次稳定门禁。"
+    }
+  ]
+}

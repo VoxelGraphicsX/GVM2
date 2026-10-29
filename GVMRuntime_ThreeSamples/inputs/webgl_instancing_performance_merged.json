@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"webgl_instancing_performance","scenarioId":"merged","frame":1,"target":".lil-gui select","canonicalState":{"method":"merged","count":1000},"events":[{"type":"change","frame":0,"value":"MERGED","settleMs":250}]}

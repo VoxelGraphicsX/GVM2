@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_stl",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoaderStlRenderer",
+      "hostTarget": "WebglLoaderStl",
+      "scenePasses": [
+        "WebglLoaderStlShadowDepthPass",
+        "WebglLoaderStlPhongPass"
+      ],
+      "screenPasses": [],
+      "renderSetType": "WebglLoaderStlSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave5-gvm/webgl_loader_stl/formal-v4/summary.json",
+      "notes": "Dedicated five-entity STL Scene with one unique RenderSet, exact ASCII/binary/Magics-color parsing, two reused shadow invocations, source winding under the reflected Scene transform, Phong/fog output, canonical loader semantics, and 36 strict executions. Atomic publication remains pending the other active batch cases."
+    }
+  ]
+}

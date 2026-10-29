@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_lines_colors",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LinesPointsRenderSetRenderer",
+      "hostTarget": "Phase1LinesPointsRenderSet",
+      "scenePasses": [
+        "WebglLinesColorsMainPass"
+      ],
+      "renderSetType": "Phase1LinesSceneRenderSet",
+      "strictReport": "build/three-r185-phase1-lines-points-formal/cases/webgl_lines_colors/summary.json"
+    },
+    {
+      "caseId": "webgl_lines_dashed",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "Phase1LinesPointsRenderSetRenderer",
+      "hostTarget": "Phase1LinesPointsRenderSet",
+      "scenePasses": [
+        "WebglLinesDashedMainPass"
+      ],
+      "renderSetType": "Phase1LinesSceneRenderSet",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgl_lines_dashed/summary.json",
+      "notes": "Three.js computeLineDistances 的每段累计值按 Float32BufferAttribute 精度重现；Legacy/Experimental × Metal/Vulkan 三次稳定、统一单采样 oracle、跨象限比较和 lint 全部通过。"
+    }
+  ]
+}

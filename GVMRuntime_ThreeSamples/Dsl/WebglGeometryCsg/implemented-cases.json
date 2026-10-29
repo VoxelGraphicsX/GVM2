@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglGeometryCsg",
+  "cases": [
+    {
+      "caseId": "webgl_geometry_csg",
+      "implementationLevel": "scaffolded",
+      "dslEntry": "WebglGeometryCsgRenderer",
+      "hostTarget": "WebglGeometryCsgRuntimeAdapter",
+      "scenePasses": [
+        "WebglGeometryCsgShadowDepthPass",
+        "WebglGeometryCsgMainColorPass",
+        "WebglGeometryCsgWireframeOverlayPass"
+      ],
+      "renderSetType": "WebglGeometryCsgSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/geometry-csg-current-v2/summary.json",
+      "notes": "已补齐四实体单 Scene RenderSet 的场景快照、组件契约和三类 scene pass 元数据；当前真正阻塞是语义与画面：尚未等价实现 three-bvh-csg 的 Icosahedron/Cylinder 布尔网格、Basic/PCF 阴影、operation/useGroups/wireframe GUI。正式三场景四象限单轮仍失败，initial 异常像素比例 0.067630、MAE 7.115、P99 235、SSIM 0.944509；因此保持 scaffolded，不计语义完成。",
+      "screenPasses": []
+    }
+  ]
+}

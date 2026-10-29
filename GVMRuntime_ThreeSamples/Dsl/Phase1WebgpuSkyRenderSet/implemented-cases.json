@@ -1,0 +1,1 @@
+{"schemaVersion":2,"cases":[{"caseId":"webgpu_sky","implementationLevel":"strict-pass","dslEntry":"Phase1WebgpuSkyRenderSet","hostTarget":"Phase1WebgpuSkyRenderSet","scenePasses":["WebgpuSkyScenePass"],"renderSetType":"WebgpuSkySceneRenderSet","strictReport":"build/three-r185-sky-pair-strict-v2/cases/webgpu_sky/summary.json"}]}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_geometry_convex",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglGeometryConvexRenderer",
+      "hostTarget": "WebglGeometryConvex",
+      "scenePasses": [
+        "WebglGeometryConvexOpaquePass",
+        "WebglGeometryConvexAxisPass",
+        "WebglGeometryConvexTransparentHullPass"
+      ],
+      "renderSetType": "WebglGeometryConvexSceneRenderSet",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgl_geometry_convex/summary.json"
+    }
+  ]
+}

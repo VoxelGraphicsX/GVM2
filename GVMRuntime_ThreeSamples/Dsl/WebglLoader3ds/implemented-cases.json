@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_loader_3ds",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglLoader3ds",
+      "hostTarget": "WebglLoader3ds",
+      "scenePasses": [
+        "WebglLoader3dsScenePass"
+      ],
+      "renderSetType": "WebglLoader3dsSceneRenderSet",
+      "strictReport": "build/three-r185-loader3ds-strict-current/case-closure/summary.json",
+      "notes": "已实现并闭环锁定 r185 portalgun.3ds：小端 chunk 解析、4531 个源顶点展开为 12351 个三角列表顶点、4117 个三角面、UV、三角法线、color.jpg/normal.jpg 显式 mip 链、切线空间法线贴图、Lambert/Blinn-Phong 光照和唯一 Scene RenderSet；color.jpg 遵循 TDSLoader TextureLoader 的 NoColorSpace 语义以 RGBA8Unorm 采样，并按 MAT_SHININESS=84 还原材质。修复 Trackball 相机回放时方向光必须随 view 矩阵变换的问题。initial-loader、canonical-loader、camera-input 三个场景均完成 Legacy/Experimental × Metal/Vulkan × 3 次稳定，正式证据：build/three-r185-loader3ds-strict-current/case-closure/summary.json；四象限统一门禁全部通过（camera-input 单轮异常像素 0.076%、MAE 0.1576、P99 3、SSIM 0.999045）。"
+    }
+  ]
+}

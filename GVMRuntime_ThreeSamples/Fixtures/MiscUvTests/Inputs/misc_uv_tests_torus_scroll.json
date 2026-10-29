@@ -1,0 +1,1 @@
+{"schemaVersion":1,"caseId":"misc_uv_tests","scenarioId":"torus-scroll","frame":0,"target":"body","canonicalState":{"sectionIndex":7},"events":[{"type":"wheel","frame":0,"x":400,"y":250,"deltaY":6300,"deltaMode":0}]}

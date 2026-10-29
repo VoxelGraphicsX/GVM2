@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_shader",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglShaderRenderer",
+      "hostTarget": "WebglShader",
+      "scenePasses": [],
+      "renderSetType": null,
+      "strictReport": "build/three-r185-batch20-wave4-gates/shader-cases-repeat1/summary.json",
+      "notes": "Monjori 全屏 DSL 片元、固定时间初始/动画场景通过统一图像阈值。"
+    }
+  ]
+}

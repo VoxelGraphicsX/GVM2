@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_postprocessing_glitch",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglPostprocessingGlitch",
+      "hostTarget": "WebglPostprocessingGlitch",
+      "scenePasses": [
+        "WebglPostprocessingGlitchMainPass"
+      ],
+      "renderSetType": "WebglPostprocessingGlitchSceneRenderSet",
+      "reportPath": "build/three-r185-wave8-custom-override/runs/webgl-postprocessing-glitch-formal/summary.json",
+      "notes": "已完成专属 100-instance SphereGeometry RenderSet、精确 r185 xorshift 随机边界、层级 Euler 变换、flat MeshPhong/雾、DSL Compute R32Float 位移纹理、DigitalGlitch 与 OutputPass；initial、240 帧 trigger history 和 wild 输入三个场景已通过 Legacy/Experimental × Metal/Vulkan × 3、36 条跨象限比较、24 条稳定性比较、RenderSet policy 与生成产物 ABI lint。正式报告：build/three-r185-wave8-custom-override/runs/webgl-postprocessing-glitch-formal/summary.json。"
+    }
+  ]
+}

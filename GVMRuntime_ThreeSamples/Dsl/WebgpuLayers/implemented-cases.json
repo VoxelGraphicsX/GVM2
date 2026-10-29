@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_layers",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuLayersRenderer",
+      "hostTarget": "WebgpuLayers",
+      "scenePasses": [
+        "WebgpuLayersSceneMainPass"
+      ],
+      "screenPasses": [
+        "WebgpuLayersBackgroundPass"
+      ],
+      "renderSetType": "WebgpuLayersSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave6-gvm/webgpu_layers/formal-v1/summary.json",
+      "notes": "Dedicated three-entity Scene RenderSet with 2,500 instances per entity, RenderEntityID/RenderEntityInstanceID data access, SHA-locked blossom texture, exact WebGPU NPOT mip resampling, r185 alpha-map channel semantics, layer masking, private RotateNode math, time deformation, and screen gradient pass all 36 four-quadrant triple-run captures. Atomic publication remains pending the other fourteen batch cases."
+    }
+  ]
+}

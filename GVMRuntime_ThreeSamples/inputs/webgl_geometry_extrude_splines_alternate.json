@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_geometry_extrude_splines",
+  "scenarioId": "alternate-spline",
+  "frame": 121,
+  "target": "#container > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "spline": "HeartCurve",
+    "animationView": "camera",
+    "orbitDelta": [48, -24]
+  },
+  "events": [
+    {
+      "type": "pointerdown",
+      "frame": 1,
+      "x": 400,
+      "y": 250,
+      "button": 0
+    },
+    {
+      "type": "pointermove",
+      "frame": 1,
+      "x": 448,
+      "y": 226,
+      "buttons": 1
+    },
+    {
+      "type": "pointerup",
+      "frame": 2,
+      "x": 448,
+      "y": 226,
+      "button": 0
+    }
+  ]
+}

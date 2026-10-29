@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgpu_materials_basic",
+  "scenarioId": "refraction",
+  "frame": 61,
+  "target": "canvas:not([class])",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "mapping": "CubeRefractionMapping",
+    "refractionRatio": 0.72
+  },
+  "events": [
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(2) select",
+      "value": "CubeRefractionMapping"
+    },
+    {
+      "type": "change",
+      "frame": 0,
+      "target": ".three-inspector .profiler-mini-panel .list-children-container > .list-item-wrapper:nth-child(3) input[type=range]",
+      "value": "0.72"
+    }
+  ]
+}

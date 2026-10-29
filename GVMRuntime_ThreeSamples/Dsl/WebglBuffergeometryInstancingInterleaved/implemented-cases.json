@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_instancing_interleaved",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryInstancingInterleavedRenderer",
+      "hostTarget": "WebglBuffergeometryInstancingInterleaved",
+      "scenePasses": ["WebglBuffergeometryInstancingInterleavedMainPass"],
+      "screenPasses": [],
+      "renderSetType": "WebglBuffergeometryInstancingInterleavedSceneRenderSet",
+      "renderSetPolicy": "required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_buffergeometry_instancing_interleaved/summary.json",
+      "notes": "实例化 interleaved buffer 通过唯一 Scene RenderSet；顶点阶段读取 RenderEntityID/RenderEntityInstanceID。"
+    }
+  ]
+}

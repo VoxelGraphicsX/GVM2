@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgpu_instance_points",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebgpuInstancePoints",
+      "hostTarget": "WebgpuInstancePoints",
+      "scenePasses": [
+        "WebgpuInstancePointsMainPass",
+        "WebgpuInstancePointsInsetPass"
+      ],
+      "renderSetType": "WebgpuInstancePointsSceneRenderSet",
+      "strictReport": "build/three-r185-current-wave8-r3-20260829/cases/webgpu_instance_points/summary.json"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "caseId": "webgl_buffergeometry_uint",
+      "implementationLevel": "strict-pass",
+      "dslEntry": "WebglBuffergeometryUintRenderer",
+      "hostTarget": "WebglBuffergeometryUint",
+      "scenePasses": ["WebglBuffergeometryUintMainPass"],
+      "screenPasses": [],
+      "renderSetType": null,
+      "renderSetPolicy": "not-required",
+      "strictReport": "build/three-r185-wave7-case-reports/webgl_buffergeometry_uint/summary.json",
+      "notes": "Uint 顶点索引和纹理材质选择走普通 RenderClass；初始与动画场景通过。"
+    }
+  ]
+}

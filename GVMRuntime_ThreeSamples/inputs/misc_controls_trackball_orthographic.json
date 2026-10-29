@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "caseId": "misc_controls_trackball",
+  "scenarioId": "orthographic-camera",
+  "frame": 1,
+  "target": "body > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "orthographicCamera": true
+  },
+  "events": [
+    { "type": "click", "frame": 0, "target": ".lil-gui input[type=\"checkbox\"]", "x": 6, "y": 6 }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "shard": "WebglMultipleViews",
+  "cases": [
+    {
+      "caseId": "webgl_multiple_views",
+      "implementationLevel": "semantic-complete",
+      "dslEntry": "WebglMultipleViewsRenderer",
+      "hostTarget": "WebglMultipleViewsRuntimeAdapter",
+      "scenePasses": [
+        "WebglMultipleViewsOpaquePass",
+        "WebglMultipleViewsTransparentEntityPass",
+        "WebglMultipleViewsWirePass"
+      ],
+      "renderSetType": "WebglMultipleViewsSceneRenderSet",
+      "reportPath": "build/three-r185-next-run/webgl-multiple-views-flat-baseline-20260825/summary.json",
+      "notes": "已拆除 ThreeNextBatch 共享占位入口，建立独立 DSL RenderSet、独立 Host 适配器、确定性 CPU 几何与固定场景帧；三视口背景、相机朝向、Icosahedron 细分、flatShading、阴影纹理和唯一 RenderSet 结构已与 r185 初始场景对齐。wireframe 使用同一 Scene RenderSet 的独立深度测试 WirePass；每个视图执行 opaque、transparent-entity、wireframe 三个场景 pass，共九次 RenderSet 调用。Legacy/Experimental × Metal/Vulkan 初始场景仍存在原生线光栅化差异，尚未达到统一严格门禁，未计通过。pointer-camera 已保留同一三 pass 顺序，正式状态仍以完整四象限三次稳定证据为准。",
+      "screenPasses": [
+        "three-view-region-compose"
+      ]
+    }
+  ]
+}

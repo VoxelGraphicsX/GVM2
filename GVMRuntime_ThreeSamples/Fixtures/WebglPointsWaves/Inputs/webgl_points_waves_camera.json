@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_points_waves",
+  "scenarioId": "camera-input",
+  "frame": 61,
+  "target": "body > div:nth-of-type(2) > canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "pointerX": 100,
+    "pointerY": 0,
+    "cameraUpdateCount": 62
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 500,
+      "y": 250,
+      "pointerId": 1,
+      "button": 0,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}

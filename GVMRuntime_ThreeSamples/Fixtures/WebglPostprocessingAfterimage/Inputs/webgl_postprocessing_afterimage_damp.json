@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "caseId": "webgl_postprocessing_afterimage",
+  "scenarioId": "nondefault-damp",
+  "frame": 61,
+  "target": "body canvas",
+  "canvasWidth": 800,
+  "canvasHeight": 500,
+  "canonicalState": {
+    "damp": 0.82,
+    "enable": true
+  },
+  "events": [
+    {
+      "type": "pointermove",
+      "frame": 0,
+      "x": 400,
+      "y": 250,
+      "pointerId": 1,
+      "button": -1,
+      "buttons": 0,
+      "isPrimary": true,
+      "pointerType": "mouse"
+    }
+  ]
+}
