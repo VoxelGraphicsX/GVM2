@@ -4,6 +4,7 @@ set(GVMRHI_PRIVATE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ComputePassValidator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/BufferCopyMultipleRegionExecutor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/CpuProbeFrontend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/DeviceImpl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceLostState.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceObjectCache.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/FullscreenTextureExecutor.cpp"

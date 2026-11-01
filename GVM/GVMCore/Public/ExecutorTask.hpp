@@ -9,7 +9,7 @@ namespace GVM::Core
     {
     public:
         /// Creates an empty task for queue extraction without allocating a callback.
-        ExecutorTask() = default;
+        ExecutorTask() noexcept;
         /// Takes ownership of a ready callback; the executor must never invoke it inline.
         explicit ExecutorTask(eastl::function<void()> callback);
         /// Transfers the single right to execute the callback.

@@ -1552,32 +1552,15 @@ namespace GVM::RHI
         virtual Queue getMainQueue() const = 0;
         /// Returns a stable compatible queue; single-queue devices alias every valid request to getMainQueue().
         /// Graphics always selects the canonical main queue. Backends may override compute and transfer placement.
-        virtual Queue getQueue(const QueueDescriptor &descriptor)
-        {
-            switch (descriptor.prefer)
-            {
-            case QueuePreference::Graphics:
-            case QueuePreference::Compute:
-            case QueuePreference::Transfer:
-                return getMainQueue();
-            default:
-                throw std::invalid_argument("Device::getQueue requires a valid queue preference.");
-            }
-        }
+        virtual Queue getQueue(const QueueDescriptor &descriptor);
         /** Returns the recorded device loss; empty while the device is healthy. GPU-work and
             object-creation calls throw DeviceLostError once a loss is recorded; free*, destroy,
             and read-only getters never throw because of loss. To recover, destroy the device,
             call Instance::createDevice() again, and recreate all resources. */
         virtual eastl::optional<DeviceLostInfo> getLostInfo() const = 0;
         virtual TimestampQuerySupport getTimestampQuerySupport() const = 0;
-        virtual PassCounterQuerySupport getPassCounterQuerySupport() const
-        {
-            PassCounterQuerySupport support = {};
-            support.supported = False;
-            support.backendName = "unknown";
-            support.unsupportedReason = "Pass counter queries are not implemented by this device.";
-            return support;
-        }
+        /// Reports unsupported pass counters unless a backend overrides this default implementation.
+        virtual PassCounterQuerySupport getPassCounterQuerySupport() const;
         /// Returns memory topology for the selected device so upper layers can choose upload strategies.
         virtual DeviceMemoryProperties getMemoryProperties() const = 0;
         /** Returns the current per-heap budget and usage; cheap enough to call once per frame. Reporting
@@ -1648,7 +1631,8 @@ namespace GVM::RHI
         virtual void freeSampler(Sampler sampler) = 0;
 
         virtual void destroy() = 0;
-        virtual ~DeviceImpl() = default;
+        /// Releases the interface after the backend has completed its explicit destroy operation.
+        virtual ~DeviceImpl();
     };
 
     /// Owns the bytes of one queued readback; becomes ready once the submission that executes the copy completes.

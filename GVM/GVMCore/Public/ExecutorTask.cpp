@@ -4,6 +4,8 @@
 
 namespace GVM::Core
 {
+    ExecutorTask::ExecutorTask() noexcept = default;
+
     ExecutorTask::ExecutorTask(eastl::function<void()> callback)
         : mCallback(eastl::move(callback))
     {
