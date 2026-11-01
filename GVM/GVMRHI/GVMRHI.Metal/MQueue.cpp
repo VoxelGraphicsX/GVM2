@@ -1,3 +1,5 @@
+#include "MSubmissionState.hpp"
+#include <EASTL/unordered_set.h>
 #include "MQueue.hpp"
 #include "MCommandEncoder.hpp"
 #include "MAutoReleasePool.hpp"
@@ -458,6 +460,17 @@ namespace GVM::RHI::Metal
 
     void MQueue::submit(const eastl::vector<CommandEncoder> &encoders)
     {
+        submitBatch(encoders, nullptr);
+    }
+
+    Submission MQueue::submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits)
+    {
+        return submitBatch(encoders, &waits);
+    }
+
+    Submission MQueue::submitBatch(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> *waits)
+    {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::submit");
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
         GVMCpuProbeScopeDetail(
@@ -470,16 +483,107 @@ namespace GVM::RHI::Metal
             mPendingBufferReadbacks.size(),
             mPendingTextureReadbacks.size());
         GVMCpuProbeValueU64(mDevice, QueueProbeCategory, "metal_queue.submit.user_encoder_count", encoders.size());
-        submitInternal(encoders);
+        CommandEncoder dependencyEncoder;
+        CommandEncoder completionEncoder;
+        eastl::shared_ptr<MSubmissionState> completion;
+        if (waits != nullptr)
+        {
+            eastl::unordered_set<MTL::Event *> events;
+            for (const auto &dependency : *waits)
+            {
+                const auto state = eastl::dynamic_pointer_cast<MSubmissionState>(getSubmissionState(dependency));
+                if (!state)
+                {
+                    throw std::invalid_argument("Submission dependency belongs to a different backend.");
+                }
+                events.insert(state->dependency(mDevice->getLostStateHandle()));
+            }
+            eastl::unordered_set<const MCommandEncoder *> uniqueEncoders;
+            for (const auto &encoder : encoders)
+            {
+                const auto *native = encoder ? dynamic_cast<const MCommandEncoder *>(encoder.get()) : nullptr;
+                if (native == nullptr || !uniqueEncoders.insert(native).second)
+                {
+                    throw std::invalid_argument("Submission requires unique Metal command encoders.");
+                }
+                native->validateSubmission(*mNativeQueue, true);
+            }
+            if (!events.empty())
+            {
+                dependencyEncoder = createCommandEncoder();
+                auto *native = static_cast<MCommandEncoder *>(dependencyEncoder.get())->getNativeCommandEncoder();
+                for (auto *event : events)
+                {
+                    native->encodeWait(event, 1);
+                }
+                dependencyEncoder->end();
+            }
+            auto event = NS::TransferPtr(mDevice->getNativeDevice()->newEvent());
+            if (!event)
+            {
+                throw std::runtime_error("Metal could not allocate a submission event.");
+            }
+            completionEncoder = createCommandEncoder();
+            static_cast<MCommandEncoder *>(completionEncoder.get())->getNativeCommandEncoder()->encodeSignalEvent(event.get(), 1);
+            completionEncoder->end();
+            eastl::vector<NS::SharedPtr<MTL::CommandBuffer>> buffers;
+            buffers.reserve(encoders.size() + 4);
+            for (const auto &encoder : {dependencyEncoder, mWriteBufferCommandEncoder})
+            {
+                if (encoder)
+                {
+                    buffers.push_back(NS::RetainPtr(static_cast<MCommandEncoder *>(encoder.get())->getNativeCommandEncoder()));
+                }
+            }
+            for (const auto &encoder : encoders)
+            {
+                buffers.push_back(NS::RetainPtr(static_cast<MCommandEncoder *>(encoder.get())->getNativeCommandEncoder()));
+            }
+            for (const auto &encoder : {mReadbackCommandEncoder, completionEncoder})
+            {
+                if (encoder)
+                {
+                    buffers.push_back(NS::RetainPtr(static_cast<MCommandEncoder *>(encoder.get())->getNativeCommandEncoder()));
+                }
+            }
+            completion = eastl::make_shared<MSubmissionState>(eastl::move(buffers), eastl::move(event), mDevice->getLostStateHandle());
+            completion->arm();
+        }
+        try
+        {
+            submitInternal(encoders, dependencyEncoder, completionEncoder);
+        }
+        catch (...)
+        {
+            if (waits != nullptr)
+            {
+                mDevice->getLostState().markLost(DeviceLostReason::SubmissionFailed, "Metal batch submission failed after commit began.");
+            }
+            throw;
+        }
         mUploadAllocator.markSubmitted(mNextSubmitSerial);
         finalizePendingReadbacks();
         postSubmit();
         mDevice->getObjectCache().releaseUnreferenced();
         pollCommittedCommandBuffers();
+        return completion ? makeSubmission(eastl::move(completion)) : Submission{};
     }
 
     void MQueue::destroy()
     {
+        std::lock_guard lock(mSubmitMutex);
+        for (const auto &committed : mCommittedCommandBuffers)
+        {
+            committed->commandBuffer->waitUntilCompleted();
+            if (committed->commandBuffer->status() == MTL::CommandBufferStatusError)
+            {
+                const auto *error = committed->commandBuffer->error();
+                const char *message = error != nullptr && error->localizedDescription() != nullptr
+                    ? error->localizedDescription()->cString(NS::UTF8StringEncoding) : "Metal submission failed during queue destruction.";
+                mDevice->getLostState().markLost(DeviceLostReason::GpuFault,
+                    message != nullptr ? message : "Metal submission failed during queue destruction.");
+            }
+        }
         GVMCpuProbeScopeDetail(
             mDevice,
             QueueProbeCategory,
@@ -662,7 +766,7 @@ namespace GVM::RHI::Metal
         }
     }
 
-    void MQueue::submitInternal(const eastl::vector<CommandEncoder> &encoders)
+    void MQueue::submitInternal(const eastl::vector<CommandEncoder> &encoders, const CommandEncoder &dependency, const CommandEncoder &completion)
     {
         GVMCpuProbeScopeDetail(
             mDevice,
@@ -674,6 +778,10 @@ namespace GVM::RHI::Metal
             mWriteBufferCommandEncoder != nullptr,
             mReadbackCommandEncoder != nullptr);
         mLastCommittedEncoder = nullptr;
+        if (dependency)
+        {
+            commitCommandEncoder(dependency, "dependency", false);
+        }
 
         if (mWriteBufferCommandEncoder != nullptr)
         {
@@ -707,6 +815,10 @@ namespace GVM::RHI::Metal
                 asyncReadback->assignCommandBuffer(nativeReadback);
             }
         }
+        if (completion)
+        {
+            commitCommandEncoder(completion, "completion", false);
+        }
     }
 
     void MQueue::commitCommandEncoder(const CommandEncoder &encoder, const char *role, bool endEncoder)
@@ -739,7 +851,16 @@ namespace GVM::RHI::Metal
         GVMCpuProbeValueU64(mDevice, QueueProbeCategory, "metal_queue.readback.pending_buffer_count", mPendingBufferReadbacks.size());
         GVMCpuProbeValueU64(mDevice, QueueProbeCategory, "metal_queue.readback.pending_texture_count", mPendingTextureReadbacks.size());
 
-        if (mLastCommittedEncoder != nullptr)
+        bool requiresHostCopy = false;
+        for (const auto &pending : mPendingBufferReadbacks)
+        {
+            requiresHostCopy = requiresHostCopy || pending.destination != nullptr;
+        }
+        for (const auto &pending : mPendingTextureReadbacks)
+        {
+            requiresHostCopy = requiresHostCopy || pending.destination != nullptr;
+        }
+        if (requiresHostCopy && mLastCommittedEncoder != nullptr)
         {
             mLastCommittedEncoder->waitUntilCompleted();
         }

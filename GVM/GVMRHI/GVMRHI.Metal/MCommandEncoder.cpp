@@ -189,6 +189,15 @@ namespace GVM::RHI::Metal
         mEnded = true;
     }
 
+    void MCommandEncoder::validateSubmission(MTL::CommandQueue &queue, bool requireEnded) const
+    {
+        if (mNativeCommandEncoder == nullptr || mNativeCommandEncoder->commandQueue() != &queue ||
+            mCommitted || mHasOpenPass || (requireEnded && !mEnded))
+        {
+            throw std::invalid_argument("Submission requires closed, unsubmitted encoders from this queue.");
+        }
+    }
+
     void MCommandEncoder::commit()
     {
         if (mCommitted) throw std::logic_error("Metal command encoder was already submitted.");

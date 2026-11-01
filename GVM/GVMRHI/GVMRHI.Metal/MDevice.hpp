@@ -98,6 +98,8 @@ namespace GVM::RHI::Metal
         void ensureUsable(const char *apiName) const;
         /** Returns the shared device-lost state reached by queues, swapchains, and readbacks. */
         [[nodiscard]] DeviceLostState &getLostState();
+        /// Retains failure reporting for submission handles that can outlive the device wrapper.
+        [[nodiscard]] const eastl::shared_ptr<DeviceLostState> &getLostStateHandle() const;
         eastl::optional<DeviceLostInfo> getLostInfo() const override;
         /** Returns the shared device-object cache so queues can release unreferenced entries after submit. */
         [[nodiscard]] Private::DeviceObjectCache &getObjectCache() { return mObjectCache; }
@@ -138,7 +140,7 @@ namespace GVM::RHI::Metal
         eastl::vector<Texture> mLiveTextures;
         eastl::vector<Sampler> mLiveSamplers;
         bool mResourcePoolsInitialized = false;
-        DeviceLostState mLostState;
+        eastl::shared_ptr<DeviceLostState> mLostState = eastl::make_shared<DeviceLostState>();
         bool mDestroyed = false;
     };
 

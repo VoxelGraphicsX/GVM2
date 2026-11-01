@@ -760,11 +760,60 @@ namespace GVM::RHI::Vulkan
 
     void VKQueue::submit(const eastl::vector<CommandEncoder> &encoders)
     {
+        submitInternal(encoders, nullptr);
+    }
+
+    Submission VKQueue::submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits)
+    {
+        return submitInternal(encoders, &waits);
+    }
+
+    Submission VKQueue::submitInternal(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> *waits)
+    {
         ensureAlive("VKQueue::submit");
         ensureNotLost();
         GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::submit", "queue={} requested_encoders={} pending_readbacks_before={}", mQueueName.c_str(), encoders.size(), mPendingReadbackTracker.pendingCount());
         VKSubmissionSerial readbackWaitSerial = 0u;
         bool assignedPendingReadbacks = false;
+        eastl::shared_ptr<VKSubmissionState> completion;
+        eastl::vector<vk::SemaphoreSubmitInfo> dependencies;
+        if (waits != nullptr)
+        {
+            for (const auto &dependency : *waits)
+            {
+                const auto state = eastl::dynamic_pointer_cast<VKSubmissionState>(getSubmissionState(dependency));
+                if (!state)
+                {
+                    throw std::invalid_argument("Submission dependency belongs to a different backend.");
+                }
+                const auto native = state->dependency(mDevice->getLostStateHandle());
+                bool found = false;
+                for (auto &existing : dependencies)
+                {
+                    if (existing.semaphore == native.semaphore)
+                    {
+                        existing.value = eastl::max(existing.value, native.value);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    dependencies.push_back(native);
+                }
+            }
+            for (const auto &encoder : encoders)
+            {
+                const auto *native = encoder ? dynamic_cast<const VKCommandEncoder *>(encoder.get()) : nullptr;
+                if (native == nullptr || native->getQueue() != this || !native->isEnded())
+                {
+                    throw std::invalid_argument("Submission requires closed encoders from this queue.");
+                }
+            }
+        }
+        vk::SubmitInfo2 submitInfo;
+        submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(dependencies.size());
+        submitInfo.pWaitSemaphoreInfos = dependencies.data();
 
         {
             ScopedLock lock(mSubmitMutex);
@@ -809,7 +858,7 @@ namespace GVM::RHI::Vulkan
             const size_t internalCommandBufferCount = commandBuffers.size() - userCommandBufferCount;
 
             VKSubmissionSerial submissionSerial = 0u;
-            if (!commandBuffers.empty())
+            if (!commandBuffers.empty() || waits != nullptr)
             {
                 const bool includesUserCommandBuffers = commandBuffers.size() > internalCommandBufferCount;
                 submissionSerial = submitRecordedCommandBuffersLocked(
@@ -817,8 +866,9 @@ namespace GVM::RHI::Vulkan
                     submittedEncoders,
                     false,
                     includesUserCommandBuffers,
-                    nullptr,
-                    selectCollectedSubmitKind(commandBuffers.size(), internalCommandBufferCount, internalContainsDeferredCopies, false));
+                    waits != nullptr ? &submitInfo : nullptr,
+                    selectCollectedSubmitKind(commandBuffers.size(), internalCommandBufferCount, internalContainsDeferredCopies, false),
+                    waits != nullptr ? &completion : nullptr);
             }
 
             assignedPendingReadbacks = assignPendingReadbackCompletionLocked(submissionSerial, readbackWaitSerial);
@@ -835,7 +885,7 @@ namespace GVM::RHI::Vulkan
 
         if (!assignedPendingReadbacks)
         {
-            return;
+            return completion ? makeSubmission(eastl::move(completion)) : Submission{};
         }
 
         if (readbackWaitSerial != 0u && !mSubmissionManager.isRetired(readbackWaitSerial))
@@ -845,6 +895,7 @@ namespace GVM::RHI::Vulkan
 
         ScopedLock lock(mSubmitMutex);
         pollCompletedSubmissions();
+        return completion ? makeSubmission(eastl::move(completion)) : Submission{};
     }
 
     VKSubmissionSerial VKQueue::submitTracked(const vk::SubmitInfo2 &submitInfo, bool internalPresentSubmit)
@@ -1093,7 +1144,7 @@ namespace GVM::RHI::Vulkan
         }
     }
 
-    VKSubmissionSerial VKQueue::submitRecordedCommandBuffersLocked(const eastl::vector<vk::CommandBuffer> &commandBuffers, const eastl::vector<CommandEncoder> &encoders, bool internalPresentSubmit, bool noteUserSubmit, const vk::SubmitInfo2 *submitTemplate, const char *submitKind)
+    VKSubmissionSerial VKQueue::submitRecordedCommandBuffersLocked(const eastl::vector<vk::CommandBuffer> &commandBuffers, const eastl::vector<CommandEncoder> &encoders, bool internalPresentSubmit, bool noteUserSubmit, const vk::SubmitInfo2 *submitTemplate, const char *submitKind, eastl::shared_ptr<VKSubmissionState> *completion)
     {
         const char *effectiveSubmitKind = submitKind;
         GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::submitRecordedCommandBuffersLocked", "queue={} command_buffers={} encoders={} internal_present={} submit_kind={}", mQueueName.c_str(), commandBuffers.size(), encoders.size(), internalPresentSubmit, effectiveSubmitKind);
@@ -1131,7 +1182,7 @@ namespace GVM::RHI::Vulkan
             submitWaitSemaphores.clear(); submitSignalSemaphores.clear();
             prepareSubmitInfoSynchronization(submitTemplate, directPresentSync, submitWaitSemaphores, submitSignalSemaphores);
             submissionSerial = mSubmissionManager.executeTrackedSubmit(mQueue, commandBuffers, submitWaitSemaphores, submitSignalSemaphores,
-                encoders, internalPresentSubmit, noteUserSubmit, submitStatistics, effectiveSubmitKind);
+                encoders, internalPresentSubmit, noteUserSubmit, submitStatistics, effectiveSubmitKind, completion);
             if (noteUserSubmit && mDevice != nullptr && mDevice->getAllocator() != nullptr)
             {
                 vmaSetCurrentFrameIndex(mDevice->getAllocator(), static_cast<uint32_t>(submissionSerial));

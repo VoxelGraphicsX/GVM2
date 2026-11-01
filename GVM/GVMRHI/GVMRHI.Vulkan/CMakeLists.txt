@@ -47,6 +47,8 @@ target_sources(
         VKShaderModule.cpp
         VKShaderReflection.cpp
         VKSubmissionManager.cpp
+        VKSubmissionTimeline.cpp
+        VKSubmissionState.cpp
         VKSyncUtils.cpp
         VKSwapchain.cpp
         VKTexture.cpp

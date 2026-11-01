@@ -42,8 +42,7 @@ namespace GVM::RHI::Vulkan
         mDevice = &device;
         mQueueName = queueName;
         mInFlightSubmissions.clear();
-        const vk::SemaphoreTypeCreateInfo type = vk::SemaphoreTypeCreateInfo{}.setSemaphoreType(vk::SemaphoreType::eTimeline);
-        mTimeline = device.getNativeDevice().createSemaphoreUnique(vk::SemaphoreCreateInfo{}.setPNext(&type));
+        mTimeline = eastl::make_shared<VKSubmissionTimeline>(device);
         mNextSubmissionId = 1u;
         mUserSubmitCount = 0u;
         mBackendSubmitCount = 0u;
@@ -57,7 +56,11 @@ namespace GVM::RHI::Vulkan
     void VKSubmissionManager::destroy()
     {
         mInFlightSubmissions.clear();
-        mTimeline.reset();
+        if (mTimeline)
+        {
+            mTimeline->close();
+            mTimeline.reset();
+        }
         mMostRecentSubmissionSerial = 0u;
         mQueueName.clear();
         mDevice = nullptr;
@@ -79,7 +82,8 @@ namespace GVM::RHI::Vulkan
         bool internalPresentSubmit,
         bool countUserSubmit,
         const QueueDiagnostics::SubmissionStatistics &statistics,
-        const char *submitKind)
+        const char *submitKind,
+        eastl::shared_ptr<VKSubmissionState> *completion)
     {
         if (mDevice == nullptr || queue == vk::Queue{})
         {
@@ -90,12 +94,13 @@ namespace GVM::RHI::Vulkan
             throw std::invalid_argument("VKSubmissionManager::executeTrackedSubmit requires a valid submit kind.");
         }
         const uint64_t submissionId = mNextSubmissionId++;
+        auto acceptedCompletion = completion != nullptr ? eastl::make_shared<VKSubmissionState>(mTimeline, submissionId) : nullptr;
         eastl::vector<vk::CommandBufferSubmitInfo> commands;
         commands.reserve(commandBuffers.size());
         for (vk::CommandBuffer commandBuffer : commandBuffers)
             commands.push_back(vk::CommandBufferSubmitInfo{}.setCommandBuffer(commandBuffer));
         eastl::vector<vk::SemaphoreSubmitInfo> signals = signalSemaphores;
-        signals.push_back(vk::SemaphoreSubmitInfo{}.setSemaphore(mTimeline.get()).setValue(submissionId)
+        signals.push_back(vk::SemaphoreSubmitInfo{}.setSemaphore(mTimeline->nativeSemaphore()).setValue(submissionId)
             .setStageMask(vk::PipelineStageFlagBits2::eAllCommands));
         vk::SubmitInfo2 submitInfo = {};
         submitInfo.commandBufferInfoCount = static_cast<uint32_t>(commands.size());
@@ -147,6 +152,10 @@ namespace GVM::RHI::Vulkan
         {
             mInFlightSubmissions.pop_back();
             throw;
+        }
+        if (completion != nullptr)
+        {
+            *completion = eastl::move(acceptedCompletion);
         }
         mMostRecentSubmissionSerial = submissionId;
         if (countUserSubmit) ++mUserSubmitCount;
@@ -204,7 +213,7 @@ namespace GVM::RHI::Vulkan
         uint64_t completedValue = 0u;
         try
         {
-            completedValue = mDevice->getNativeDevice().getSemaphoreCounterValue(mTimeline.get());
+            completedValue = mDevice->getNativeDevice().getSemaphoreCounterValue(mTimeline->nativeSemaphore());
         }
         catch (const vk::DeviceLostError &error)
         {
@@ -322,7 +331,7 @@ namespace GVM::RHI::Vulkan
                 submission.submissionId,
                 mInFlightSubmissions.size(),
                 submissionAgeMilliseconds(submission));
-            const vk::Semaphore semaphore = mTimeline.get();
+            const vk::Semaphore semaphore = mTimeline->nativeSemaphore();
             const vk::SemaphoreWaitInfo waitInfo = vk::SemaphoreWaitInfo{}.setSemaphores(semaphore).setValues(targetSubmissionId);
             const vk::Result waitResult = mDevice->getNativeDevice().waitSemaphores(waitInfo, kHostGpuWaitTimeoutNanoseconds);
             if (waitResult == vk::Result::eTimeout)
@@ -394,7 +403,7 @@ namespace GVM::RHI::Vulkan
             outStatus.ageMs = submissionAgeMilliseconds(submission);
             try
             {
-                outStatus.signaled = mDevice->getNativeDevice().getSemaphoreCounterValue(mTimeline.get()) >= submission.submissionId;
+                outStatus.signaled = mDevice->getNativeDevice().getSemaphoreCounterValue(mTimeline->nativeSemaphore()) >= submission.submissionId;
             }
             catch (const vk::DeviceLostError &error)
             {

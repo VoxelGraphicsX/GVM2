@@ -136,7 +136,7 @@ namespace GVM::RHI::Metal
     void MDevice::init(MInstance *instance)
     {
         mInstance = instance;
-        mLostState.setCallback(instance->getDescriptor().deviceLostCallback);
+        mLostState->setCallback(instance->getDescriptor().deviceLostCallback);
         mLogger = instance != nullptr ? instance->getLogger() : Logger{};
         mDiagnosticsOverlayConfig = instance != nullptr ? instance->getDescriptor().diagnosticsOverlay : RuntimeDiagnosticsOverlayConfig{};
         this->activateGCPool();
@@ -315,17 +315,22 @@ namespace GVM::RHI::Metal
         {
             throw std::runtime_error((eastl::string(apiName) + " was called on a destroyed Metal device.").c_str());
         }
-        mLostState.throwIfLost(apiName);
+        mLostState->throwIfLost(apiName);
     }
 
     DeviceLostState &MDevice::getLostState()
+    {
+        return *mLostState;
+    }
+
+    const eastl::shared_ptr<DeviceLostState> &MDevice::getLostStateHandle() const
     {
         return mLostState;
     }
 
     eastl::optional<DeviceLostInfo> MDevice::getLostInfo() const
     {
-        return mLostState.getInfo();
+        return mLostState->getInfo();
     }
 
     Buffer MDevice::createBuffer(const BufferDescriptor &descriptor)

@@ -43,6 +43,8 @@ namespace GVM::RHI::Vulkan
         void copyBufferToBufferMultipleRegion(Buffer source, Buffer destination, Buffer regions, uint32_t regionCount) override;
         void fillBuffer(BufferRange source, uint8_t value) override;
         void submit(const eastl::vector<CommandEncoder> &encoders) override;
+        /// Submits closed encoders with GPU timeline waits and returns retained completion.
+        Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits) override;
         void destroy() override;
         void waitForSubmission(VKSubmissionSerial serial, const char *waitSource = "unspecified");
         /**
@@ -76,6 +78,8 @@ namespace GVM::RHI::Vulkan
 
     private:
         using InFlightSubmission = VKSubmissionManager::InFlightSubmission;
+        /// Shares legacy transfer ordering; null waits preserve the old no-op submission contract.
+        Submission submitInternal(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> *waits);
         void ensureAlive(const char *apiName) const;
         /** Throws once the queue was marked lost by a failed native submission; waits and polling stay usable. */
         void ensureNotLost() const;
@@ -115,7 +119,8 @@ namespace GVM::RHI::Vulkan
             bool internalPresentSubmit,
             bool noteUserSubmit,
             const vk::SubmitInfo2 *submitTemplate,
-            const char *submitKind);
+            const char *submitKind,
+            eastl::shared_ptr<VKSubmissionState> *completion = nullptr);
 
         VKDevice *mDevice = nullptr;
         Logger mLogger;

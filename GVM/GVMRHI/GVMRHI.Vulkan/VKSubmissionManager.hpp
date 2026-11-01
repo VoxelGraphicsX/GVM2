@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VKCommon.hpp"
+#include "VKSubmissionState.hpp"
 
 #include <EASTL/functional.h>
 #include <EASTL/string.h>
@@ -62,7 +63,8 @@ namespace GVM::RHI::Vulkan
             bool internalPresentSubmit,
             bool countUserSubmit,
             const QueueDiagnostics::SubmissionStatistics &statistics,
-            const char *submitKind);
+            const char *submitKind,
+            eastl::shared_ptr<VKSubmissionState> *completion = nullptr);
 
         [[nodiscard]]
         size_t getInFlightCount() const;
@@ -108,7 +110,7 @@ namespace GVM::RHI::Vulkan
         VKDevice *mDevice = nullptr;
         eastl::string mQueueName;
         eastl::vector<InFlightSubmission> mInFlightSubmissions;
-        vk::UniqueSemaphore mTimeline;
+        eastl::shared_ptr<VKSubmissionTimeline> mTimeline;
         uint64_t mNextSubmissionId = 1u;
         uint64_t mUserSubmitCount = 0u;
         uint64_t mBackendSubmitCount = 0u;

@@ -33,6 +33,8 @@ namespace GVM::RHI::Metal
         virtual void resolveQuerySet(QuerySet querySet, uint32_t firstQuery, uint32_t queryCount, BufferRange destination) override;
         virtual void end() override;
         void commit();
+        /// Validates queue ownership, single-use submission and optionally an explicit end boundary.
+        void validateSubmission(MTL::CommandQueue &queue, bool requireEnded) const;
         void waitUntilCompleted();
         MTL::CommandBuffer *getNativeCommandEncoder() const;
         void notifyPassEnded();

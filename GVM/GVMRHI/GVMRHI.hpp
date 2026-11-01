@@ -1,4 +1,5 @@
 #pragma once
+#include "Submission.hpp"
 #include <EASTL/string.h>
 #include <EASTL/string_view.h>
 #include <EASTL/vector.h>
@@ -1681,8 +1682,19 @@ namespace GVM::RHI
         virtual void fillBuffer(BufferRange source, uint8_t value) = 0;
         /** Submits the recorded command encoders so that all queued writes run before them and all queued reads and texture-to-buffer copies run after them, each in call order. */
         virtual void submit(const eastl::vector<CommandEncoder> &encoders) = 0;
+        /// Submits closed encoders after GPU dependencies, preserving pending-write/user/pending-read order.
+        /// Dependencies must originate from this device; accepted work returns an owning completion handle.
+        /// Empty batches still return completion; legacy pointer readbacks retain their host-wait behavior.
+        virtual Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits);
         virtual void destroy() = 0;
-        virtual ~QueueImpl() = default;
+        /// Releases the interface after backend queue destruction has drained accepted GPU work.
+        virtual ~QueueImpl();
+
+    protected:
+        /// Creates the public handle from backend-owned accepted completion state.
+        static Submission makeSubmission(eastl::shared_ptr<Private::SubmissionState> state);
+        /// Resolves a nonempty dependency for backend validation and native synchronization.
+        static const eastl::shared_ptr<Private::SubmissionState> &getSubmissionState(const Submission &submission);
     };
 
     class SwapchainImpl

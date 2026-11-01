@@ -24,6 +24,7 @@ target_sources(
         MPipelineLayout.cpp
         MQuerySet.cpp
         MQueue.cpp
+        MSubmissionState.cpp
     MReadback.cpp
         MRenderPassEncoder.cpp
         MRenderPipeline.cpp

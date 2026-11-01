@@ -140,7 +140,7 @@ namespace GVM::RHI::Vulkan
 
         mInstance = instance;
         mLogContext = instance->getLogContext();
-        mLostState.setCallback(instance->getDescriptor().deviceLostCallback);
+        mLostState->setCallback(instance->getDescriptor().deviceLostCallback);
         mLogger = instance->getLogger();
         mDiagnosticsOverlayConfig = instance->getDescriptor().diagnosticsOverlay;
         if (!mLogger && mLogContext)
@@ -566,7 +566,7 @@ namespace GVM::RHI::Vulkan
             }
             catch (const vk::DeviceLostError &error)
             {
-                mLostState.markLost(DeviceLostReason::GpuFault, error.what());
+                mLostState->markLost(DeviceLostReason::GpuFault, error.what());
                 GVMLogWarn(this, DeviceLogCategory, "event=device_wait_idle_device_lost reason={}", error.what());
             }
             GVMLogWarn(this, DeviceLogCategory, "event=device_wait_idle_end");
@@ -634,17 +634,22 @@ namespace GVM::RHI::Vulkan
     void VKDevice::ensureUsable(const char *apiName) const
     {
         ensureAlive(apiName);
-        mLostState.throwIfLost(apiName);
+        mLostState->throwIfLost(apiName);
     }
 
     DeviceLostState &VKDevice::getLostState()
+    {
+        return *mLostState;
+    }
+
+    const eastl::shared_ptr<DeviceLostState> &VKDevice::getLostStateHandle() const
     {
         return mLostState;
     }
 
     eastl::optional<DeviceLostInfo> VKDevice::getLostInfo() const
     {
-        return mLostState.getInfo();
+        return mLostState->getInfo();
     }
 
     ComputePipeline VKDevice::createComputePipeline(const ComputePipelineDescriptor &descriptor)

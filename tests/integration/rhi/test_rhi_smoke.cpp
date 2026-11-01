@@ -4,9 +4,14 @@
 #include <GVMCore/Private/GDeviceProxy.hpp>
 #include <GVMCore/Private/GQueue.hpp>
 #include <GVMRHI/GVMRHI.hpp>
+#include "MCommandEncoder.hpp"
+#include "MDevice.hpp"
+#include "MQueue.hpp"
 
 #include <array>
 #include <cstring>
+#include <atomic>
+#include <thread>
 
 namespace
 {
@@ -361,6 +366,189 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
             EXPECT_EQ(device->getQueue({.prefer = preference, .index = 4096}), mainQueue);
         }
         EXPECT_THROW(device->getQueue({.prefer = static_cast<QueuePreference>(255)}), std::invalid_argument);
+    }
+
+    /// Verifies an empty batch still produces a GPU completion and repeated waits remain valid.
+    TEST_F(RhiSmokeTest, SubmissionEmptyBatchAndRepeatedDependenciesComplete)
+    {
+        auto *queue = device->getMainQueue();
+        const auto first = queue->submit({}, {});
+        const auto second = queue->submit({}, {first, first});
+        const auto third = queue->submit({}, {first, second});
+        ASSERT_TRUE(third.wait(5'000'000'000ull));
+        EXPECT_TRUE(first.isComplete());
+        EXPECT_TRUE(second.wait(0));
+        EXPECT_TRUE(third.isComplete());
+    }
+
+    /// Verifies invalid handles and incomplete or duplicate encoders are rejected before commit.
+    TEST_F(RhiSmokeTest, SubmissionValidationLeavesEncodersUsable)
+    {
+        using namespace GVM::RHI;
+        auto *queue = device->getMainQueue();
+        Submission unbound;
+        EXPECT_THROW(unbound.isComplete(), std::logic_error);
+        EXPECT_THROW(unbound.wait(0), std::logic_error);
+        EXPECT_THROW(queue->submit({}, {unbound}), std::invalid_argument);
+        auto encoder = queue->createCommandEncoder();
+        EXPECT_THROW(queue->submit({encoder}, {}), std::invalid_argument);
+        encoder->end();
+        EXPECT_THROW(queue->submit({encoder, encoder}, {}), std::exception);
+        EXPECT_THROW(queue->submit({CommandEncoder{}}, {}), std::invalid_argument);
+        const auto completion = queue->submit({encoder}, {});
+        ASSERT_TRUE(completion.wait(5'000'000'000ull));
+        EXPECT_THROW(queue->submit({encoder}, {}), std::exception);
+        EXPECT_TRUE(queue->submit({}, {completion}).wait(5'000'000'000ull));
+    }
+
+    /// Verifies a new submission preserves upload, user-copy and readback ordering through dependencies.
+    TEST_F(RhiSmokeTest, SubmissionOrdersPendingTransfersAndUserCommands)
+    {
+        using namespace GVM::RHI;
+        auto *queue = device->getMainQueue();
+        const std::array<uint32_t, 4> expected = {17, 29, 43, 71};
+        const auto source = device->createBuffer({.label = "SubmissionSource",
+            .usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = sizeof(expected)});
+        const auto target = device->createBuffer({.label = "SubmissionTarget",
+            .usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = sizeof(expected)});
+        queue->writeBuffer(BufferRange(source, 0, sizeof(expected)), expected.data(), sizeof(expected));
+        auto encoder = queue->createCommandEncoder();
+        auto pass = encoder->beginBlitPass({});
+        pass->copyBufferToBuffer(BufferRange(source, 0, sizeof(expected)), BufferRange(target, 0, sizeof(expected)));
+        pass->end();
+        encoder->end();
+        auto readback = queue->readBufferAsync(BufferRange(target, 0, sizeof(expected)));
+        const auto copied = queue->submit({encoder}, {});
+        const auto joined = queue->submit({}, {copied, copied});
+        ASSERT_TRUE(joined.wait(5'000'000'000ull));
+        readback->wait();
+        const auto bytes = readback->getData();
+        ASSERT_EQ(bytes.size(), sizeof(expected));
+        EXPECT_EQ(std::memcmp(bytes.data(), expected.data(), sizeof(expected)), 0);
+        device->freeBuffer(source);
+        device->freeBuffer(target);
+    }
+
+    /// Verifies a completion's device identity cannot be reused on a different device instance.
+    TEST_F(RhiSmokeTest, SubmissionRejectsForeignDeviceDependencies)
+    {
+        const auto completion = device->getMainQueue()->submit({}, {});
+        auto *foreignInstance = GVM::Tests::createTestInstance();
+        ASSERT_NE(foreignInstance, nullptr);
+        auto *foreignDevice = foreignInstance->createDevice();
+        ASSERT_NE(foreignDevice, nullptr);
+        EXPECT_THROW(foreignDevice->getMainQueue()->submit({}, {completion}), std::invalid_argument);
+        EXPECT_TRUE(foreignDevice->getMainQueue()->submit({}, {}).wait(5'000'000'000ull));
+        GVM::RHI::destroyInstance(foreignInstance);
+        EXPECT_TRUE(completion.wait(5'000'000'000ull));
+    }
+
+    /// Verifies copied completion handles allow concurrent host waits without queue access.
+    TEST_F(RhiSmokeTest, SubmissionSupportsConcurrentHostWaiters)
+    {
+        const auto completion = device->getMainQueue()->submit({}, {});
+        std::atomic<uint32_t> completed{0};
+        eastl::vector<std::thread> waiters;
+        for (uint32_t index = 0; index < 4; ++index)
+        {
+            waiters.emplace_back([completion, &completed]
+            {
+                if (completion.wait(5'000'000'000ull))
+                {
+                    completed.fetch_add(1);
+                }
+            });
+        }
+        for (auto &waiter : waiters)
+        {
+            waiter.join();
+        }
+        EXPECT_EQ(completed.load(), 4u);
+    }
+
+    /// Verifies device teardown drains accepted work and leaves retained completions queryable.
+    TEST_F(RhiSmokeTest, SubmissionOutlivesDeviceAndQueueWrappers)
+    {
+        const auto completion = device->getMainQueue()->submit({}, {});
+        GVM::RHI::destroyInstance(instance);
+        instance = nullptr;
+        device = nullptr;
+        EXPECT_TRUE(completion.wait(0));
+        EXPECT_TRUE(completion.isComplete());
+    }
+
+    /// Verifies a stalled Metal producer holds a different native queue without a host-side submit wait.
+    TEST_F(RhiSmokeTest, SubmissionMetalCrossQueueWaitAndTimeout)
+    {
+        if (!inlineMetalShaderSupported())
+        {
+            GTEST_SKIP() << "This test exercises native Metal queues and a host-signaled Metal event.";
+        }
+        using namespace GVM::RHI;
+        auto &metalDevice = *static_cast<Metal::MDevice *>(device);
+        Metal::MQueue consumer;
+        consumer.init(&metalDevice, "SubmissionConsumer");
+        auto gate = NS::TransferPtr(metalDevice.getNativeDevice()->newSharedEvent());
+        const auto source = device->createBuffer({.label = "SubmissionGatedSource",
+            .usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 16});
+        const auto target = device->createBuffer({.label = "SubmissionGatedTarget",
+            .usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 16});
+        auto producerEncoder = device->getMainQueue()->createCommandEncoder();
+        static_cast<Metal::MCommandEncoder *>(producerEncoder.get())->getNativeCommandEncoder()->encodeWait(gate.get(), 1);
+        auto producerPass = producerEncoder->beginBlitPass({});
+        producerPass->fillBuffer(BufferRange(source, 0, 16), 0x3a);
+        producerPass->end();
+        producerEncoder->end();
+        try
+        {
+            const auto produced = device->getMainQueue()->submit({producerEncoder}, {});
+            auto consumerEncoder = consumer.createCommandEncoder();
+            auto consumerPass = consumerEncoder->beginBlitPass({});
+            consumerPass->copyBufferToBuffer(BufferRange(source, 0, 16), BufferRange(target, 0, 16));
+            consumerPass->end();
+            consumerEncoder->end();
+            auto readback = consumer.readBufferAsync(BufferRange(target, 0, 16));
+            const auto consumed = consumer.submit({consumerEncoder}, {produced});
+            EXPECT_FALSE(produced.wait(1'000'000));
+            EXPECT_FALSE(consumed.wait(1'000'000));
+            gate->setSignaledValue(1);
+            EXPECT_TRUE(consumed.wait(5'000'000'000ull));
+            readback->wait();
+            const auto bytes = readback->getData();
+            EXPECT_EQ(bytes.size(), 16u);
+            for (const auto byte : bytes)
+            {
+                EXPECT_EQ(byte, 0x3a);
+            }
+        }
+        catch (...)
+        {
+            gate->setSignaledValue(1);
+            consumer.destroy();
+            throw;
+        }
+        consumer.destroy();
+        device->freeBuffer(source);
+        device->freeBuffer(target);
+    }
+
+    /// Verifies diagnostics wrappers preserve the dependency-aware submission contract.
+    TEST_F(RhiSmokeTest, SubmissionPassesThroughDiagnosticsOverlay)
+    {
+        auto descriptor = GVM::Tests::makeTestInstanceDescriptor();
+        descriptor.diagnosticsOverlay.enabled = GVM::RHI::True;
+        auto *overlayInstance = GVM::RHI::createInstance(descriptor);
+        ASSERT_NE(overlayInstance, nullptr);
+        auto *overlayDevice = overlayInstance->createDevice();
+        ASSERT_NE(overlayDevice, nullptr);
+        auto *queue = overlayDevice->getMainQueue();
+        auto encoder = queue->createCommandEncoder();
+        EXPECT_THROW(queue->submit({encoder}, {}), std::invalid_argument);
+        encoder->end();
+        const auto first = queue->submit({encoder}, {});
+        EXPECT_TRUE(queue->submit({}, {first}).wait(5'000'000'000ull));
+        GVM::RHI::destroyInstance(overlayInstance);
+        EXPECT_TRUE(first.isComplete());
     }
 
     TEST_F(RhiSmokeTest, HealthyDeviceReportsEmptyLostInfoAndNoCallback)

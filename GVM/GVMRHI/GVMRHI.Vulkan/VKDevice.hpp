@@ -100,6 +100,8 @@ namespace GVM::RHI::Vulkan
         void ensureUsable(const char *apiName) const;
         /** Returns the shared device-lost state reached by queues, swapchains, and readbacks. */
         [[nodiscard]] DeviceLostState &getLostState();
+        /// Retains failure reporting for submission handles that can outlive the device wrapper.
+        [[nodiscard]] const eastl::shared_ptr<DeviceLostState> &getLostStateHandle() const;
         /** Returns the recorded device loss; empty while the device is healthy. */
         eastl::optional<DeviceLostInfo> getLostInfo() const override;
         [[nodiscard]] VKPresentManager &getPresentManager();
@@ -156,7 +158,7 @@ namespace GVM::RHI::Vulkan
         VKPresentManager mPresentManager;
         VKResourceRegistry mResourceRegistry{*this};
         VKResourceStateDB mResourceStateDB;
-        DeviceLostState mLostState;
+        eastl::shared_ptr<DeviceLostState> mLostState = eastl::make_shared<DeviceLostState>();
         mutable Mutex mDescriptorPoolMutex;
         VKDescriptorPoolStore mDescriptorPoolStore;
         VKPipelineCache mPipelineCache;

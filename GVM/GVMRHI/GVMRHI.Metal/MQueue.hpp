@@ -7,6 +7,7 @@
 #include <EASTL/unique_ptr.h>
 #include <GVMRHI/GVMRHI.hpp>
 #include <Metal/Metal.hpp>
+#include <mutex>
 namespace GVM::RHI::Metal
 {
 
@@ -41,10 +42,16 @@ namespace GVM::RHI::Metal
         /// Queues a texture readback executed by the next submission; the Readback becomes ready once that submission completes.
         virtual Readback readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize) override;
         virtual void submit(const eastl::vector<CommandEncoder> &encoders) override;
+        /// Submits closed encoders with GPU event dependencies and retained completion.
+        Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits) override;
+        /// Drains accepted command buffers before releasing queue-owned upload and readback resources.
         virtual void destroy() override;
         MTL::CommandQueue *getNativeQueue() const;
 
     private:
+        std::mutex mSubmitMutex;
+        /// Shares legacy transfer ordering, adding dependency and completion command buffers only when requested.
+        Submission submitBatch(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> *waits);
         MUploadAllocator mUploadAllocator;
         eastl::string mQueueName;
 
@@ -117,7 +124,7 @@ namespace GVM::RHI::Metal
          * tracks its command buffer under role, commits it, and records it as the last committed encoder.
          */
         void commitCommandEncoder(const CommandEncoder &encoder, const char *role, bool endEncoder);
-        void submitInternal(const eastl::vector<CommandEncoder> &encoders);
+        void submitInternal(const eastl::vector<CommandEncoder> &encoders, const CommandEncoder &dependency, const CommandEncoder &completion);
         void finalizePendingReadbacks();
         void postSubmit();
     };

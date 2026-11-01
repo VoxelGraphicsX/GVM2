@@ -601,10 +601,14 @@ namespace GVM::RHI::Private
         Readback readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize) override;
             /// Ends wrapped encoders as needed, submits real backend encoders, and advances overlay readback state.
             void submit(const eastl::vector<CommandEncoder> &encoders) override;
+            /// Forwards explicit GPU dependencies and returns the underlying completion handle.
+            Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits) override;
             /// Releases overlay state while leaving backend queue lifetime with the owning device.
             void destroy() override;
 
         private:
+            /// Unwraps recorded encoders, preserving the strict closed-encoder contract for tracked submissions.
+            eastl::vector<CommandEncoder> unwrapEncoders(const eastl::vector<CommandEncoder> &encoders, bool requireClosed);
             eastl::unique_ptr<DiagnosticsOverlayController> mController;
             Queue mInnerQueue = nullptr;
         };
@@ -1447,7 +1451,7 @@ namespace GVM::RHI::Private
         return mInnerQueue->readTextureAsync(source, dataLayout, readSize);
         }
 
-        void DiagnosticsOverlayQueue::submit(const eastl::vector<CommandEncoder> &encoders)
+        eastl::vector<CommandEncoder> DiagnosticsOverlayQueue::unwrapEncoders(const eastl::vector<CommandEncoder> &encoders, bool requireClosed)
         {
             eastl::vector<CommandEncoder> innerEncoders;
             innerEncoders.reserve(encoders.size());
@@ -1455,6 +1459,10 @@ namespace GVM::RHI::Private
             {
                 if (encoder == nullptr)
                 {
+                    if (requireClosed)
+                    {
+                        throw std::invalid_argument("Submission requires nonnull command encoders.");
+                    }
                     continue;
                 }
 
@@ -1462,6 +1470,10 @@ namespace GVM::RHI::Private
                 {
                     if (!overlayEncoder->isEnded())
                     {
+                        if (requireClosed)
+                        {
+                            throw std::invalid_argument("Submission requires closed overlay command encoders.");
+                        }
                         overlayEncoder->end();
                     }
                     innerEncoders.push_back(overlayEncoder->getInnerEncoder());
@@ -1472,11 +1484,26 @@ namespace GVM::RHI::Private
                 }
             }
 
-            mInnerQueue->submit(innerEncoders);
+            return innerEncoders;
+        }
+
+        void DiagnosticsOverlayQueue::submit(const eastl::vector<CommandEncoder> &encoders)
+        {
+            mInnerQueue->submit(unwrapEncoders(encoders, false));
             if (mController && mController->isEnabled())
             {
                 mController->afterSubmit(mInnerQueue);
             }
+        }
+
+        Submission DiagnosticsOverlayQueue::submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits)
+        {
+            auto completion = mInnerQueue->submit(unwrapEncoders(encoders, true), waits);
+            if (mController && mController->isEnabled())
+            {
+                mController->afterSubmit(mInnerQueue);
+            }
+            return completion;
         }
 
         void DiagnosticsOverlayQueue::destroy()
