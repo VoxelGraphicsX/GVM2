@@ -9,7 +9,12 @@ namespace UGLC::CodeGen::CPP
     {
 
         std::string result = canonicalName;
-        if (canonicalName == "UGL::Device")
+        if (canonicalName == "UGL::TaskGraph" || canonicalName == "UGL::TaskRuntime" ||
+            canonicalName == "UGL::Task" || canonicalName == "UGL::Execution" || canonicalName == "UGL::ExecutionStatus")
+        {
+            result = "GVM::Core::" + canonicalName.substr(5);
+        }
+        else if (canonicalName == "UGL::Device")
         {
             result = "GVM::Core::DeviceProxy";
         }

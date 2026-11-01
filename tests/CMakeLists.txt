@@ -62,6 +62,8 @@ if(GVM_BUILD_TESTS_UNIT)
             unit/test_staging_linear_allocator.cpp
             unit/test_helper_function.cpp
             unit/test_eastl_allocator.cpp
+            unit/test_task_runtime.cpp
+            unit/TaskTestExecutor.cpp
         LABELS unit whitebox core
         INCLUDE_DIRS
             ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
@@ -656,6 +658,15 @@ elseif(GVM_BUILD_TESTS_RHI)
 endif()
 
 if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
+    gvm_add_dsl_runtime_gtest(gvm_dsl_task_graph_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/CpuTaskGraph.hpp
+        SOURCES integration/dsl/test_cpu_task_graph.cpp
+        LABELS integration dsl core task-graph
+        UGL_INCLUDE_DIRS ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders ${GVM_REPOSITORY_ROOT}/GVM/third_party
+        LINK_LIBS glm::glm
+        UGLC_ARGS --shader-pipeline=uglir
+    )
+    target_compile_definitions(gvm_dsl_task_graph_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
     gvm_add_dsl_codegen_test(gvm_dsl_codegen_smoke_tests
         ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_01_Triangle/Test_01_Triangle.hpp
         SOURCES

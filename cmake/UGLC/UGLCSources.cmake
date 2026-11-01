@@ -23,6 +23,7 @@ set(UGLC_CODEGEN_SOURCES
     CodeGen/SpaceManager.cpp
     CodeGen/CPP/CPPBindGroupTypeConvertor.cpp
     CodeGen/CPP/CPPFunctionConvertor.cpp
+    CodeGen/CPP/CPPGraphEntryEmitter.cpp
     CodeGen/CPP/CPPHostClassValidator.cpp
     CodeGen/CPP/CPPHostShaderOnlyGuard.cpp
     CodeGen/CPP/CPPPixelLocalAnalysis.cpp

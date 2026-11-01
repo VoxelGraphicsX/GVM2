@@ -32,4 +32,5 @@
 #include "Details/UGL.RenderSet.h"
 #include "Details/UGL.Swapchain.h"
 #include "Details/UGL.Sync.h"
+#include "Details/UGL.TaskGraph.h"
 #endif

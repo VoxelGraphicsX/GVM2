@@ -13,6 +13,7 @@
 #include <CodeGen/UGLC.Constants.hpp>
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Attr.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/Basic/DiagnosticSema.h>
 #include <clang/Basic/SourceManager.h>
@@ -27,6 +28,39 @@ namespace UGLC::CodeGen::ShaderEmitter
 {
     namespace
     {
+        /// Recognizes an explicit graph export; host generation still validates its complete effect contract.
+        bool hasTaskGraphEntry(const clang::DeclContext &declarations)
+        {
+            for (const auto *declaration : declarations.decls())
+            {
+                if (const auto *scope = llvm::dyn_cast<clang::NamespaceDecl>(declaration))
+                {
+                    if (hasTaskGraphEntry(*scope))
+                    {
+                        return true;
+                    }
+                }
+                const auto *function = llvm::dyn_cast<clang::FunctionDecl>(declaration);
+                if (function == nullptr || !function->doesThisDeclarationHaveABody())
+                {
+                    continue;
+                }
+                const auto *output = function->getReturnType()->getAsCXXRecordDecl();
+                if (output == nullptr || output->getQualifiedNameAsString() != "UGL::Task")
+                {
+                    continue;
+                }
+                for (const auto *attribute : function->specific_attrs<clang::AnnotateAttr>())
+                {
+                    if (attribute->getAnnotation() == "Export")
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         /** Completes record and array interface types without instantiating unrelated methods. */
         void requireCompleteInterfaceType(clang::Sema &sema, clang::QualType type,
                                           clang::SourceLocation location,
@@ -581,7 +615,7 @@ namespace UGLC::CodeGen::ShaderEmitter
         {
             throw UGLC::CodeGen::DiagnosticError(UGLIR::collectUGLIRLoweringDiagnosticRecords(lowering));
         }
-        if (lowering.modules.empty())
+        if (lowering.modules.empty() && (!roots.empty() || !hasTaskGraphEntry(*context.getTranslationUnitDecl())))
         {
             throw std::runtime_error(formatUnlocatedDiagnostic("UGLIR lowering: no shader modules were produced by the UGLIR shader pipeline."));
         }

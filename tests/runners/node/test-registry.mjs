@@ -71,6 +71,13 @@ export function getTestRegistry(sourceDir, binaryDir, options = {}) {
   ];
 
   const registry = [
+    {
+      target: 'gvm_dsl_task_graph_tests',
+      group: 'dsl',
+      labels: ['integration', 'dsl', 'core', 'task-graph'],
+      timeoutMs: 60000,
+      environment: {}
+    },
     ...uglirTargets.filter(entry => includeLegacy || !entry.labels.includes('legacy')),
     {
       target: 'gvm_unit_rhi_values',

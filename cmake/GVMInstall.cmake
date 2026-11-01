@@ -64,6 +64,7 @@ install(
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GStagingLinearAllocator.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GSync.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GVMCore.Private.hpp"
+        "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/TaskGraphDefinition.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/GVMCore/Private"
 )
 

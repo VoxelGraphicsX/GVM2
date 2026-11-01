@@ -1870,6 +1870,33 @@ function createPipelineSelectionCases(enabled) {
 
 export function getTestRegistry(sourceDir, profile) {
   return [
+    ...[
+      ['resource', 'InvalidTaskResource.hpp', 'CPU graph tasks cannot contain GPU resources'],
+      ['reference', 'InvalidTaskReference.hpp', 'pointers, references'],
+      ['address', 'InvalidTaskAddress.hpp', 'address-of'],
+      ['global', 'InvalidTaskGlobal.hpp', 'shared global or static storage'],
+      ['static-member', 'InvalidTaskStaticMember.hpp', 'shared global or static storage'],
+      ['pointer-call', 'InvalidTaskPointerCall.hpp', 'pointer-valued calls'],
+      ['destructor-effect', 'InvalidTaskDestructorEffect.hpp', 'shared global or static storage'],
+      ['mutable-constant', 'InvalidTaskMutableConstant.hpp', 'mutable subobjects'],
+      ['function-pointer', 'InvalidTaskFunctionPointer.hpp', 'function pointer'],
+      ['native-effect', 'InvalidTaskNativeEffect.hpp', 'no complete source effect contract'],
+      ['transitive-resource', 'InvalidTaskTransitiveResource.hpp', 'CPU graph tasks cannot contain GPU resources']
+    ].map(([suffix, sourceFile, diagnostic]) => createFixtureCase({
+      id: `invalid-task-${suffix}`,
+      title: `Task graph rejects ${suffix}`,
+      group: 'diagnostics',
+      labels: ['diagnostic', 'task-graph', 'ownership', 'effects'],
+      fixtureDir: `invalid-task-${suffix}`,
+      sourceFile,
+      description: 'Checks the unified graph CPU value and transitive effect contract before native code generation.',
+      uglcArgs: ['--shader-pipeline=uglir'],
+      expectedExitCode: 1,
+      verify: async (t) => {
+        await t.expectStepOutputContains('uglc', diagnostic, 'Graph diagnostics must identify the invalid ownership or effect.');
+        await t.expectStepOutputContains('uglc', sourceFile, 'Graph diagnostics must identify the source file.');
+      }
+    })),
     ...createConstructorArgumentCases(),
     ...createPipelineSelectionCases(profile.legacyEnabled),
     ...[

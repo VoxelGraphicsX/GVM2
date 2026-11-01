@@ -5,6 +5,7 @@
 #include "../UGLC.Constants.hpp"
 
 #include "CPPHostClassValidator.hpp"
+#include "CPPGraphEntryEmitter.hpp"
 #include "CPPPixelLocalAnalysis.hpp"
 #include "CPPStaticShaderVariantCollector.hpp"
 #include "CPPVertexFormatTypeConvertor.hpp"
@@ -279,6 +280,7 @@ namespace UGLC::CodeGen::CPP
         , mRendererEmitter(*this)
         , mShaderArtifactEmitter(*this)
         , mHostClassValidator(std::make_unique<CPPHostClassValidator>(*this))
+        , mGraphEntryEmitter(std::make_unique<CPPGraphEntryEmitter>(*this))
         , mShaderSourcePipelineOptions(shaderSourcePipelineOptions)
         , Rewriter(Rewriter)
     {
@@ -502,6 +504,7 @@ namespace UGLC::CodeGen::CPP
                 return true;
             }
             auto result = generateFunctionDefinition(decl);
+            result += mGraphEntryEmitter->emitEntry(*decl);
             clang::SourceRange bodyRange = decl->getSourceRange();
             Rewriter->ReplaceText(bodyRange, result);
 
@@ -2260,6 +2263,10 @@ namespace UGLC::CodeGen::CPP
     }
     std::string CPPVisitor::translateCXXMemberCallExpr(const clang::CXXMemberCallExpr *E)
     {
+        if (const auto graphCall = mGraphEntryEmitter->translateCall(*E))
+        {
+            return *graphCall;
+        }
         if (llvm::isa<clang::CXXConversionDecl>(E->getMethodDecl()))
         {
             // 如果是，说明这是一个由编译器为实现类型转换而插入的隐式调用。

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22.0)
 set(CMAKE_CXX_STANDARD 20)
 include(GNUInstallDirs)
+find_package(Threads REQUIRED)
 
 #add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/EASTL_Helper ${CMAKE_CURRENT_BINARY_DIR}/EASTL_Helper)
 add_library(GVMCore SHARED)
@@ -30,6 +31,16 @@ target_sources(
         Public/GAbstractRenderSetCommandEncoder.cpp
         Public/GAbstractRenderer.cpp
         Public/GRenderSetCommand.cpp
+        Public/ExecutorTask.cpp
+        Public/ITaskExecutor.cpp
+        Public/ThreadExecutor.cpp
+        Public/Task.cpp
+        Public/TaskGraph.cpp
+        Public/TaskRuntime.cpp
+        Public/Execution.cpp
+        Private/TaskGraphDefinition.cpp
+        Private/TaskExecutionState.cpp
+        Private/TaskRuntimeState.cpp
 )
 set_target_properties(GVMCore PROPERTIES
     EXPORT_NAME Core
@@ -51,5 +62,5 @@ target_include_directories(GVMCore
         ${CMAKE_CURRENT_SOURCE_DIR}/../
 )
 
-target_link_libraries(GVMCore PRIVATE EASTL)
+target_link_libraries(GVMCore PRIVATE EASTL Threads::Threads)
 target_link_libraries(GVMCore PUBLIC EASTL_Helper GVMLoggingSupport GVMRHI)

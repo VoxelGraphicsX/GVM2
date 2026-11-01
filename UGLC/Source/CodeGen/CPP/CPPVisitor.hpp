@@ -32,6 +32,7 @@ namespace UGLC::CodeGen
 namespace UGLC::CodeGen::CPP
 {
     class CPPHostClassValidator;
+    class CPPGraphEntryEmitter;
 
     struct BufferUsageInfo
     {
@@ -58,6 +59,7 @@ namespace UGLC::CodeGen::CPP
         friend class CPPHostClassValidator;
         friend class CPPRendererEmitter;
         friend class CPPShaderArtifactEmitter;
+        friend class CPPGraphEntryEmitter;
         // std::string mCodeGenResult;
         CPPTypeConvertor mTypeConvertor;
         CPPFunctionConvertor mFuncConvertor;
@@ -65,6 +67,7 @@ namespace UGLC::CodeGen::CPP
         CPPRendererEmitter mRendererEmitter;
         CPPShaderArtifactEmitter mShaderArtifactEmitter;
         std::unique_ptr<CPPHostClassValidator> mHostClassValidator;
+        std::unique_ptr<CPPGraphEntryEmitter> mGraphEntryEmitter;
         ShaderSourcePipelineOptions mShaderSourcePipelineOptions;
         /** Resolves a host declaration to the same concrete record identity as the shader frontend. */
         std::string getPreparedRecordSymbolName(const clang::CXXRecordDecl &record) const;
