@@ -132,7 +132,6 @@ namespace GVM::RHI::Vulkan
         Private::BufferCopyMultipleRegionExecutor mBufferCopyMultipleRegionExecutor;
         mutable Mutex mSubmitMutex;
         VKSubmissionManager mSubmissionManager;
-        VKResourceStateDB mStateDB;
         VKUploadAllocator mUploadAllocator;
         VKPendingReadbackTracker mPendingReadbackTracker;
         uint64_t mReadbackSequence = 0;

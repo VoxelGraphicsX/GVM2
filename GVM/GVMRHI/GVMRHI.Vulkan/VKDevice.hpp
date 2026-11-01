@@ -12,6 +12,7 @@
 #include "VKPresentManager.hpp"
 #include "VKRenderPassFramebufferCache.hpp"
 #include "VKResourceRegistry.hpp"
+#include "VKResourceStateDB.hpp"
 #include <GVMRHI/Private/FullscreenTextureExecutor.hpp>
 
 #include <GVMRHI/Private/DeviceObjectCache.hpp>
@@ -88,6 +89,10 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]] VKQueue *getMainQueueImpl() const;
         /** Returns the registry that owns resource pools, live tracking, and retire draining. */
         [[nodiscard]] VKResourceRegistry &getResourceRegistry();
+        /// Returns the device-owned resource history; mutations currently require the canonical queue submission lock.
+        [[nodiscard]] VKResourceStateDB &getResourceStateDB();
+        /// Returns the device-owned resource history for backend queries.
+        [[nodiscard]] const VKResourceStateDB &getResourceStateDB() const;
         /** Throws std::runtime_error naming apiName when the device has been destroyed. */
         /** Throws std::runtime_error when the device is destroyed or has no native device. */
         void ensureAlive(const char *apiName) const;
@@ -150,6 +155,7 @@ namespace GVM::RHI::Vulkan
         Private::FullscreenTextureExecutor mFullscreenTextureExecutor;
         VKPresentManager mPresentManager;
         VKResourceRegistry mResourceRegistry{*this};
+        VKResourceStateDB mResourceStateDB;
         DeviceLostState mLostState;
         mutable Mutex mDescriptorPoolMutex;
         VKDescriptorPoolStore mDescriptorPoolStore;

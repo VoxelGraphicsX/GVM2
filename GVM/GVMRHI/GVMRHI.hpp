@@ -1530,11 +1530,40 @@ namespace GVM::RHI
         using std::runtime_error::runtime_error;
     };
 
+    /// Selects a queue compatible with the workload, without requiring a distinct GPU engine.
+    enum class QueuePreference
+    {
+        Graphics,
+        Compute,
+        Transfer
+    };
+
+    /// Requests a preferred logical queue; unavailable candidates alias a compatible queue.
+    struct QueueDescriptor
+    {
+        QueuePreference prefer = QueuePreference::Graphics;
+        uint32_t index = 0;
+    };
+
     class DeviceImpl
     {
     public:
         // virtual createQueue() = 0;
         virtual Queue getMainQueue() const = 0;
+        /// Returns a stable compatible queue; single-queue devices alias every valid request to getMainQueue().
+        /// Graphics always selects the canonical main queue. Backends may override compute and transfer placement.
+        virtual Queue getQueue(const QueueDescriptor &descriptor)
+        {
+            switch (descriptor.prefer)
+            {
+            case QueuePreference::Graphics:
+            case QueuePreference::Compute:
+            case QueuePreference::Transfer:
+                return getMainQueue();
+            default:
+                throw std::invalid_argument("Device::getQueue requires a valid queue preference.");
+            }
+        }
         /** Returns the recorded device loss; empty while the device is healthy. GPU-work and
             object-creation calls throw DeviceLostError once a loss is recorded; free*, destroy,
             and read-only getters never throw because of loss. To recover, destroy the device,

@@ -48,8 +48,8 @@ namespace GVM::RHI::Vulkan
         eastl::vector<VKImageSubresourceState> subresources;
     };
 
-    /// Owns the state at the tail of the scheduled queue, independent of GPU retirement.
-    /// Mutable references are used only while the queue's submission lock is held.
+    /// Owns device resource history at the tail of scheduled work, independent of GPU retirement.
+    /// The current single-queue backend mutates references only under its canonical submission lock.
     class VKResourceStateDB final
     {
     public:
@@ -73,7 +73,7 @@ namespace GVM::RHI::Vulkan
         void discardBufferState(const VKBuffer &buffer);
         /// Removes a physically retired texture from state tracking.
         void discardTextureState(const VKTexture &texture);
-        /// Clears queue state when the device or queue is destroyed.
+        /// Clears resource history when the owning device is initialized or destroyed.
         void reset();
 
     private:

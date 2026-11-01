@@ -84,12 +84,12 @@ namespace GVM::RHI::Vulkan
 
     VKResourceStateDB &VKQueue::getResourceStateDB()
     {
-        return mStateDB;
+        return mDevice->getResourceStateDB();
     }
 
     const VKResourceStateDB &VKQueue::getResourceStateDB() const
     {
-        return mStateDB;
+        return mDevice->getResourceStateDB();
     }
 
 
@@ -264,7 +264,6 @@ namespace GVM::RHI::Vulkan
         mInternalComputeCopyPassEncoder = nullptr;
         mInternalReadbackCommandEncoder = nullptr;
         mInternalReadbackBlitPassEncoder = nullptr;
-        mStateDB.reset();
         const ShaderModule copyShader = mDevice->createShaderModule({
             .label = "BufferCopyMultipleRegionShader",
             .spirv = eastl::vector<uint32_t>(Detail::CopyBufferToBufferMultipleRegionSpirvWords,
@@ -456,7 +455,7 @@ namespace GVM::RHI::Vulkan
     void VKQueue::recordHostWrite(VKBuffer &buffer)
     {
         ScopedLock lock(mSubmitMutex);
-        mStateDB.recordExternalBufferUsage(buffer, vk::PipelineStageFlagBits2::eHost, vk::AccessFlagBits2::eHostWrite);
+        getResourceStateDB().recordExternalBufferUsage(buffer, vk::PipelineStageFlagBits2::eHost, vk::AccessFlagBits2::eHostWrite);
     }
 
     void VKQueue::writeBuffer(BufferRange buffer, void const *data, uint64_t size)
@@ -920,7 +919,6 @@ namespace GVM::RHI::Vulkan
             mSubmissionManager.destroy();
             mCommandContextPool.destroy();
         }
-        mStateDB.reset();
 
         mUploadAllocator.destroy();
         if (mDevice != nullptr)

@@ -348,6 +348,21 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
         GVM::RHI::destroyInstance(overlayInstance);
     }
 
+    /// Verifies preferred queue selection preserves canonical identity on current single-queue backends.
+    TEST_F(RhiSmokeTest, PreferredQueuesAliasTheCanonicalQueue)
+    {
+        using namespace GVM::RHI;
+        const auto mainQueue = device->getMainQueue();
+        for (QueuePreference preference : {QueuePreference::Graphics, QueuePreference::Compute, QueuePreference::Transfer})
+        {
+            const auto preferred = device->getQueue({.prefer = preference});
+            EXPECT_EQ(preferred, mainQueue);
+            EXPECT_EQ(device->getQueue({.prefer = preference}), preferred);
+            EXPECT_EQ(device->getQueue({.prefer = preference, .index = 4096}), mainQueue);
+        }
+        EXPECT_THROW(device->getQueue({.prefer = static_cast<QueuePreference>(255)}), std::invalid_argument);
+    }
+
     TEST_F(RhiSmokeTest, HealthyDeviceReportsEmptyLostInfoAndNoCallback)
     {
         bool callbackInvoked = false;

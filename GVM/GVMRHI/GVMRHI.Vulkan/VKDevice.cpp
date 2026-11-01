@@ -150,6 +150,8 @@ namespace GVM::RHI::Vulkan
         GVMLogInfo(this, DeviceLogCategory, "event=device_init_begin");
         mPresentManager.reset();
 
+        mResourceStateDB.reset();
+
         selectAndSurveyPhysicalDevice();
         createNativeDevice();
         createVulkanMemoryAllocator();
@@ -483,6 +485,16 @@ namespace GVM::RHI::Vulkan
         return mResourceRegistry;
     }
 
+    VKResourceStateDB &VKDevice::getResourceStateDB()
+    {
+        return mResourceStateDB;
+    }
+
+    const VKResourceStateDB &VKDevice::getResourceStateDB() const
+    {
+        return mResourceStateDB;
+    }
+
     VKRenderPassFramebufferCache &VKDevice::getRenderPassFramebufferCache()
     {
         return mRenderPassFramebufferCache;
@@ -577,6 +589,7 @@ namespace GVM::RHI::Vulkan
 
         mResourceRegistry.collectReleasedResources();
         mResourceRegistry.releaseAll();
+        mResourceStateDB.reset();
         mPresentManager.reset();
         mFullscreenTextureExecutor = Private::FullscreenTextureExecutor{};
 

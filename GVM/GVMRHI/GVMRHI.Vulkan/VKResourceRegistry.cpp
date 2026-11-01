@@ -505,10 +505,7 @@ namespace GVM::RHI::Vulkan
         }
         if (auto *bufferImpl = static_cast<VKBuffer *>(buffer.get()); bufferImpl != nullptr)
         {
-            if (mDevice.getMainQueueImpl() != nullptr)
-            {
-                mDevice.getMainQueueImpl()->getResourceStateDB().discardBufferState(*bufferImpl);
-            }
+            mDevice.getResourceStateDB().discardBufferState(*bufferImpl);
             bufferImpl->destroy();
         }
         mBufferPool.freeByHandle(buffer);
@@ -522,10 +519,7 @@ namespace GVM::RHI::Vulkan
         }
         if (auto *textureImpl = static_cast<VKTexture *>(texture.get()); textureImpl != nullptr)
         {
-            if (mDevice.getMainQueueImpl() != nullptr)
-            {
-                mDevice.getMainQueueImpl()->getResourceStateDB().discardTextureState(*textureImpl);
-            }
+            mDevice.getResourceStateDB().discardTextureState(*textureImpl);
             textureImpl->destroy();
         }
         mTexturePool.freeByHandle(texture);
