@@ -5,6 +5,7 @@ set(GVMRHI_PRIVATE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/BufferCopyMultipleRegionExecutor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/CpuProbeFrontend.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceImpl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TextureViewImpl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/QueueImpl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/SubmissionState.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../Submission.cpp"

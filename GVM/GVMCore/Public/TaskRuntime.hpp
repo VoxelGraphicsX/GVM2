@@ -12,17 +12,19 @@ namespace GVM::Core
         class TaskRuntimeState;
     }
 
-    /// Bounds accepted CPU graph executions and their ready work without configuring GPU queues.
+    /// Bounds graph executions, ready CPU work and GPU pass batches without exposing queues.
     struct TaskRuntimeDescriptor
     {
         uint32_t maximumActiveExecutions = 32;
         uint32_t maximumTasksPerExecution = 65536;
         uint32_t maximumInFlightTasksPerExecution = 0;
         uint32_t workerCount = 0;
+        uint32_t maximumPassesPerExecution = 4096;
+        uint32_t maximumPassesPerBatch = 64;
     };
 
     /// Drives graphs independently of a Renderer; destruction drains only this runtime's work.
-    /// Native builders, callables and values must own their captures and contain no GPU resources.
+    /// Native CPU callables must own their captures and contain no GPU resources; GPU values flow between RenderNodes.
     class TaskRuntime final
     {
     public:
@@ -30,6 +32,10 @@ namespace GVM::Core
         explicit TaskRuntime(const TaskRuntimeDescriptor &descriptor = {});
         /// Borrows an executor that must outlive this runtime and all of its accepted callbacks.
         explicit TaskRuntime(ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor = {});
+        /// Enables GPU subgraphs on a borrowed device that must outlive the runtime and all returned GPU values.
+        explicit TaskRuntime(RHI::DeviceImpl &device, const TaskRuntimeDescriptor &descriptor = {});
+        /// Shares an application's executor for CPU tasks and GPU pass recording without creating another worker pool.
+        TaskRuntime(RHI::DeviceImpl &device, ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor = {});
         /// Closes admission and drains accepted work; call only from a host thread.
         ~TaskRuntime();
         TaskRuntime(const TaskRuntime &) = delete;

@@ -1,14 +1,17 @@
 #include "TaskRuntimeState.hpp"
+#include "GraphDevice.hpp"
+#include "GpuGraphService.hpp"
 
 #include <EASTL/algorithm.h>
 #include <stdexcept>
 
 namespace GVM::Core::Private
 {
-    TaskRuntimeState::TaskRuntimeState(ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor)
+    TaskRuntimeState::TaskRuntimeState(ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor, RHI::DeviceImpl *device)
         : mExecutor(executor), mDescriptor(descriptor), mMaximumInFlight(executor.concurrency())
     {
-        if (mMaximumInFlight == 0 || descriptor.maximumActiveExecutions == 0 || descriptor.maximumTasksPerExecution == 0)
+        if (mMaximumInFlight == 0 || descriptor.maximumActiveExecutions == 0 || descriptor.maximumTasksPerExecution == 0 ||
+            descriptor.maximumPassesPerExecution == 0 || descriptor.maximumPassesPerBatch == 0)
         {
             throw std::invalid_argument("TaskRuntime requires a usable executor and nonzero admission limits.");
         }
@@ -16,6 +19,34 @@ namespace GVM::Core::Private
         {
             mMaximumInFlight = eastl::min(mMaximumInFlight, descriptor.maximumInFlightTasksPerExecution);
         }
+        if (device != nullptr)
+        {
+            mGpuDevice = GraphDevice::acquire(*device);
+            mGpuService = eastl::make_unique<GpuGraphService>();
+        }
+    }
+
+    TaskRuntimeState::~TaskRuntimeState() = default;
+
+    const eastl::shared_ptr<GraphDevice> &TaskRuntimeState::gpuDevice() const
+    {
+        return mGpuDevice;
+    }
+    void TaskRuntimeState::enqueueGpu(eastl::shared_ptr<GpuGraphExecution> execution)
+    {
+        if (!mGpuService)
+        {
+            throw std::logic_error("GPU work requires a device-enabled TaskRuntime.");
+        }
+        mGpuService->enqueue(eastl::move(execution));
+    }
+    uint32_t TaskRuntimeState::maximumPasses() const noexcept
+    {
+        return mDescriptor.maximumPassesPerExecution;
+    }
+    uint32_t TaskRuntimeState::maximumPassesPerBatch() const noexcept
+    {
+        return mDescriptor.maximumPassesPerBatch;
     }
 
     bool TaskRuntimeState::tryAdmit()
@@ -60,6 +91,11 @@ namespace GVM::Core::Private
         while (mActive != 0 || mDispatching != 0)
         {
             mDrained.wait(lock);
+        }
+        lock.unlock();
+        if (mGpuService)
+        {
+            mGpuService->close();
         }
     }
 

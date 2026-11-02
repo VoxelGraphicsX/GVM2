@@ -11,6 +11,10 @@
 
 namespace GVM::RHI::Vulkan
 {
+    const TextureImpl *VKTextureView::getSourceTexture() const
+    {
+        return mTexture;
+    }
     void VKTextureView::init(VKDevice &device, VKTexture &texture, const TextureViewDescriptor &descriptor)
     {
         mDevice = &device;

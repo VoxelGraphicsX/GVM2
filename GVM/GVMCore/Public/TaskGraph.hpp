@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Task.hpp"
+#include "IRenderNode.hpp"
+#include "GraphBuffer.hpp"
 #include "../Private/TaskGraphDefinition.hpp"
 #include <EASTL/tuple.h>
 #include <EASTL/type_traits.h>
@@ -10,6 +12,19 @@ namespace GVM::Core
 {
     namespace Private
     {
+        /// Infers the result of an ordinary owned CPU callable.
+        template <class Callable, bool BuildsSubgraph, class... Values>
+        struct TaskResult
+        {
+            using Value = eastl::invoke_result_t<Callable &, Values...>;
+        };
+        /// Infers the declared result of a statically resolved RenderNode subgraph builder.
+        template <class Callable, class... Values>
+        struct TaskResult<Callable, true, Values...>
+        {
+            using Value = typename Callable::Output;
+        };
+
         /// Maps an ordinary argument to its owned value type.
         template <class T>
         struct TaskArgument
@@ -27,7 +42,7 @@ namespace GVM::Core
         };
     }
 
-    /// Builds an owning task DAG; native callables must use isolated captures and CPU-only values.
+    /// Builds an owning DAG of ordinary CPU callables and invocation-local RenderNode subgraphs.
     /// The DSL compiler enforces the stronger transitive resource and capture contract.
     class TaskGraph final
     {
@@ -44,17 +59,34 @@ namespace GVM::Core
         template <class Callable, class... Arguments>
         auto add(Callable callable, const Arguments &...arguments)
         {
-            using Result = eastl::invoke_result_t<Callable &, typename Private::TaskArgument<Arguments>::Value...>;
+            constexpr bool buildsSubgraph = requires { typename Callable::RenderNodeProtocol; };
+            using Result = typename Private::TaskResult<Callable, buildsSubgraph, typename Private::TaskArgument<Arguments>::Value...>::Value;
+            static_assert(buildsSubgraph || ((!eastl::is_same_v<typename Private::TaskArgument<Arguments>::Value, GraphBuffer>) && ...),
+                "GPU resources can only be consumed by RenderNode builders or ReadbackNode adapters.");
+            static_assert(buildsSubgraph || !eastl::is_same_v<Result, GraphBuffer>, "CPU tasks cannot produce GPU resources.");
             static_assert(!eastl::is_reference_v<Result> && !eastl::is_pointer_v<Result>, "Task results must own their values.");
             static_assert((!eastl::is_pointer_v<Arguments> && ...), "Task inputs cannot borrow pointer storage.");
             Private::TaskDefinition definition;
+            definition.buildsSubgraph = buildsSubgraph;
             (appendDependency(definition, arguments), ...);
             auto inputs = eastl::make_tuple(captureInput(arguments)...);
-            definition.evaluate = [callable = eastl::move(callable), inputs = eastl::move(inputs)](const Private::TaskResults &results) mutable -> eastl::any
+            definition.evaluate = [callable = eastl::move(callable), inputs = eastl::move(inputs)](const Private::TaskResults &results, RenderNode *node) mutable -> eastl::any
             {
-                return eastl::apply([&callable, &results](const auto &...resolve) -> eastl::any
+                return eastl::apply([&callable, &results, node](const auto &...resolve) -> eastl::any
                 {
-                    if constexpr (eastl::is_void_v<Result>)
+                    if constexpr (buildsSubgraph)
+                    {
+                        if constexpr (eastl::is_void_v<Result>)
+                        {
+                            callable.build(*node, resolve(results)...);
+                            return {};
+                        }
+                        else
+                        {
+                            return eastl::any(callable.build(*node, resolve(results)...));
+                        }
+                    }
+                    else if constexpr (eastl::is_void_v<Result>)
                     {
                         eastl::invoke(callable, resolve(results)...);
                         return {};

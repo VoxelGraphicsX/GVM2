@@ -11,6 +11,139 @@ namespace UGLC::CodeGen::CPP
     {
     }
 
+    bool CPPGraphEntryEmitter::isRenderRecord(const clang::CXXRecordDecl &record) const
+    {
+        if (record.getQualifiedNameAsString() == "UGL::IRenderNode")
+        {
+            return true;
+        }
+        if (const auto *definition = record.getDefinition())
+        {
+            for (const auto &base : definition->bases())
+            {
+                if (const auto *parent = base.getType()->getAsCXXRecordDecl(); parent != nullptr && isRenderRecord(*parent))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool CPPGraphEntryEmitter::isRenderMethod(const clang::FunctionDecl &function) const
+    {
+        const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(&function);
+        return method != nullptr && !method->isStatic() && !method->isImplicit() &&
+            !llvm::isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(method) && isRenderRecord(*method->getParent());
+    }
+
+    void CPPGraphEntryEmitter::validateTarget(const clang::FunctionDecl &function)
+    {
+        if (const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(&function);
+            method != nullptr && method->getParent()->getQualifiedNameAsString() == "UGL::ReadbackNode")
+        {
+            validateValue(function.getReturnType(), function.getLocation());
+            return;
+        }
+        const bool previous = mRenderValidation;
+        mRenderValidation = isRenderMethod(function);
+        try
+        {
+            if (mRenderValidation && !llvm::cast<clang::CXXMethodDecl>(function).isConst())
+            {
+                mVisitor.throwCodegenError(&function, "RenderNode build must use const configuration and invocation-local effects.");
+            }
+            validateFunction(function, false);
+        }
+        catch (...)
+        {
+            mRenderValidation = previous;
+            throw;
+        }
+        mRenderValidation = previous;
+    }
+
+    std::optional<std::string> CPPGraphEntryEmitter::emitRenderMethod(const clang::FunctionDecl &function)
+    {
+        if (!isRenderMethod(function) || mVisitor.isFromExcludedFile(function.getLocation()))
+        {
+            return std::nullopt;
+        }
+        validateTarget(function);
+        const auto *previous = mRenderMethod;
+        mRenderMethod = &function;
+        try
+        {
+            auto signature = mVisitor.generateFunctionSignature(&function, function.getNameAsString());
+            const auto position = signature.find(function.getNameAsString() + "(");
+            if (position == std::string::npos)
+            {
+                mVisitor.throwCodegenError(&function, "Cannot lower the RenderNode method signature.");
+            }
+            signature.insert(position + function.getNameAsString().size() + 1,
+                "GVM::Core::RenderNode &__gvm_node" + std::string(function.getNumParams() == 0 ? "" : ", "));
+            auto result = signature + mVisitor.generateFunctionBody(&function);
+            mRenderMethod = previous;
+            return result;
+        }
+        catch (...)
+        {
+            mRenderMethod = previous;
+            throw;
+        }
+    }
+
+    std::optional<std::string> CPPGraphEntryEmitter::translateRenderCall(const clang::CXXMemberCallExpr &call)
+    {
+        const auto *method = call.getMethodDecl();
+        if (method == nullptr || !isRenderRecord(*method->getParent()))
+        {
+            return std::nullopt;
+        }
+        if (mRenderMethod == nullptr)
+        {
+            mVisitor.throwCodegenError(&call, "RenderNode methods can only execute inside graph.add invocations.");
+        }
+        const bool intrinsic = method->getParent()->getQualifiedNameAsString() == "UGL::IRenderNode";
+        const auto name = method->getNameAsString();
+        const auto *templates = method->getTemplateSpecializationArgs();
+        if (intrinsic && name == "createBuffer")
+        {
+            const auto *buffer = templates != nullptr && templates->size() != 0
+                ? llvm::dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>((*templates)[0].getAsType()->getAsCXXRecordDecl()) : nullptr;
+            if (buffer == nullptr || buffer->getQualifiedNameAsString() != "UGL::GraphBuffer")
+            {
+                mVisitor.throwCodegenError(&call, "RenderNode createBuffer requires an owning GraphBuffer<T> type.");
+            }
+            const auto element = buffer->getTemplateArgs()[0].getAsType();
+            validateValue(element, call.getExprLoc());
+            return "__gvm_node.createBuffer({.label = " + mVisitor.TranslateExpr(call.getArg(0)) +
+                ", .usage = GVM::RHI::BufferUsage::Storage | GVM::RHI::BufferUsage::CopySrc | GVM::RHI::BufferUsage::CopyDst, .size = uint64_t(" +
+                mVisitor.TranslateExpr(call.getArg(1)) + ") * sizeof(" + mVisitor.generateTypeCanonicalName(element) + ")})";
+        }
+        const auto *object = call.getImplicitObjectArgument()->IgnoreParenImpCasts();
+        std::string result = intrinsic ? "__gvm_node." + name :
+            llvm::isa<clang::CXXThisExpr>(object) ? "this->" + name : mVisitor.TranslateExpr(object) + "." + name;
+        if (intrinsic && name == "dispatchThreads")
+        {
+            result += "<" + mVisitor.generateTypeCanonicalName((*templates)[0].getAsType()) + ">";
+        }
+        result += "(";
+        if (!intrinsic)
+        {
+            result += "__gvm_node";
+        }
+        for (unsigned index = 0; index < call.getNumArgs(); ++index)
+        {
+            if (index != 0 || !intrinsic)
+            {
+                result += ", ";
+            }
+            result += mVisitor.TranslateExpr(call.getArg(index));
+        }
+        return result + ")";
+    }
+
     bool CPPGraphEntryEmitter::isTask(clang::QualType type) const
     {
         const auto *record = type.getNonReferenceType()->getAsCXXRecordDecl();
@@ -45,6 +178,39 @@ namespace UGLC::CodeGen::CPP
             mVisitor.throwCodegenError(location, "Task graph value requires a complete owned scalar, record, or approved container.");
         }
         const auto name = record->getQualifiedNameAsString();
+        if ((graphConstruction || mRenderValidation) && name == "UGL::IRenderNode")
+        {
+            return;
+        }
+        if (graphConstruction && name == "UGL::ReadbackNode")
+        {
+            return;
+        }
+        if (mRenderValidation && name == "UGL::GraphBuffer")
+        {
+            const auto *specialization = llvm::cast<clang::ClassTemplateSpecializationDecl>(record);
+            const auto element = specialization->getTemplateArgs()[0].getAsType();
+            mRenderValidation = false;
+            try
+            {
+                validateValue(element, location);
+                if (!element.isTriviallyCopyableType(*mVisitor.Context))
+                {
+                    mVisitor.throwCodegenError(location, "GraphBuffer elements must be trivially copyable owned CPU values.");
+                }
+            }
+            catch (...)
+            {
+                mRenderValidation = true;
+                throw;
+            }
+            mRenderValidation = true;
+            return;
+        }
+        if (mRenderValidation && (name == "UGL::ComputePassTaskDescriptor" || name == "UGL::RenderPassTaskDescriptor"))
+        {
+            return;
+        }
         if (graphConstruction && (isTask(type) || name == "UGL::TaskGraph"))
         {
             return;
@@ -53,7 +219,8 @@ namespace UGLC::CodeGen::CPP
         {
             mVisitor.throwCodegenError(location, "CPU graph tasks cannot contain GPU resources or graph runtime objects: " + name + ".");
         }
-        if (!mValidatedValues.insert(record->getCanonicalDecl()).second)
+        auto &values = mRenderValidation ? mValidatedRenderValues : graphConstruction ? mValidatedGraphValues : mValidatedValues;
+        if (!values.insert(record->getCanonicalDecl()).second)
         {
             return;
         }
@@ -88,7 +255,7 @@ namespace UGLC::CodeGen::CPP
         }
         for (const auto *field : record->fields())
         {
-            validateValue(field->getType(), field->getLocation());
+            validateValue(field->getType(), field->getLocation(), graphConstruction);
             if (const auto *initializer = field->getInClassInitializer())
             {
                 validateStatement(*initializer, false);
@@ -115,11 +282,12 @@ namespace UGLC::CodeGen::CPP
         {
             mVisitor.throwCodegenError(value, "Graph callable must be a statically named function or an ordinary class value, not a function pointer.");
         }
-        validateValue(value->getType(), value->getExprLoc());
+        const bool render = isRenderRecord(*record);
+        validateValue(value->getType(), value->getExprLoc(), render);
         const clang::CXXMethodDecl *selected = nullptr;
         for (const auto *method : record->methods())
         {
-            if (method->getOverloadedOperator() == clang::OO_Call)
+            if (render ? method->getNameAsString() == "build" : method->getOverloadedOperator() == clang::OO_Call)
             {
                 if (selected != nullptr)
                 {
@@ -137,7 +305,7 @@ namespace UGLC::CodeGen::CPP
 
     void CPPGraphEntryEmitter::validateFunction(const clang::FunctionDecl &function, bool graphConstruction)
     {
-        auto &visited = graphConstruction ? mValidatedBuilders : mValidatedFunctions;
+        auto &visited = mRenderValidation ? mValidatedRenderFunctions : graphConstruction ? mValidatedBuilders : mValidatedFunctions;
         if (!visited.insert(function.getCanonicalDecl()).second)
         {
             return;
@@ -305,11 +473,17 @@ namespace UGLC::CodeGen::CPP
             if (graphAdd && graphConstruction)
             {
                 const auto &target = resolveCallable(*call->getArg(0));
-                validateFunction(target, false);
+                validateTarget(target);
             }
             else if (!container)
             {
-                validateFunction(*callee, graphConstruction);
+                const bool intrinsic = method != nullptr &&
+                    (method->getParent()->getQualifiedNameAsString() == "UGL::IRenderNode" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::GraphBuffer");
+                if (!(mRenderValidation && intrinsic))
+                {
+                    validateFunction(*callee, graphConstruction);
+                }
             }
         }
         if (const auto *construction = llvm::dyn_cast<clang::CXXConstructExpr>(&statement))
@@ -342,6 +516,10 @@ namespace UGLC::CodeGen::CPP
 
     std::optional<std::string> CPPGraphEntryEmitter::translateCall(const clang::CXXMemberCallExpr &call)
     {
+        if (const auto renderCall = translateRenderCall(call))
+        {
+            return renderCall;
+        }
         const auto *method = call.getMethodDecl();
         const auto owner = method->getParent()->getQualifiedNameAsString();
         const bool add = owner == "UGL::TaskGraph" && method->getNameAsString() == "add";
@@ -355,7 +533,14 @@ namespace UGLC::CodeGen::CPP
         {
             mVisitor.throwCodegenError(&call, "TaskRuntime entry must return a deferred Task value.");
         }
-        validateFunction(target, submit);
+        if (submit)
+        {
+            validateFunction(target, true);
+        }
+        else
+        {
+            validateTarget(target);
+        }
         for (unsigned index = 1; index < call.getNumArgs(); ++index)
         {
             validateValue(call.getArg(index)->getType(), call.getArg(index)->getExprLoc(), add && isTask(call.getArg(index)->getType()));

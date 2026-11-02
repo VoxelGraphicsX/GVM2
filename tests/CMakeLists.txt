@@ -62,6 +62,7 @@ if(GVM_BUILD_TESTS_UNIT)
             unit/test_staging_linear_allocator.cpp
             unit/test_helper_function.cpp
             unit/test_eastl_allocator.cpp
+            unit/test_pass_schedule.cpp
             unit/test_task_runtime.cpp
             unit/TaskTestExecutor.cpp
         LABELS unit whitebox core
@@ -658,6 +659,17 @@ elseif(GVM_BUILD_TESTS_RHI)
 endif()
 
 if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
+    gvm_add_dsl_runtime_gtest(gvm_dsl_gpu_task_graph_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/GpuTaskGraph.hpp
+        SOURCES integration/dsl/test_gpu_task_graph.cpp integration/dsl/GpuGraphTestNode.cpp integration/dsl/GpuGraphTestExecutor.cpp
+        LABELS integration dsl core task-graph gpu
+        UGL_INCLUDE_DIRS ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders ${GVM_REPOSITORY_ROOT}/GVM/third_party
+        LINK_LIBS glm::glm
+        UGLC_ARGS --shader-pipeline=uglir
+        RUN_SERIAL
+        TIMEOUT 120
+    )
+    target_compile_definitions(gvm_dsl_gpu_task_graph_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
     gvm_add_dsl_runtime_gtest(gvm_dsl_task_graph_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/CpuTaskGraph.hpp
         SOURCES integration/dsl/test_cpu_task_graph.cpp

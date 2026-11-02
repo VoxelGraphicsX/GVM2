@@ -15,6 +15,17 @@ namespace GVM::Core
     {
     }
 
+    TaskRuntime::TaskRuntime(RHI::DeviceImpl &device, const TaskRuntimeDescriptor &descriptor)
+        : mOwnedExecutor(eastl::make_unique<ThreadExecutor>(descriptor.workerCount)),
+          mState(eastl::make_shared<Private::TaskRuntimeState>(*mOwnedExecutor, descriptor, &device))
+    {
+    }
+
+    TaskRuntime::TaskRuntime(RHI::DeviceImpl &device, ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor)
+        : mState(eastl::make_shared<Private::TaskRuntimeState>(executor, descriptor, &device))
+    {
+    }
+
     TaskRuntime::~TaskRuntime()
     {
         mState->closeAndWait();

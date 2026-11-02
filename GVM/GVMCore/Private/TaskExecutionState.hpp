@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TaskGraphDefinition.hpp"
+#include "GraphPass.hpp"
 #include "../Public/Execution.hpp"
 #include "../Public/ITaskExecutor.hpp"
 #include <condition_variable>
@@ -10,6 +11,7 @@
 namespace GVM::Core::Private
 {
     class TaskRuntimeState;
+    class GpuGraphExecution;
 
     /// Owns one execution's immutable plan, result slots and continuation counters.
     class TaskExecutionState final : public eastl::enable_shared_from_this<TaskExecutionState>
@@ -40,7 +42,15 @@ namespace GVM::Core::Private
         /// Executes an accepted node outside locks, capturing all user exceptions.
         void evaluate(uint32_t index) noexcept;
         /// Completes one accepted job and publishes its successors exactly once.
-        void finish(uint32_t index, eastl::any value, std::exception_ptr failure) noexcept;
+        void finish(uint32_t index, eastl::any value, std::exception_ptr failure, bool deferred = false) noexcept;
+        /// Freezes a quiescent build wave and records its logical passes on the same task executor.
+        void beginGpu() noexcept;
+        /// Schedules CPU result resolution after the monitor reports GPU completion or failure.
+        void gpuFinished(std::exception_ptr failure) noexcept;
+        /// Publishes readback values and successors only after accepted GPU work has drained.
+        void finishGpu(std::exception_ptr failure) noexcept;
+        /// Publishes one completed value with the execution lock held.
+        void publishLocked(uint32_t index, eastl::any value);
         /// Records a scheduling failure for a job that the executor did not accept.
         void scheduleFailed(uint32_t index, ScheduleResult result) noexcept;
         /// Selects a terminal outcome only when every accepted job has stopped using its inputs.
@@ -63,6 +73,13 @@ namespace GVM::Core::Private
         eastl::vector<uint32_t> mPending;
         eastl::vector<uint32_t> mReady;
         TaskResults mResults;
+        eastl::vector<RenderNodeFragment> mFragments;
+        eastl::vector<eastl::function<eastl::any()>> mGpuResolvers;
+        eastl::vector<uint32_t> mDeferredGpuNodes;
+        eastl::shared_ptr<GpuGraphExecution> mGpuExecution;
+        uint32_t mPassCount = 0;
+        bool mGpuPending = false;
+        bool mGpuActive = false;
         eastl::any mFinalResult;
         uint32_t mOutput = 0;
         uint32_t mInFlight = 0;

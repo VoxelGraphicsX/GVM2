@@ -66,6 +66,9 @@ install(
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GSync.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GVMCore.Private.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/TaskGraphDefinition.hpp"
+        "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/PassResourceAccess.hpp"
+        "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GraphPass.hpp"
+        "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GraphDevice.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/GVMCore/Private"
 )
 

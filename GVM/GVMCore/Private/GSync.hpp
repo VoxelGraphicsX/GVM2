@@ -1,4 +1,5 @@
 #pragma once
+#include "PassResourceAccess.hpp"
 #include <EASTL/functional.h>
 #include <EASTL/map.h>
 #include <EASTL/vector.h>
@@ -14,6 +15,7 @@ namespace GVM::Core
     {
 
         eastl::function<void(GVM::RHI::ComputePassEncoder)> dispatchFn;
+        Private::PassResourceUsage resources;
     };
 
     enum class RenderPassPhaseRequirement
@@ -27,6 +29,7 @@ namespace GVM::Core
 
         eastl::function<void(GVM::RHI::RenderPassEncoder)> drawFn;
         RenderPassPhaseRequirement phaseRequirement = RenderPassPhaseRequirement::OrdinaryOrPixelLocal;
+        Private::PassResourceUsage resources;
     };
 
     /// Marks a boundary between two ordered pixel-local passes inside one render pass.

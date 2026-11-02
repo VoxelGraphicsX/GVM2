@@ -18,10 +18,21 @@ namespace UGLC::CodeGen::CPP
         explicit CPPGraphEntryEmitter(CPPVisitor &visitor);
         /// Lowers graph.add and runtime.submit while leaving unrelated calls unchanged.
         std::optional<std::string> translateCall(const clang::CXXMemberCallExpr &call);
+        /// Emits a RenderNode member with an invocation parameter hidden from the source DSL.
+        std::optional<std::string> emitRenderMethod(const clang::FunctionDecl &function);
         /// Adds an Entries descriptor after an exported graph function definition.
         std::string emitEntry(const clang::FunctionDecl &function);
 
+        /// Identifies the explicit subgraph protocol through ordinary class inheritance.
+        bool isRenderRecord(const clang::CXXRecordDecl &record) const;
+
     private:
+        /// Identifies nonstatic user methods that must receive invocation-local state.
+        bool isRenderMethod(const clang::FunctionDecl &function) const;
+        /// Validates a graph target using its inferred CPU or subgraph effects.
+        void validateTarget(const clang::FunctionDecl &function);
+        /// Lowers registered graph construction intrinsics and synchronous node helpers.
+        std::optional<std::string> translateRenderCall(const clang::CXXMemberCallExpr &call);
         /// Rejects resources, borrowed storage and opaque records in ordinary CPU values.
         void validateValue(clang::QualType type, clang::SourceLocation location, bool graphConstruction = false);
         /// Validates a callable body and all reachable user functions without revisiting recursion.
@@ -42,6 +53,11 @@ namespace UGLC::CodeGen::CPP
         bool isOwningContainer(const clang::CXXRecordDecl &record) const;
 
         CPPVisitor &mVisitor;
+        const clang::FunctionDecl *mRenderMethod = nullptr;
+        bool mRenderValidation = false;
+        std::unordered_set<const clang::CXXRecordDecl *> mValidatedRenderValues;
+        std::unordered_set<const clang::CXXRecordDecl *> mValidatedGraphValues;
+        std::unordered_set<const clang::FunctionDecl *> mValidatedRenderFunctions;
         std::unordered_set<const clang::CXXRecordDecl *> mValidatedValues;
         std::unordered_set<const clang::FunctionDecl *> mValidatedFunctions;
         std::unordered_set<const clang::FunctionDecl *> mValidatedBuilders;

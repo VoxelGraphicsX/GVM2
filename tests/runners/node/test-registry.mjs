@@ -72,6 +72,13 @@ export function getTestRegistry(sourceDir, binaryDir, options = {}) {
 
   const registry = [
     {
+      target: 'gvm_dsl_gpu_task_graph_tests',
+      group: 'dsl',
+      labels: ['integration', 'dsl', 'core', 'task-graph', 'gpu'],
+      timeoutMs: 120000,
+      environment: backendEnvironment
+    },
+    {
       target: 'gvm_dsl_task_graph_tests',
       group: 'dsl',
       labels: ['integration', 'dsl', 'core', 'task-graph'],

@@ -1,5 +1,7 @@
 #include "TaskExecutionState.hpp"
 #include "TaskRuntimeState.hpp"
+#include "GpuGraphExecution.hpp"
+#include "../Public/RenderNode.hpp"
 
 #include <EASTL/algorithm.h>
 #include <chrono>
@@ -105,6 +107,7 @@ namespace GVM::Core::Private
     void TaskExecutionState::cancel()
     {
         bool terminal = false;
+        eastl::shared_ptr<GpuGraphExecution> gpu;
         {
             std::lock_guard lock(mMutex);
             if (terminalLocked())
@@ -116,7 +119,12 @@ namespace GVM::Core::Private
                 mStopStatus = ExecutionStatus::Cancelled;
                 mDiagnostic = "Task execution was cancelled.";
             }
+            gpu = mGpuExecution;
             terminal = finishLocked();
+        }
+        if (gpu)
+        {
+            gpu->cancel();
         }
         if (terminal)
         {
@@ -173,6 +181,10 @@ namespace GVM::Core::Private
                 eastl::vector<uint32_t> ready;
                 ready.reserve(tasks.size());
                 TaskResults results(tasks.size());
+                eastl::vector<RenderNodeFragment> fragments(tasks.size());
+                eastl::vector<eastl::function<eastl::any()>> resolvers(tasks.size());
+                eastl::vector<uint32_t> deferred;
+                deferred.reserve(tasks.size());
                 for (uint32_t index = 0; index < tasks.size(); ++index)
                 {
                     pending[index] = static_cast<uint32_t>(tasks[index].predecessors.size());
@@ -192,6 +204,9 @@ namespace GVM::Core::Private
                     mPending = eastl::move(pending);
                     mReady = eastl::move(ready);
                     mResults = eastl::move(results);
+                    mFragments = eastl::move(fragments);
+                    mGpuResolvers = eastl::move(resolvers);
+                    mDeferredGpuNodes = eastl::move(deferred);
                     mOutput = output.index;
                     mRemaining = static_cast<uint32_t>(mTasks.size());
                     mPrepared = true;
@@ -218,16 +233,35 @@ namespace GVM::Core::Private
         }
         for (;;)
         {
-            uint32_t index;
+            uint32_t index = Preparation;
+            bool beginGpuWave = false;
             {
                 std::lock_guard lock(mMutex);
                 if (terminalLocked() || mStopStatus != ExecutionStatus::Pending || mReadyCursor == mReady.size() || mInFlight >= mRuntime->maximumInFlight())
                 {
                     mDispatching = false;
-                    return;
+                    if (!terminalLocked() && mStopStatus == ExecutionStatus::Pending &&
+                        mInFlight == 0 && mGpuPending && !mGpuActive)
+                    {
+                        mGpuActive = true;
+                        mGpuPending = false;
+                        beginGpuWave = true;
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
-                index = mReady[mReadyCursor++];
-                ++mInFlight;
+                else
+                {
+                    index = mReady[mReadyCursor++];
+                    ++mInFlight;
+                }
+            }
+            if (beginGpuWave)
+            {
+                beginGpu();
+                return;
             }
             try
             {
@@ -252,6 +286,7 @@ namespace GVM::Core::Private
     {
         eastl::any value;
         std::exception_ptr failure;
+        bool deferred = false;
         try
         {
             bool proceed;
@@ -261,18 +296,42 @@ namespace GVM::Core::Private
             }
             if (proceed)
             {
-                auto operation = eastl::move(mTasks[index].evaluate);
-                value = operation(mResults);
+                if (mTasks[index].buildsSubgraph)
+                {
+                    RenderNode node(mRuntime->gpuDevice(), mRuntime->maximumPasses());
+                    // Retain GPU builder captures until accepted passes complete; Args may reference literal input resources.
+                    value = mTasks[index].evaluate(mResults, &node);
+                    auto fragment = node.finish();
+                    std::lock_guard lock(mMutex);
+                    if (fragment.passes.size() > mRuntime->maximumPasses() - mPassCount)
+                    {
+                        throw std::length_error("GPU graph exceeds the execution pass budget.");
+                    }
+                    mPassCount += static_cast<uint32_t>(fragment.passes.size());
+                    deferred = bool(fragment.resolve);
+                    if (deferred)
+                    {
+                        mGpuResolvers[index] = eastl::move(fragment.resolve);
+                        mDeferredGpuNodes.push_back(index);
+                    }
+                    mGpuPending = mGpuPending || !fragment.passes.empty();
+                    mFragments[index] = eastl::move(fragment);
+                }
+                else
+                {
+                    auto operation = eastl::move(mTasks[index].evaluate);
+                    value = operation(mResults, nullptr);
+                }
             }
         }
         catch (...)
         {
             failure = std::current_exception();
         }
-        finish(index, eastl::move(value), failure);
+        finish(index, eastl::move(value), failure, deferred);
     }
 
-    void TaskExecutionState::finish(uint32_t index, eastl::any value, std::exception_ptr failure) noexcept
+    void TaskExecutionState::finish(uint32_t index, eastl::any value, std::exception_ptr failure, bool deferred) noexcept
     {
         bool terminal;
         {
@@ -283,23 +342,136 @@ namespace GVM::Core::Private
                 mStopStatus = ExecutionStatus::Failed;
             }
             --mInFlight;
-            if (index != Preparation)
+            if (index != Preparation && !deferred)
             {
                 --mRemaining;
                 if (mStopStatus == ExecutionStatus::Pending)
                 {
-                    mResults[index] = eastl::move(value);
-                    for (uint32_t successor : mSuccessors[index])
-                    {
-                        if (--mPending[successor] == 0)
-                        {
-                            mReady.push_back(successor);
-                        }
-                    }
+                    publishLocked(index, eastl::move(value));
                 }
             }
             terminal = finishLocked();
         }
+        if (terminal)
+        {
+            notifyTerminal();
+        }
+        else
+        {
+            dispatchReady();
+        }
+    }
+
+    void TaskExecutionState::publishLocked(uint32_t index, eastl::any value)
+    {
+        mResults[index] = eastl::move(value);
+        for (uint32_t successor : mSuccessors[index])
+        {
+            if (--mPending[successor] == 0)
+            {
+                mReady.push_back(successor);
+            }
+        }
+    }
+
+    void TaskExecutionState::beginGpu() noexcept
+    {
+        try
+        {
+            eastl::vector<RenderNodeFragment> fragments(mTasks.size());
+            {
+                std::lock_guard lock(mMutex);
+                fragments.swap(mFragments);
+            }
+            auto gpu = eastl::make_shared<GpuGraphExecution>(*mRuntime, eastl::move(fragments),
+                [self = shared_from_this()](std::exception_ptr failure) { self->gpuFinished(failure); });
+            {
+                std::lock_guard lock(mMutex);
+                mGpuExecution = gpu;
+                if (mStopStatus != ExecutionStatus::Pending)
+                {
+                    gpu->cancel();
+                }
+            }
+            mRuntime->enqueueGpu(gpu);
+            gpu->start();
+        }
+        catch (...)
+        {
+            gpuFinished(std::current_exception());
+        }
+    }
+
+    void TaskExecutionState::gpuFinished(std::exception_ptr failure) noexcept
+    {
+        {
+            std::lock_guard lock(mMutex);
+            ++mInFlight;
+        }
+        try
+        {
+            ExecutorTask task([self = shared_from_this(), failure] { self->finishGpu(failure); });
+            if (mRuntime->schedule(eastl::move(task)) == ScheduleResult::Accepted)
+            {
+                return;
+            }
+            throw std::runtime_error("Task executor rejected GPU completion continuation.");
+        }
+        catch (...)
+        {
+            finishGpu(failure ? failure : std::current_exception());
+        }
+    }
+
+    void TaskExecutionState::finishGpu(std::exception_ptr failure) noexcept
+    {
+        eastl::vector<eastl::any> values;
+        try
+        {
+            bool proceed;
+            {
+                std::lock_guard lock(mMutex);
+                proceed = !failure && mStopStatus == ExecutionStatus::Pending;
+            }
+            if (proceed)
+            {
+                values.reserve(mDeferredGpuNodes.size());
+                for (uint32_t index : mDeferredGpuNodes)
+                {
+                    values.push_back(mGpuResolvers[index]());
+                }
+            }
+        }
+        catch (...)
+        {
+            failure = std::current_exception();
+        }
+        bool terminal;
+        eastl::shared_ptr<GpuGraphExecution> completedGpu;
+        {
+            std::lock_guard lock(mMutex);
+            if (failure && !mFailure)
+            {
+                mFailure = failure;
+                mStopStatus = ExecutionStatus::Failed;
+            }
+            for (size_t offset = 0; offset < mDeferredGpuNodes.size(); ++offset)
+            {
+                const auto index = mDeferredGpuNodes[offset];
+                --mRemaining;
+                if (mStopStatus == ExecutionStatus::Pending)
+                {
+                    publishLocked(index, eastl::move(values[offset]));
+                }
+                mGpuResolvers[index] = nullptr;
+            }
+            mDeferredGpuNodes.clear();
+            mGpuActive = false;
+            --mInFlight;
+            completedGpu = eastl::move(mGpuExecution);
+            terminal = finishLocked();
+        }
+        completedGpu.reset();
         if (terminal)
         {
             notifyTerminal();
@@ -325,7 +497,7 @@ namespace GVM::Core::Private
 
     bool TaskExecutionState::finishLocked() noexcept
     {
-        if (terminalLocked() || mInFlight != 0)
+        if (terminalLocked() || mInFlight != 0 || mGpuActive)
         {
             return false;
         }
@@ -334,7 +506,7 @@ namespace GVM::Core::Private
             mStatus = mStopStatus;
             return true;
         }
-        if (mPrepared && mRemaining == 0)
+        if (mPrepared && mRemaining == 0 && !mGpuPending)
         {
             mFinalResult = eastl::move(mResults[mOutput]);
             mStatus = ExecutionStatus::Succeeded;
@@ -350,6 +522,9 @@ namespace GVM::Core::Private
         eastl::vector<uint32_t>().swap(mPending);
         eastl::vector<uint32_t>().swap(mReady);
         TaskResults().swap(mResults);
+        eastl::vector<RenderNodeFragment>().swap(mFragments);
+        eastl::vector<eastl::function<eastl::any()>>().swap(mGpuResolvers);
+        eastl::vector<uint32_t>().swap(mDeferredGpuNodes);
         mRuntime->complete();
         {
             std::lock_guard lock(mMutex);

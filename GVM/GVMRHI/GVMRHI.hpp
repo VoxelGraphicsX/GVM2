@@ -2353,6 +2353,8 @@ namespace GVM::RHI
     class TextureViewImpl : public ResourceObject
     {
     public:
+        /// Returns the parent allocation for graph hazard analysis, or null when identity is unavailable.
+        virtual const TextureImpl *getSourceTexture() const;
         /// Returns the concrete pixel format used by this view for pipeline attachment compatibility.
         [[nodiscard]]
         virtual TextureFormat getFormat() const = 0;

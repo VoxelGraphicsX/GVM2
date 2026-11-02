@@ -2,11 +2,65 @@
 
 #include <EASTL/functional.h>
 #include <EASTL/string.h>
+#include <EASTL/vector.h>
 #include <cstdint>
 #include <limits>
 
 namespace UGL
 {
+    /// Owns a typed graph allocation; size and slice use bytes and never expose CPU resource access.
+    template <class T>
+    class GraphBuffer
+    {
+    public:
+        using Element = T;
+        /// Returns the retained byte range size without reading GPU contents.
+        uint64_t size() const;
+        /// Produces another owning view of the same allocation without copying its contents.
+        GraphBuffer slice(uint64_t offset, uint64_t size) const;
+    };
+
+    /// Defines a statically resolved subgraph builder with invocation-local construction intrinsics.
+    template <class InputValue, class OutputValue>
+    class IRenderNode
+    {
+    public:
+        using Input = InputValue;
+        using Output = OutputValue;
+        using RenderNodeProtocol = void;
+    protected:
+        /// Allocates a typed buffer owned by graph values and all accepted passes that use it.
+        template <class BufferType>
+        BufferType createBuffer(eastl::string label, uint count) const;
+        /// Captures CPU elements in an upload pass, without mutating a shared queue's pending operations.
+        template <class T>
+        void writeBuffer(GraphBuffer<T> destination, eastl::vector<T> values) const;
+        /// Creates an immutable shader dispatch; the last three arguments are thread counts.
+        template <class Shader, class... Arguments>
+        ComputePassTaskDescriptor dispatchThreads(Arguments... arguments) const;
+        /// Creates one logical compute pass from a set of immutable dispatch descriptors.
+        template <class... Tasks>
+        void computePass(eastl::string label, Tasks... tasks) const;
+        /// Creates one ordinary render pass whose attachment and shader effects drive scheduling.
+        template <class Framebuffer, class... Tasks>
+        void renderPass(eastl::string label, Framebuffer framebuffer, Tasks... tasks) const;
+        /// Copies equally sized graph ranges as a separately schedulable transfer pass.
+        template <class T>
+        void copyBuffer(GraphBuffer<T> source, GraphBuffer<T> destination) const;
+        /// Fills an aligned graph range as a separately schedulable transfer pass.
+        template <class T>
+        void fillBuffer(GraphBuffer<T> target, uint8_t value) const;
+    };
+
+    /// Converts tightly packed GPU elements to an owned CPU vector through a completion continuation.
+    template <class T>
+    class ReadbackNode final : public IRenderNode<GraphBuffer<T>, eastl::vector<T>>
+    {
+    public:
+        /// Emits a staging copy and publishes the owned vector only after GPU completion.
+        eastl::vector<T> build(GraphBuffer<T> input) const;
+    };
+
     /// Names a deferred graph result; values are supplied to dependent graph.add calls automatically.
     template <class T>
     class Task
@@ -17,6 +71,18 @@ namespace UGL
 
     namespace Private
     {
+        /// Resolves ordinary function and class results for the uniform graph.add API.
+        template <class Callable, bool Subgraph, class... Arguments>
+        struct GraphResult
+        {
+            using Value = eastl::invoke_result_t<Callable &, Arguments...>;
+        };
+        /// Resolves a subgraph builder's declared output without invoking its build method during parsing.
+        template <class Callable, class... Arguments>
+        struct GraphResult<Callable, true, Arguments...>
+        {
+            using Value = typename Callable::Output;
+        };
         /// Resolves an ordinary graph argument to its owned value type during source checking.
         template <class T>
         struct TaskArgument
@@ -68,7 +134,7 @@ namespace UGL
     public:
         /// Captures values and infers dependencies from Task arguments; functions are static declarations.
         template <class Callable, class... Arguments>
-        Task<eastl::invoke_result_t<Callable &, typename Private::TaskArgument<Arguments>::Value...>>
+        Task<typename Private::GraphResult<Callable, requires { typename Callable::RenderNodeProtocol; }, typename Private::TaskArgument<Arguments>::Value...>::Value>
         add(const Callable &callable, Arguments... arguments);
     };
 

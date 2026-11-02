@@ -7,6 +7,11 @@ namespace GVM::RHI::Metal
     {
     }
 
+    const TextureImpl *MTextureView::getSourceTexture() const
+    {
+        return mParentTexture;
+    }
+
     void MTextureView::init(MTexture &parentTexture, MTL::Texture *nativeTextureView, const TextureViewDescriptor &descriptor)
     {
         this->mParentTexture = &parentTexture;

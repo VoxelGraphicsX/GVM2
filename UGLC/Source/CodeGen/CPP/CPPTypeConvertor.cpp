@@ -10,9 +10,14 @@ namespace UGLC::CodeGen::CPP
 
         std::string result = canonicalName;
         if (canonicalName == "UGL::TaskGraph" || canonicalName == "UGL::TaskRuntime" ||
+            canonicalName == "UGL::IRenderNode" || canonicalName == "UGL::ReadbackNode" ||
             canonicalName == "UGL::Task" || canonicalName == "UGL::Execution" || canonicalName == "UGL::ExecutionStatus")
         {
             result = "GVM::Core::" + canonicalName.substr(5);
+        }
+        else if (canonicalName == "UGL::GraphBuffer")
+        {
+            result = "GVM::Core::GraphBuffer";
         }
         else if (canonicalName == "UGL::Device")
         {
@@ -299,6 +304,11 @@ namespace UGLC::CodeGen::CPP
 
     bool CPPTypeConvertor::checkShouldIgnoreTemplateParams(const std::string &canonicalName) const
     {
+        if (canonicalName == "UGL::GraphBuffer")
+        {
+            return true;
+        }
+
         if (canonicalName == "UGL::StructuredBuffer" || canonicalName == "UGL::RWStructuredBuffer" || canonicalName == "UGL::UniformBuffer" || canonicalName == "UGL::StorageBuffer")
         {
             return true;

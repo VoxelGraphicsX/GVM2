@@ -41,6 +41,14 @@ target_sources(
         Private/TaskGraphDefinition.cpp
         Private/TaskExecutionState.cpp
         Private/TaskRuntimeState.cpp
+        Private/PassResourceAccess.cpp
+        Private/PassSchedule.cpp
+        Private/GraphDevice.cpp
+        Private/GraphBufferAllocation.cpp
+        Private/GpuGraphExecution.cpp
+        Private/GpuGraphService.cpp
+        Public/GraphBuffer.cpp
+        Public/RenderNode.cpp
 )
 set_target_properties(GVMCore PROPERTIES
     EXPORT_NAME Core

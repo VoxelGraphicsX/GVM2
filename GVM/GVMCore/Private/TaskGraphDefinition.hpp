@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <mutex>
 
+namespace GVM::Core { class RenderNode; }
+
 namespace GVM::Core::Private
 {
     using TaskResults = eastl::vector<eastl::any>;
@@ -15,7 +17,8 @@ namespace GVM::Core::Private
     struct TaskDefinition
     {
         eastl::vector<uint32_t> predecessors;
-        eastl::function<eastl::any(const TaskResults &)> evaluate;
+        eastl::function<eastl::any(const TaskResults &, RenderNode *)> evaluate;
+        bool buildsSubgraph = false;
     };
 
     /// Owns a graph definition; execution snapshots isolate callable state between submissions.

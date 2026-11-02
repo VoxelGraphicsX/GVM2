@@ -1934,6 +1934,10 @@ namespace UGLC::CodeGen::CPP
 
     std::string CPPVisitor::generateFunctionDefinition(const clang::FunctionDecl *func)
     {
+        if (const auto renderMethod = mGraphEntryEmitter->emitRenderMethod(*func))
+        {
+            return *renderMethod;
+        }
         if (functionRequiresDeletedHostDefinition(func))
         {
             return generateDeletedFunctionDeclaration(func);
@@ -3030,8 +3034,14 @@ namespace UGLC::CodeGen::CPP
     {
         CPPTypeConvertor argumentTypes(true);
         const auto *record = llvm::dyn_cast<clang::CXXRecordDecl>(decl->getParent());
-        return BaseASTVisitor::generateRecordFieldDecl(decl,
+        auto result = BaseASTVisitor::generateRecordFieldDecl(decl,
             record != nullptr && isArgumentRecord(*record) ? &argumentTypes : typeConvertor);
+        if (record != nullptr && mGraphEntryEmitter->isRenderRecord(*record))
+        {
+            const auto access = decl->getAccess();
+            result = std::string(access == clang::AS_public ? "public: " : access == clang::AS_protected ? "protected: " : "private: ") + result;
+        }
+        return result;
     }
 
     std::string CPPVisitor::generateArgumentLayout(const clang::CXXRecordDecl &record)
@@ -3276,6 +3286,33 @@ namespace UGLC::CodeGen::CPP
                 result += "        const uint32_t __ugl_gx = __ugl_x / workGroupX + (__ugl_x % workGroupX != 0);\n        const uint32_t __ugl_gy = __ugl_y / workGroupY + (__ugl_y % workGroupY != 0);\n        const uint32_t __ugl_gz = __ugl_z / workGroupZ + (__ugl_z % workGroupZ != 0);\n";
             }
             result += "        " + taskType + " __ugl_task;\n";
+            if (layout.enabled || reflection.resources.empty())
+            {
+                result += "        __ugl_task.resources.complete = true;\n";
+                for (const auto &resource : reflection.resources)
+                {
+                    const bool buffer = resource.kind == UGLIR::ResourceKind::UniformBuffer || resource.kind == UGLIR::ResourceKind::StorageBuffer;
+                    const bool texture = resource.kind == UGLIR::ResourceKind::Texture || resource.kind == UGLIR::ResourceKind::StorageTexture;
+                    if (buffer || texture)
+                    {
+                        const bool writes = resource.effectiveAccessMode() != UGLIR::AccessMode::Read;
+                        result += "        __ugl_task.resources.accesses.push_back(GVM::Core::Private::PassResourceAccess::" +
+                            std::string(buffer ? "buffer(" : "texture(") + resource.name + ", " + (writes ? "true" : "false") + "));\n";
+                    }
+                }
+                if (indexed)
+                {
+                    result += "        __ugl_task.resources.accesses.push_back(GVM::Core::Private::PassResourceAccess::buffer(__ugl_indexBuffer, false));\n";
+                }
+                if (indirect)
+                {
+                    result += "        __ugl_task.resources.accesses.push_back(GVM::Core::Private::PassResourceAccess::buffer(__ugl_indirectBuffer, false));\n";
+                }
+                if (counted)
+                {
+                    result += "        __ugl_task.resources.accesses.push_back(GVM::Core::Private::PassResourceAccess::buffer(__ugl_indirectCountBuffer, false));\n";
+                }
+            }
             if (pixelLocal)
             {
                 result += "        __ugl_task.phaseRequirement = GVM::Core::RenderPassPhaseRequirement::PixelLocalOnly;\n";
