@@ -3,7 +3,7 @@
 
 namespace GVM::Core::Private
 {
-    /// Owns one native allocation until all graph values, recording jobs and GPU continuations release it.
+    /// Owns one native allocation internally until its execution and GPU continuations release it.
     class GraphBufferAllocation final
     {
     public:

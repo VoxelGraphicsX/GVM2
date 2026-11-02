@@ -16,10 +16,6 @@ namespace GVM::Core::Private
             {
                 mPasses.push_back(eastl::move(pass));
             }
-            for (auto &buffer : fragment.buffers)
-            {
-                mBuffers.push_back(eastl::move(buffer));
-            }
         }
         if (mPasses.size() > runtime.maximumPasses())
         {

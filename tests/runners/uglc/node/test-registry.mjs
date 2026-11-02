@@ -1872,9 +1872,10 @@ export function getTestRegistry(sourceDir, profile) {
   return [
     ...[
       ['resource', 'InvalidTaskResource.hpp', 'CPU graph tasks cannot contain GPU resources'],
-      ['graph-buffer-element', 'InvalidTaskGraphBufferElement.hpp', 'CPU graph tasks cannot contain GPU resources'],
+      ['buffer-element', 'InvalidTaskBufferElement.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['render-mutable', 'InvalidTaskRenderMutable.hpp', 'RenderNode build must use const configuration'],
-      ['graph-buffer-cpu', 'InvalidTaskGraphBufferCpu.hpp', 'CPU graph tasks cannot contain GPU resources'],
+      ['buffer-export', 'InvalidTaskBufferExport.hpp', 'CPU graph tasks cannot contain GPU resources'],
+      ['buffer-cpu', 'InvalidTaskBufferCpu.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['reference', 'InvalidTaskReference.hpp', 'pointers, references'],
       ['address', 'InvalidTaskAddress.hpp', 'address-of'],
       ['global', 'InvalidTaskGlobal.hpp', 'shared global or static storage'],

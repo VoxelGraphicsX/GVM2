@@ -74,6 +74,7 @@ namespace GVM::Core::Private
         eastl::vector<uint32_t> mReady;
         TaskResults mResults;
         eastl::vector<RenderNodeFragment> mFragments;
+        eastl::vector<eastl::shared_ptr<GraphBufferAllocation>> mAllocations;
         eastl::vector<eastl::function<eastl::any()>> mGpuResolvers;
         eastl::vector<uint32_t> mDeferredGpuNodes;
         eastl::shared_ptr<GpuGraphExecution> mGpuExecution;

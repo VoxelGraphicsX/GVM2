@@ -30,6 +30,13 @@ GpuGraphTestNode::GpuGraphTestNode(eastl::shared_ptr<GpuGraphRecordingProbe> pro
 
 uint32_t GpuGraphTestNode::build(GVM::Core::RenderNode &node, uint32_t count) const
 {
+    if (mProbe->allocateProbeBuffer)
+    {
+        auto buffer = node.createBuffer({.label = "GraphLifetimeProbe",
+            .usage = GVM::RHI::BufferUsage::CopySrc | GVM::RHI::BufferUsage::CopyDst, .size = 16});
+        std::lock_guard lock(mProbe->mutex);
+        mProbe->buffer = buffer;
+    }
     if (mProbe->observeBuild)
     {
         recordProbe(mProbe);

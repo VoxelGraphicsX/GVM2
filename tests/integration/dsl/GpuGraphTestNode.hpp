@@ -14,6 +14,8 @@ struct GpuGraphRecordingProbe
     bool released = true;
     bool fail = false;
     bool observeBuild = false;
+    bool allocateProbeBuffer = false;
+    GVM::RHI::Buffer buffer;
 };
 
 /// Builds native test subgraphs with instrumented compute and optional ordinary render passes.

@@ -69,6 +69,7 @@ install(
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/PassResourceAccess.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GraphPass.hpp"
         "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GraphDevice.hpp"
+        "${GVM_INSTALL_PROJECT_ROOT}/GVM/GVMCore/Private/GraphBufferAllocation.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/GVMCore/Private"
 )
 

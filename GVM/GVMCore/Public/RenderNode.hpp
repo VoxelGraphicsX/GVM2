@@ -1,5 +1,4 @@
 #pragma once
-#include "GraphBuffer.hpp"
 #include "../Private/GraphDevice.hpp"
 #include "../Private/GraphPass.hpp"
 #include "../Private/GSync.hpp"
@@ -21,16 +20,16 @@ namespace GVM::Core
         ~RenderNode();
         RenderNode(const RenderNode &) = delete;
         RenderNode &operator=(const RenderNode &) = delete;
-        /// Allocates owned GPU storage; copies of the returned value retain its lifetime.
-        GraphBuffer createBuffer(const RHI::BufferDescriptor &descriptor);
+        /// Allocates graph-local storage using the existing RHI handle; the execution owns its lifetime.
+        RHI::Buffer createBuffer(const RHI::BufferDescriptor &descriptor);
         /// Captures a complete ordered list of dispatches as one independently recordable compute pass.
         void computePass(const eastl::string &label, eastl::vector<ComputePassTaskDescriptor> tasks);
         /// Captures a framebuffer and draw list; distinct graphics passes remain GPU-ordered.
         void renderPass(RHI::RenderPassDescriptor descriptor, eastl::vector<RenderPassTaskDescriptor> tasks);
         /// Copies a graph byte range as its own transfer pass without touching queue pending lists.
-        void copyBuffer(GraphBuffer source, GraphBuffer destination);
+        void copyBuffer(RHI::BufferRange source, RHI::BufferRange destination);
         /// Fills a graph byte range as its own transfer pass; ranges must be four-byte aligned.
-        void fillBuffer(GraphBuffer target, uint8_t value);
+        void fillBuffer(RHI::BufferRange target, uint8_t value);
 
         /// Packs ordinary dispatch descriptors into one logical compute pass.
         template <class... Tasks>
@@ -58,7 +57,7 @@ namespace GVM::Core
         }
         /// Copies owned CPU elements into a retained staging allocation and emits a transfer pass.
         template <class T>
-        void writeBuffer(GraphBuffer destination, const eastl::vector<T> &values)
+        void writeBuffer(RHI::BufferRange destination, const eastl::vector<T> &values)
         {
             static_assert(eastl::is_trivially_copyable_v<T>, "GPU uploads require trivially copyable elements.");
             upload(eastl::move(destination), values.data(), values.size() * sizeof(T));
@@ -81,10 +80,12 @@ namespace GVM::Core
         Private::RenderNodeFragment finish();
         /// Enforces the runtime's per-execution pass limit before appending another operation.
         void append(Private::GraphPass pass);
+        /// Creates a private allocation owner retained by this invocation and its execution.
+        eastl::shared_ptr<Private::GraphBufferAllocation> allocateBuffer(const RHI::BufferDescriptor &descriptor);
         /// Snapshots host bytes synchronously, then captures an upload pass.
-        void upload(GraphBuffer destination, const void *data, uint64_t size);
+        void upload(RHI::BufferRange destination, const void *data, uint64_t size);
         /// Emits an owned staging copy for a typed readback node.
-        GraphBuffer prepareReadback(GraphBuffer source);
+        eastl::shared_ptr<Private::GraphBufferAllocation> prepareReadback(RHI::BufferRange source);
         /// Publishes a typed CPU resolver that runs only after this fragment's GPU completion.
         void resolveAfterGpu(eastl::function<eastl::any()> resolver);
         /// Constructs shader objects under the graph device lock while retaining immutable argument snapshots.

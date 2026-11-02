@@ -8,13 +8,13 @@ struct Element
     UGL::StructuredBuffer<float> resource;
 };
 /// Requires transitive element validation before emitting the subgraph.
-class InvalidNode : public UGL::IRenderNode<uint, UGL::GraphBuffer<Element>>
+class InvalidNode : public UGL::IRenderNode<uint, UGL::Buffer<Element, UGL::BufferUsage<UGL::Storage>>>
 {
 public:
     /// Attempts to allocate elements with resource ownership instead of CPU data.
-    UGL::GraphBuffer<Element> build(uint count) const
+    UGL::Buffer<Element, UGL::BufferUsage<UGL::Storage>> build(uint count) const
     {
-        return createBuffer<UGL::GraphBuffer<Element>>("Invalid", count);
+        return createBuffer<UGL::Buffer<Element, UGL::BufferUsage<UGL::Storage>>>("Invalid", count);
     }
 };
 /// Invokes the invalid subgraph through the unified API.

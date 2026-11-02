@@ -111,14 +111,28 @@ namespace UGLC::CodeGen::CPP
         {
             const auto *buffer = templates != nullptr && templates->size() != 0
                 ? llvm::dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>((*templates)[0].getAsType()->getAsCXXRecordDecl()) : nullptr;
-            if (buffer == nullptr || buffer->getQualifiedNameAsString() != "UGL::GraphBuffer")
+            if (buffer == nullptr || buffer->getQualifiedNameAsString() != "UGL::Buffer")
             {
-                mVisitor.throwCodegenError(&call, "RenderNode createBuffer requires an owning GraphBuffer<T> type.");
+                mVisitor.throwCodegenError(&call, "RenderNode createBuffer requires an existing Buffer<T, BufferUsage<...>> type.");
             }
             const auto element = buffer->getTemplateArgs()[0].getAsType();
             validateValue(element, call.getExprLoc());
+            const auto *usage = llvm::dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(buffer->getTemplateArgs()[1].getAsType()->getAsCXXRecordDecl());
+            if (usage == nullptr || usage->getQualifiedNameAsString() != "UGL::BufferUsage")
+            {
+                mVisitor.throwCodegenError(&call, "RenderNode createBuffer requires BufferUsage<...> usage declarations.");
+            }
+            std::string flags;
+            for (const auto &argument : usage->getTemplateArgs()[0].pack_elements())
+            {
+                if (!flags.empty())
+                {
+                    flags += " | ";
+                }
+                flags += convertBufferUsage(argument.getAsType()->getAsCXXRecordDecl()->getQualifiedNameAsString());
+            }
             return "__gvm_node.createBuffer({.label = " + mVisitor.TranslateExpr(call.getArg(0)) +
-                ", .usage = GVM::RHI::BufferUsage::Storage | GVM::RHI::BufferUsage::CopySrc | GVM::RHI::BufferUsage::CopyDst, .size = uint64_t(" +
+                ", .usage = " + (flags.empty() ? "0" : flags) + ", .size = uint64_t(" +
                 mVisitor.TranslateExpr(call.getArg(1)) + ") * sizeof(" + mVisitor.generateTypeCanonicalName(element) + ")})";
         }
         const auto *object = call.getImplicitObjectArgument()->IgnoreParenImpCasts();
@@ -186,7 +200,7 @@ namespace UGLC::CodeGen::CPP
         {
             return;
         }
-        if (mRenderValidation && name == "UGL::GraphBuffer")
+        if (mRenderValidation && (name == "UGL::Buffer" || name == "UGL::BufferRange"))
         {
             const auto *specialization = llvm::cast<clang::ClassTemplateSpecializationDecl>(record);
             const auto element = specialization->getTemplateArgs()[0].getAsType();
@@ -196,7 +210,7 @@ namespace UGLC::CodeGen::CPP
                 validateValue(element, location);
                 if (!element.isTriviallyCopyableType(*mVisitor.Context))
                 {
-                    mVisitor.throwCodegenError(location, "GraphBuffer elements must be trivially copyable owned CPU values.");
+                    mVisitor.throwCodegenError(location, "Graph buffer elements must be trivially copyable owned CPU values.");
                 }
             }
             catch (...)
@@ -479,7 +493,7 @@ namespace UGLC::CodeGen::CPP
             {
                 const bool intrinsic = method != nullptr &&
                     (method->getParent()->getQualifiedNameAsString() == "UGL::IRenderNode" ||
-                     method->getParent()->getQualifiedNameAsString() == "UGL::GraphBuffer");
+                     method->getParent()->getQualifiedNameAsString() == "UGL::BufferRange");
                 if (!(mRenderValidation && intrinsic))
                 {
                     validateFunction(*callee, graphConstruction);
@@ -491,7 +505,8 @@ namespace UGLC::CodeGen::CPP
             validateValue(construction->getType(), construction->getExprLoc(), graphConstruction);
             const auto *constructor = construction->getConstructor();
             const bool graph = constructor->getParent()->getQualifiedNameAsString() == "UGL::TaskGraph" || isTask(construction->getType());
-            if (!constructor->isDefaulted() && !constructor->isImplicit() && !isOwningContainer(*constructor->getParent()) && !(graphConstruction && graph))
+            const bool bufferRange = mRenderValidation && constructor->getParent()->getQualifiedNameAsString() == "UGL::BufferRange";
+            if (!constructor->isDefaulted() && !constructor->isImplicit() && !isOwningContainer(*constructor->getParent()) && !(graphConstruction && graph) && !bufferRange)
             {
                 validateFunction(*constructor, graphConstruction);
             }
@@ -535,6 +550,7 @@ namespace UGLC::CodeGen::CPP
         }
         if (submit)
         {
+            validateResult(target);
             validateFunction(target, true);
         }
         else
@@ -554,6 +570,12 @@ namespace UGLC::CodeGen::CPP
         return result + ")";
     }
 
+    void CPPGraphEntryEmitter::validateResult(const clang::FunctionDecl &function)
+    {
+        const auto *task = llvm::cast<clang::ClassTemplateSpecializationDecl>(function.getReturnType()->getAsCXXRecordDecl());
+        validateValue(task->getTemplateArgs()[0].getAsType(), function.getLocation());
+    }
+
     std::string CPPGraphEntryEmitter::emitEntry(const clang::FunctionDecl &function)
     {
         if (!function.doesThisDeclarationHaveABody() || !isTask(function.getReturnType()) ||
@@ -565,6 +587,7 @@ namespace UGLC::CodeGen::CPP
         {
             mVisitor.throwCodegenError(&function, "Exported graph entry requires one concrete owned input parameter.");
         }
+        validateResult(function);
         validateFunction(function, true);
         return "\nnamespace Entries\n{\n    /// Invokes the statically exported graph with an owned input snapshot.\n    inline constexpr auto " +
             function.getNameAsString() + " = [](auto input)\n    {\n        return ::" + function.getQualifiedNameAsString() + "(input);\n    };\n}\n";

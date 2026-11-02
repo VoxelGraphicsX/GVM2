@@ -29,15 +29,19 @@ namespace GVM::Core
         }
         mFragment.passes.push_back(eastl::move(pass));
     }
-    GraphBuffer RenderNode::createBuffer(const RHI::BufferDescriptor &descriptor)
+    RHI::Buffer RenderNode::createBuffer(const RHI::BufferDescriptor &descriptor)
+    {
+        return allocateBuffer(descriptor)->buffer();
+    }
+    eastl::shared_ptr<Private::GraphBufferAllocation> RenderNode::allocateBuffer(const RHI::BufferDescriptor &descriptor)
     {
         if (descriptor.size == 0)
         {
             throw std::invalid_argument("Graph buffer allocations must be nonempty.");
         }
-        GraphBuffer result(eastl::make_shared<Private::GraphBufferAllocation>(mDevice, descriptor), 0, descriptor.size);
-        mFragment.buffers.push_back(result);
-        return result;
+        auto allocation = eastl::make_shared<Private::GraphBufferAllocation>(mDevice, descriptor);
+        mFragment.allocations.push_back(allocation);
+        return allocation;
     }
     void RenderNode::computePass(const eastl::string &label, eastl::vector<ComputePassTaskDescriptor> tasks)
     {
@@ -120,22 +124,24 @@ namespace GVM::Core
         };
         append(eastl::move(pass));
     }
-    void RenderNode::copyBuffer(GraphBuffer source, GraphBuffer destination)
+    void RenderNode::copyBuffer(RHI::BufferRange source, RHI::BufferRange destination)
     {
-        if (source.size() != destination.size() || source.size() == 0)
+        source = RHI::BufferRange(source.buffer, source.offset, source.size);
+        destination = RHI::BufferRange(destination.buffer, destination.offset, destination.size);
+        if (source.size != destination.size || source.size == 0)
         {
             throw std::invalid_argument("Graph copies require equal nonempty buffer ranges.");
         }
         Private::GraphPass pass;
         pass.kind = Private::GraphPassKind::Transfer;
-        pass.resources = {{Private::PassResourceAccess::buffer(source.range(), false),
-            Private::PassResourceAccess::buffer(destination.range(), true)}, true};
+        pass.resources = {{Private::PassResourceAccess::buffer(source, false),
+            Private::PassResourceAccess::buffer(destination, true)}, true};
         pass.record = [source = eastl::move(source), destination = eastl::move(destination)](RHI::CommandEncoder encoder)
         {
             auto copy = encoder->beginBlitPass({.label = "GraphCopy"});
             try
             {
-                copy->copyBufferToBuffer(source.range(), destination.range());
+                copy->copyBufferToBuffer(source, destination);
             }
             catch (...)
             {
@@ -146,9 +152,10 @@ namespace GVM::Core
         };
         append(eastl::move(pass));
     }
-    void RenderNode::fillBuffer(GraphBuffer target, uint8_t value)
+    void RenderNode::fillBuffer(RHI::BufferRange target, uint8_t value)
     {
-        const auto range = target.range();
+        target = RHI::BufferRange(target.buffer, target.offset, target.size);
+        const auto range = target;
         if ((range.offset % 4) != 0 || (range.size % 4) != 0)
         {
             throw std::invalid_argument("Graph fills require four-byte aligned ranges.");
@@ -161,7 +168,7 @@ namespace GVM::Core
             auto copy = encoder->beginBlitPass({.label = "GraphFill"});
             try
             {
-                copy->fillBuffer(target.range(), value);
+                copy->fillBuffer(target, value);
             }
             catch (...)
             {
@@ -172,20 +179,21 @@ namespace GVM::Core
         };
         append(eastl::move(pass));
     }
-    void RenderNode::upload(GraphBuffer destination, const void *data, uint64_t size)
+    void RenderNode::upload(RHI::BufferRange destination, const void *data, uint64_t size)
     {
-        if (size != destination.size() || size == 0 || data == nullptr)
+        if (size != destination.size || size == 0 || data == nullptr)
         {
             throw std::invalid_argument("Graph upload bytes must match the destination range.");
         }
-        auto staging = createBuffer({.label = "GraphUpload", .usage = RHI::BufferUsage::MapWrite | RHI::BufferUsage::CopySrc, .size = size});
-        staging.mAllocation->write(data, size);
-        copyBuffer(eastl::move(staging), eastl::move(destination));
+        auto staging = allocateBuffer({.label = "GraphUpload", .usage = RHI::BufferUsage::MapWrite | RHI::BufferUsage::CopySrc, .size = size});
+        staging->write(data, size);
+        copyBuffer(staging->buffer(), destination);
     }
-    GraphBuffer RenderNode::prepareReadback(GraphBuffer source)
+    eastl::shared_ptr<Private::GraphBufferAllocation> RenderNode::prepareReadback(RHI::BufferRange source)
     {
-        auto staging = createBuffer({.label = "GraphReadback", .usage = RHI::BufferUsage::MapRead | RHI::BufferUsage::CopyDst, .size = source.size()});
-        copyBuffer(eastl::move(source), staging);
+        source = RHI::BufferRange(source.buffer, source.offset, source.size);
+        auto staging = allocateBuffer({.label = "GraphReadback", .usage = RHI::BufferUsage::MapRead | RHI::BufferUsage::CopyDst, .size = source.size});
+        copyBuffer(source, staging->buffer());
         return staging;
     }
     void RenderNode::resolveAfterGpu(eastl::function<eastl::any()> resolver)

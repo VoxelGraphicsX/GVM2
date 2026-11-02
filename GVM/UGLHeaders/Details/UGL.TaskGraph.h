@@ -8,18 +8,6 @@
 
 namespace UGL
 {
-    /// Owns a typed graph allocation; size and slice use bytes and never expose CPU resource access.
-    template <class T>
-    class GraphBuffer
-    {
-    public:
-        using Element = T;
-        /// Returns the retained byte range size without reading GPU contents.
-        uint64_t size() const;
-        /// Produces another owning view of the same allocation without copying its contents.
-        GraphBuffer slice(uint64_t offset, uint64_t size) const;
-    };
-
     /// Defines a statically resolved subgraph builder with invocation-local construction intrinsics.
     template <class InputValue, class OutputValue>
     class IRenderNode
@@ -29,12 +17,12 @@ namespace UGL
         using Output = OutputValue;
         using RenderNodeProtocol = void;
     protected:
-        /// Allocates a typed buffer owned by graph values and all accepted passes that use it.
+        /// Allocates an existing typed Buffer whose lifetime is managed internally by the graph execution.
         template <class BufferType>
         BufferType createBuffer(eastl::string label, uint count) const;
         /// Captures CPU elements in an upload pass, without mutating a shared queue's pending operations.
-        template <class T>
-        void writeBuffer(GraphBuffer<T> destination, eastl::vector<T> values) const;
+        template <class BufferType, class T>
+        void writeBuffer(BufferType destination, eastl::vector<T> values) const;
         /// Creates an immutable shader dispatch; the last three arguments are thread counts.
         template <class Shader, class... Arguments>
         ComputePassTaskDescriptor dispatchThreads(Arguments... arguments) const;
@@ -45,20 +33,20 @@ namespace UGL
         template <class Framebuffer, class... Tasks>
         void renderPass(eastl::string label, Framebuffer framebuffer, Tasks... tasks) const;
         /// Copies equally sized graph ranges as a separately schedulable transfer pass.
-        template <class T>
-        void copyBuffer(GraphBuffer<T> source, GraphBuffer<T> destination) const;
+        template <class Source, class Destination>
+        void copyBuffer(Source source, Destination destination) const;
         /// Fills an aligned graph range as a separately schedulable transfer pass.
-        template <class T>
-        void fillBuffer(GraphBuffer<T> target, uint8_t value) const;
+        template <class BufferType>
+        void fillBuffer(BufferType target, uint8_t value) const;
     };
 
     /// Converts tightly packed GPU elements to an owned CPU vector through a completion continuation.
     template <class T>
-    class ReadbackNode final : public IRenderNode<GraphBuffer<T>, eastl::vector<T>>
+    class ReadbackNode final : public IRenderNode<BufferRange<T, BufferUsage<CopySrc>>, eastl::vector<T>>
     {
     public:
         /// Emits a staging copy and publishes the owned vector only after GPU completion.
-        eastl::vector<T> build(GraphBuffer<T> input) const;
+        eastl::vector<T> build(BufferRange<T, BufferUsage<CopySrc>> input) const;
     };
 
     /// Names a deferred graph result; values are supplied to dependent graph.add calls automatically.

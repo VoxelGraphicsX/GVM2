@@ -47,7 +47,6 @@ target_sources(
         Private/GraphBufferAllocation.cpp
         Private/GpuGraphExecution.cpp
         Private/GpuGraphService.cpp
-        Public/GraphBuffer.cpp
         Public/RenderNode.cpp
 )
 set_target_properties(GVMCore PROPERTIES

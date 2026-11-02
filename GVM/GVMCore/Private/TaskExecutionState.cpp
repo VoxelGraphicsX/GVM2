@@ -1,6 +1,7 @@
 #include "TaskExecutionState.hpp"
 #include "TaskRuntimeState.hpp"
 #include "GpuGraphExecution.hpp"
+#include "GraphBufferAllocation.hpp"
 #include "../Public/RenderNode.hpp"
 
 #include <EASTL/algorithm.h>
@@ -314,6 +315,8 @@ namespace GVM::Core::Private
                         mGpuResolvers[index] = eastl::move(fragment.resolve);
                         mDeferredGpuNodes.push_back(index);
                     }
+                    mAllocations.insert(mAllocations.end(), fragment.allocations.begin(), fragment.allocations.end());
+                    fragment.allocations.clear();
                     mGpuPending = mGpuPending || !fragment.passes.empty();
                     mFragments[index] = eastl::move(fragment);
                 }
@@ -525,6 +528,7 @@ namespace GVM::Core::Private
         eastl::vector<RenderNodeFragment>().swap(mFragments);
         eastl::vector<eastl::function<eastl::any()>>().swap(mGpuResolvers);
         eastl::vector<uint32_t>().swap(mDeferredGpuNodes);
+        eastl::vector<eastl::shared_ptr<GraphBufferAllocation>>().swap(mAllocations);
         mRuntime->complete();
         {
             std::lock_guard lock(mMutex);

@@ -27,6 +27,8 @@ namespace UGLC::CodeGen::CPP
         bool isRenderRecord(const clang::CXXRecordDecl &record) const;
 
     private:
+        /// Requires self-owned host results; borrowed GPU handles need a registered owner adapter before export.
+        void validateResult(const clang::FunctionDecl &function);
         /// Identifies nonstatic user methods that must receive invocation-local state.
         bool isRenderMethod(const clang::FunctionDecl &function) const;
         /// Validates a graph target using its inferred CPU or subgraph effects.

@@ -6,6 +6,9 @@ namespace GpuGraphFixture
 {
     using namespace UGL;
 
+    using SampleBuffer = Buffer<float, BufferUsage<Storage, CopySrc, CopyDst>>;
+    using SampleRange = BufferRange<float, BufferUsage<Storage, CopySrc, CopyDst>>;
+
     /// Describes CPU-owned inputs to the mixed CPU/GPU graph.
     struct Input
     {
@@ -85,41 +88,42 @@ namespace GpuGraphFixture
         }
     };
 
-    /// Uploads CPU values through a graph-owned transfer pass.
-    class Upload final : public IRenderNode<eastl::vector<float>, GraphBuffer<float>>
+    /// Uploads CPU values into an existing Buffer managed internally by the execution.
+    class Upload final : public IRenderNode<eastl::vector<float>, SampleBuffer>
     {
     public:
-        /// Returns an owned resource description while GPU execution remains deferred.
-        GraphBuffer<float> build(IN eastl::vector<float> values) const
+        /// Returns an existing buffer handle while GPU execution remains deferred.
+        SampleBuffer build(IN eastl::vector<float> values) const
         {
-            auto output = createBuffer<GraphBuffer<float>>("GraphInput", uint(values.size()));
-            writeBuffer(output, values);
+            auto output = createBuffer<SampleBuffer>("GraphInput", uint(values.size()));
+            writeBuffer(SampleRange(output, 0u, uint(values.size()) * sizeof(float)), values);
             return output;
         }
     };
 
     /// Expands one configuration object into three independently recordable compute passes.
-    class Filter final : public IRenderNode<GraphBuffer<float>, GraphBuffer<float>>
+    class Filter final : public IRenderNode<SampleBuffer, SampleBuffer>
     {
     public:
         float scale = 2.0f;
         float bias = 0.25f;
+        uint elementCount = 256u;
         /// Builds two independent branches and a resource-dependent combine pass.
-        GraphBuffer<float> build(IN GraphBuffer<float> input) const
+        SampleBuffer build(IN SampleBuffer input) const
         {
-            uint count = uint(input.size() / sizeof(float));
+            uint count = elementCount;
             auto scaled = scaleInput(input, count);
-            auto biased = createBuffer<GraphBuffer<float>>("Biased", count);
-            auto combined = createBuffer<GraphBuffer<float>>("Combined", count);
+            auto biased = createBuffer<SampleBuffer>("Biased", count);
+            auto combined = createBuffer<SampleBuffer>("Combined", count);
             computePass("Bias", dispatchThreads<Bias>(input, biased, count, bias, count, 1u, 1u));
             computePass("Combine", dispatchThreads<Add>(scaled, biased, combined, count, count, 1u, 1u));
             return combined;
         }
     private:
         /// Verifies synchronous helper methods receive the same hidden invocation state.
-        GraphBuffer<float> scaleInput(IN GraphBuffer<float> input, uint count) const
+        SampleBuffer scaleInput(IN SampleBuffer input, uint count) const
         {
-            auto output = createBuffer<GraphBuffer<float>>("Scaled", count);
+            auto output = createBuffer<SampleBuffer>("Scaled", count);
             computePass("Scale", dispatchThreads<Scale>(input, output, count, scale, count, 1u, 1u));
             return output;
         }
@@ -141,6 +145,7 @@ namespace GpuGraphFixture
     {
         TaskGraph graph;
         Filter filter;
+        filter.elementCount = input.count;
         filter.scale = input.scale;
         filter.bias = input.bias;
         auto source = graph.add(generate, input);
@@ -150,13 +155,20 @@ namespace GpuGraphFixture
         return graph.add(sum, copied);
     }
 
-    /// Exports an owning GPU result that remains valid after the execution handle is released.
-    [[Export]] auto buildBuffer(IN Input input)
+    /// Reuses a first-wave buffer after a CPU readback dependency has completed.
+    class ReuseBuffer final : public IRenderNode<SampleBuffer, SampleBuffer>
     {
-        TaskGraph graph;
-        auto source = graph.add(generate, input);
-        return graph.add(Upload{}, source);
-    }
+    public:
+        /// Reads the retained original allocation while deriving dispatch size from ordinary CPU values.
+        SampleBuffer build(IN SampleBuffer input, IN eastl::vector<float> values) const
+        {
+            uint count = uint(values.size());
+            auto output = createBuffer<SampleBuffer>("Reused", count);
+            computePass("Reuse", dispatchThreads<Scale>(input, output, count, 1.0f, count, 1u, 1u));
+            return output;
+        }
+    };
+
     /// Builds a second GPU wave from the first wave's completed owned CPU readback.
     [[Export]] auto buildTwoWaves(IN Input input)
     {
@@ -164,7 +176,7 @@ namespace GpuGraphFixture
         auto source = graph.add(generate, input);
         auto first = graph.add(Upload{}, source);
         auto intermediate = graph.add(ReadbackNode<float>{}, first);
-        auto second = graph.add(Upload{}, intermediate);
+        auto second = graph.add(ReuseBuffer{}, first, intermediate);
         auto result = graph.add(ReadbackNode<float>{}, second);
         return graph.add(sum, result);
     }

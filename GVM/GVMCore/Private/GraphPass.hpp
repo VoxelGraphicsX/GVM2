@@ -1,11 +1,13 @@
 #pragma once
 #include "PassResourceAccess.hpp"
-#include "../Public/GraphBuffer.hpp"
+#include <EASTL/shared_ptr.h>
 #include <EASTL/any.h>
 #include <EASTL/functional.h>
 
 namespace GVM::Core::Private
 {
+    class GraphBufferAllocation;
+
     /// Identifies the capability inferred from a logical pass's actual commands.
     enum class GraphPassKind { Compute, Render, Transfer };
 
@@ -21,7 +23,7 @@ namespace GVM::Core::Private
     struct RenderNodeFragment
     {
         eastl::vector<GraphPass> passes;
-        eastl::vector<GraphBuffer> buffers;
+        eastl::vector<eastl::shared_ptr<GraphBufferAllocation>> allocations;
         eastl::function<eastl::any()> resolve;
     };
 }

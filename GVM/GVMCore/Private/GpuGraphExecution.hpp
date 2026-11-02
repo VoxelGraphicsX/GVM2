@@ -30,7 +30,6 @@ namespace GVM::Core::Private
         TaskRuntimeState &mRuntime;
         eastl::shared_ptr<GraphDevice> mDevice;
         eastl::vector<GraphPass> mPasses;
-        eastl::vector<GraphBuffer> mBuffers;
         eastl::vector<RHI::CommandEncoder> mEncoders;
         eastl::vector<uint32_t> mBatchEnds;
         eastl::function<void(std::exception_ptr)> mCompletion;

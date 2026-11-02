@@ -24,7 +24,7 @@ namespace GVM::Core
     };
 
     /// Drives graphs independently of a Renderer; destruction drains only this runtime's work.
-    /// Native CPU callables must own their captures and contain no GPU resources; GPU values flow between RenderNodes.
+    /// Native CPU callables must own their captures and contain no GPU resources; borrowed GPU handles flow between RenderNodes and remain subject to their existing owner lifetime.
     class TaskRuntime final
     {
     public:
@@ -32,7 +32,7 @@ namespace GVM::Core
         explicit TaskRuntime(const TaskRuntimeDescriptor &descriptor = {});
         /// Borrows an executor that must outlive this runtime and all of its accepted callbacks.
         explicit TaskRuntime(ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor = {});
-        /// Enables GPU subgraphs on a borrowed device that must outlive the runtime and all returned GPU values.
+        /// Enables GPU subgraphs on a borrowed device that must outlive the runtime and its accepted operations.
         explicit TaskRuntime(RHI::DeviceImpl &device, const TaskRuntimeDescriptor &descriptor = {});
         /// Shares an application's executor for CPU tasks and GPU pass recording without creating another worker pool.
         TaskRuntime(RHI::DeviceImpl &device, ITaskExecutor &executor, const TaskRuntimeDescriptor &descriptor = {});
@@ -48,6 +48,8 @@ namespace GVM::Core
         {
             using Output = eastl::invoke_result_t<Builder &, Input>;
             using Value = typename Output::Value;
+            static_assert(!eastl::is_same_v<Value, RHI::Buffer> && !eastl::is_same_v<Value, RHI::BufferRange>,
+                "Graph results require owned CPU values or a registered GPU owner; borrowed buffer handles cannot be exported.");
             static_assert(eastl::is_same_v<Output, Task<Value>>, "A graph entry must return a Task value.");
             static_assert(!eastl::is_pointer_v<Input>, "Graph entry inputs must own their values.");
             auto prepare = [builder = eastl::move(builder), input = eastl::move(input)]() mutable
