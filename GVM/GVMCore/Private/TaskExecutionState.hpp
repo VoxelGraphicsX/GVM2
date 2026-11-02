@@ -31,7 +31,7 @@ namespace GVM::Core::Private
         bool wait(uint64_t timeoutNanoseconds) const;
         /// Requests cancellation without interrupting a callback that has already started.
         void cancel();
-        /// Copies the final owned result only after success; failures rethrow their original exception.
+        /// Copies a successful result and transfers exported allocations to explicit caller destruction.
         eastl::any result() const;
 
     private:
@@ -45,9 +45,11 @@ namespace GVM::Core::Private
         void finish(uint32_t index, eastl::any value, std::exception_ptr failure, bool deferred = false) noexcept;
         /// Freezes a quiescent build wave and records its logical passes on the same task executor.
         void beginGpu() noexcept;
-        /// Schedules CPU result resolution after the monitor reports GPU completion or failure.
+        /// Makes one completed readback ready for the same bounded dispatch path as ordinary CPU work.
+        void gpuValueReady(uint32_t index) noexcept;
+        /// Schedules wave accounting after the monitor reports GPU completion or failure.
         void gpuFinished(std::exception_ptr failure) noexcept;
-        /// Publishes readback values and successors only after accepted GPU work has drained.
+        /// Finalizes wave accounting after accepted GPU work drains and permits later waves to start.
         void finishGpu(std::exception_ptr failure) noexcept;
         /// Publishes one completed value with the execution lock held.
         void publishLocked(uint32_t index, eastl::any value);
@@ -74,14 +76,19 @@ namespace GVM::Core::Private
         eastl::vector<uint32_t> mReady;
         TaskResults mResults;
         eastl::vector<RenderNodeFragment> mFragments;
-        eastl::vector<eastl::shared_ptr<GraphBufferAllocation>> mAllocations;
+        eastl::vector<eastl::shared_ptr<GraphResourceAllocation>> mAllocations;
         eastl::vector<eastl::function<eastl::any()>> mGpuResolvers;
+        eastl::vector<bool> mGpuValuesReady;
         eastl::vector<uint32_t> mDeferredGpuNodes;
+        eastl::vector<uint32_t> mActiveGpuNodes;
         eastl::shared_ptr<GpuGraphExecution> mGpuExecution;
         uint32_t mPassCount = 0;
         bool mGpuPending = false;
         bool mGpuActive = false;
         eastl::any mFinalResult;
+        eastl::function<eastl::any(const eastl::any &)> mResolveOutput;
+        eastl::function<eastl::vector<const void *>(const eastl::any &)> mOutputResources;
+        eastl::vector<const void *> mExportedResources;
         uint32_t mOutput = 0;
         uint32_t mInFlight = 0;
         uint32_t mRemaining = 0;

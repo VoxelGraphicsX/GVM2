@@ -60,6 +60,55 @@ namespace CpuGraphFixture
         return graph.add(score, samples);
     }
 
+    /// Sums a projected field as an ordinary owned CPU input.
+    float sumValues(IN eastl::vector<float> values)
+    {
+        float total = 0.0f;
+        for (uint index = 0; index < uint(values.size()); ++index)
+        {
+            total += values[index];
+        }
+        return total;
+    }
+
+    /// Projects a record field without synchronously extracting a task result.
+    [[Export]] auto buildProjectedGraph(IN Input input)
+    {
+        TaskGraph graph;
+        auto samples = graph.add(generate, input);
+        return graph.add(sumValues, samples.values);
+    }
+
+    /// Exports a deferred field directly without adding an artificial CPU task.
+    [[Export]] auto buildProjectedOutput(IN Input input)
+    {
+        TaskGraph graph;
+        auto samples = graph.add(generate, input);
+        return samples.values;
+    }
+
+    /// Contains a nested owned record for recursive field projection.
+    struct NestedSamples
+    {
+        Samples samples;
+    };
+
+    /// Produces a nested record without sharing its CPU storage.
+    NestedSamples generateNested(IN Input input)
+    {
+        NestedSamples output;
+        output.samples = generate(input);
+        return output;
+    }
+
+    /// Preserves field types through more than one deferred projection.
+    [[Export]] auto buildNestedProjection(IN Input input)
+    {
+        TaskGraph graph;
+        auto nested = graph.add(generateNested, input);
+        return graph.add(sumValues, nested.samples.values);
+    }
+
     /// Demonstrates the same host API inside DSL code without using a renderer.
     float evaluateCpuGraph(IN Input input)
     {

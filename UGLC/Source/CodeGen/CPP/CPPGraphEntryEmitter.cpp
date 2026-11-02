@@ -135,10 +135,39 @@ namespace UGLC::CodeGen::CPP
                 ", .usage = " + (flags.empty() ? "0" : flags) + ", .size = uint64_t(" +
                 mVisitor.TranslateExpr(call.getArg(1)) + ") * sizeof(" + mVisitor.generateTypeCanonicalName(element) + ")})";
         }
+        if (intrinsic && name == "createTexture")
+        {
+            const auto *texture = templates != nullptr && templates->size() != 0
+                ? llvm::dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>((*templates)[0].getAsType()->getAsCXXRecordDecl()) : nullptr;
+            if (texture == nullptr || texture->getQualifiedNameAsString() != "UGL::Texture")
+            {
+                mVisitor.throwCodegenError(&call, "RenderNode createTexture requires an existing Texture<Format, TextureUsage<...>, Dimension> type.");
+            }
+            const auto &arguments = texture->getTemplateArgs();
+            const auto *usage = llvm::dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(arguments[1].getAsType()->getAsCXXRecordDecl());
+            if (usage == nullptr || usage->getQualifiedNameAsString() != "UGL::TextureUsage" ||
+                arguments[2].getAsType()->getAsCXXRecordDecl()->getQualifiedNameAsString() != "UGL::TextureDimension::e2D")
+            {
+                mVisitor.throwCodegenError(&call, "Graph texture extents require TextureUsage<...> and a two-dimensional texture.");
+            }
+            std::string flags;
+            for (const auto &argument : usage->getTemplateArgs()[0].pack_elements())
+            {
+                if (!flags.empty())
+                {
+                    flags += " | ";
+                }
+                flags += convertTextureUsage(argument.getAsType()->getAsCXXRecordDecl()->getQualifiedNameAsString());
+            }
+            const auto extent = "(" + mVisitor.TranslateExpr(call.getArg(1)) + ")";
+            return "__gvm_node.createTexture({.label = " + mVisitor.TranslateExpr(call.getArg(0)) +
+                ", .usage = " + (flags.empty() ? "0" : flags) + ", .size = {uint32_t(" + extent + ".x), uint32_t(" + extent +
+                ".y), 1u}, .format = " + convertTextureFormat(arguments[0].getAsType()->getAsCXXRecordDecl()->getQualifiedNameAsString()) + "})";
+        }
         const auto *object = call.getImplicitObjectArgument()->IgnoreParenImpCasts();
         std::string result = intrinsic ? "__gvm_node." + name :
             llvm::isa<clang::CXXThisExpr>(object) ? "this->" + name : mVisitor.TranslateExpr(object) + "." + name;
-        if (intrinsic && name == "dispatchThreads")
+        if (intrinsic && (name == "dispatchThreads" || name == "draw"))
         {
             result += "<" + mVisitor.generateTypeCanonicalName((*templates)[0].getAsType()) + ">";
         }
@@ -164,10 +193,35 @@ namespace UGLC::CodeGen::CPP
         return record != nullptr && record->getQualifiedNameAsString() == "UGL::Task";
     }
 
+    std::optional<std::string> CPPGraphEntryEmitter::translateProjection(const clang::MemberExpr &member)
+    {
+        const auto *base = member.getBase()->IgnoreParenImpCasts();
+        if (!isTask(base->getType()) || !llvm::isa<clang::FieldDecl>(member.getMemberDecl()))
+        {
+            return std::nullopt;
+        }
+        return "GVM::Core::Private::projectTask(" + mVisitor.TranslateExpr(base) +
+            ", [](const auto &value)\n{\n    return value." + member.getMemberNameInfo().getAsString() + ";\n})";
+    }
+
     bool CPPGraphEntryEmitter::isOwningContainer(const clang::CXXRecordDecl &record) const
     {
         const auto name = record.getQualifiedNameAsString();
         return name == "eastl::vector" || name == "eastl::array" || name == "eastl::basic_string";
+    }
+
+    bool CPPGraphEntryEmitter::isMathValue(const clang::CXXRecordDecl &record) const
+    {
+        const auto name = record.getQualifiedNameAsString();
+        for (const char *scalar : {"bool", "int", "uint", "half", "float", "double"})
+        {
+            const auto prefix = std::string("UGL::") + scalar;
+            if (name.size() == prefix.size() + 1 && name.starts_with(prefix) && name.back() >= '2' && name.back() <= '4')
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void CPPGraphEntryEmitter::validateValue(clang::QualType type, clang::SourceLocation location, bool graphConstruction)
@@ -192,6 +246,19 @@ namespace UGLC::CodeGen::CPP
             mVisitor.throwCodegenError(location, "Task graph value requires a complete owned scalar, record, or approved container.");
         }
         const auto name = record->getQualifiedNameAsString();
+        if (mExportValidation && (name == "UGL::TextureView" || name == "UGL::IFrameBuffer"))
+        {
+            mVisitor.throwCodegenError(location, "GPU results must export the parent Texture allocation, not a view or framebuffer alone.");
+        }
+        if (isMathValue(*record))
+        {
+            return;
+        }
+        if (mExportValidation && name.starts_with("UGL::") && name != "UGL::Buffer" &&
+            name != "UGL::BufferRange" && name != "UGL::Texture" && name != "UGL::Vector" && name != "UGL::Matrix")
+        {
+            mVisitor.throwCodegenError(location, "Graph results require CPU values or Buffer/Texture allocation handles; pass descriptors and graph builders cannot be exported.");
+        }
         if ((graphConstruction || mRenderValidation) && name == "UGL::IRenderNode")
         {
             return;
@@ -204,7 +271,9 @@ namespace UGLC::CodeGen::CPP
         {
             const auto *specialization = llvm::cast<clang::ClassTemplateSpecializationDecl>(record);
             const auto element = specialization->getTemplateArgs()[0].getAsType();
+            const bool exporting = mExportValidation;
             mRenderValidation = false;
+            mExportValidation = false;
             try
             {
                 validateValue(element, location);
@@ -216,12 +285,16 @@ namespace UGLC::CodeGen::CPP
             catch (...)
             {
                 mRenderValidation = true;
+                mExportValidation = exporting;
                 throw;
             }
             mRenderValidation = true;
+            mExportValidation = exporting;
             return;
         }
-        if (mRenderValidation && (name == "UGL::ComputePassTaskDescriptor" || name == "UGL::RenderPassTaskDescriptor"))
+        if (mRenderValidation && (name == "UGL::ComputePassTaskDescriptor" || name == "UGL::RenderPassTaskDescriptor" ||
+            name == "UGL::Texture" || name == "UGL::TextureView" || name == "UGL::IFrameBuffer" ||
+            name == "UGL::ColorAttachment" || name == "UGL::DepthStencilAttachment" || name == "UGL::Color"))
         {
             return;
         }
@@ -233,7 +306,7 @@ namespace UGLC::CodeGen::CPP
         {
             mVisitor.throwCodegenError(location, "CPU graph tasks cannot contain GPU resources or graph runtime objects: " + name + ".");
         }
-        auto &values = mRenderValidation ? mValidatedRenderValues : graphConstruction ? mValidatedGraphValues : mValidatedValues;
+        auto &values = mExportValidation ? mValidatedExportValues : mRenderValidation ? mValidatedRenderValues : graphConstruction ? mValidatedGraphValues : mValidatedValues;
         if (!values.insert(record->getCanonicalDecl()).second)
         {
             return;
@@ -326,6 +399,12 @@ namespace UGLC::CodeGen::CPP
         }
         if (const auto *method = llvm::dyn_cast<clang::CXXMethodDecl>(&function))
         {
+            if ((method->isImplicit() || method->isDefaulted()) &&
+                (method->isCopyAssignmentOperator() || method->isMoveAssignmentOperator()))
+            {
+                validateValue(mVisitor.Context->getRecordType(method->getParent()), function.getLocation(), graphConstruction);
+                return;
+            }
             if (method->isVirtual())
             {
                 mVisitor.throwCodegenError(&function, "CPU graph effects cannot be inferred through virtual dispatch.");
@@ -400,6 +479,15 @@ namespace UGLC::CodeGen::CPP
 
     void CPPGraphEntryEmitter::validateStatement(const clang::Stmt &statement, bool graphConstruction)
     {
+        if (const auto *assignment = llvm::dyn_cast<clang::CXXOperatorCallExpr>(&statement);
+            assignment != nullptr && assignment->getOperator() == clang::OO_Equal && assignment->getNumArgs() != 0)
+        {
+            const auto *member = llvm::dyn_cast<clang::MemberExpr>(assignment->getArg(0)->IgnoreParenImpCasts());
+            if (member != nullptr && isTask(member->getBase()->IgnoreParenImpCasts()->getType()))
+            {
+                mVisitor.throwCodegenError(member, "Deferred task field projections cannot be assigned; connect them as graph inputs.");
+            }
+        }
         if (const auto *loop = llvm::dyn_cast<clang::CXXForRangeStmt>(&statement))
         {
             validateValue(loop->getLoopVariable()->getType(), loop->getLoopVariable()->getLocation(), graphConstruction);
@@ -489,11 +577,16 @@ namespace UGLC::CodeGen::CPP
                 const auto &target = resolveCallable(*call->getArg(0));
                 validateTarget(target);
             }
-            else if (!container)
+            else if (!container && !(method != nullptr && isMathValue(*method->getParent())))
             {
                 const bool intrinsic = method != nullptr &&
                     (method->getParent()->getQualifiedNameAsString() == "UGL::IRenderNode" ||
-                     method->getParent()->getQualifiedNameAsString() == "UGL::BufferRange");
+                     method->getParent()->getQualifiedNameAsString() == "UGL::Buffer" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::BufferRange" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::Texture" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::TextureView" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::ColorAttachment" ||
+                     method->getParent()->getQualifiedNameAsString() == "UGL::DepthStencilAttachment");
                 if (!(mRenderValidation && intrinsic))
                 {
                     validateFunction(*callee, graphConstruction);
@@ -506,7 +599,8 @@ namespace UGLC::CodeGen::CPP
             const auto *constructor = construction->getConstructor();
             const bool graph = constructor->getParent()->getQualifiedNameAsString() == "UGL::TaskGraph" || isTask(construction->getType());
             const bool bufferRange = mRenderValidation && constructor->getParent()->getQualifiedNameAsString() == "UGL::BufferRange";
-            if (!constructor->isDefaulted() && !constructor->isImplicit() && !isOwningContainer(*constructor->getParent()) && !(graphConstruction && graph) && !bufferRange)
+            if (!constructor->isDefaulted() && !constructor->isImplicit() && !isOwningContainer(*constructor->getParent()) &&
+                !isMathValue(*constructor->getParent()) && !(graphConstruction && graph) && !bufferRange)
             {
                 validateFunction(*constructor, graphConstruction);
             }
@@ -573,7 +667,96 @@ namespace UGLC::CodeGen::CPP
     void CPPGraphEntryEmitter::validateResult(const clang::FunctionDecl &function)
     {
         const auto *task = llvm::cast<clang::ClassTemplateSpecializationDecl>(function.getReturnType()->getAsCXXRecordDecl());
-        validateValue(task->getTemplateArgs()[0].getAsType(), function.getLocation());
+        const bool previous = mRenderValidation;
+        mRenderValidation = true;
+        mExportValidation = true;
+        try
+        {
+            validateValue(task->getTemplateArgs()[0].getAsType(), function.getLocation());
+        }
+        catch (...)
+        {
+            mRenderValidation = previous;
+            mExportValidation = false;
+            throw;
+        }
+        mRenderValidation = previous;
+        mExportValidation = false;
+    }
+
+    bool CPPGraphEntryEmitter::containsResources(clang::QualType type, std::unordered_set<const clang::CXXRecordDecl *> &visited) const
+    {
+        if (const auto *array = mVisitor.Context->getAsConstantArrayType(type))
+        {
+            return containsResources(array->getElementType(), visited);
+        }
+        const auto *record = type->getAsCXXRecordDecl();
+        if (record == nullptr || !visited.insert(record->getCanonicalDecl()).second)
+        {
+            return false;
+        }
+        const auto name = record->getQualifiedNameAsString();
+        if (name == "UGL::Buffer" || name == "UGL::BufferRange" || name == "UGL::Texture" || name == "UGL::TextureView")
+        {
+            return true;
+        }
+        if (isOwningContainer(*record))
+        {
+            const auto *specialization = llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(record);
+            return specialization != nullptr && containsResources(specialization->getTemplateArgs()[0].getAsType(), visited);
+        }
+        if (mVisitor.isFromExcludedFile(record->getLocation()) || !record->hasDefinition())
+        {
+            return false;
+        }
+        for (const auto &base : record->bases())
+        {
+            if (containsResources(base.getType(), visited))
+            {
+                return true;
+            }
+        }
+        for (const auto *field : record->getDefinition()->fields())
+        {
+            if (containsResources(field->getType(), visited))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::string CPPGraphEntryEmitter::emitResourceVisitor(const clang::CXXRecordDecl &record) const
+    {
+        if (!record.isThisDeclarationADefinition() || isRenderRecord(record) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLAbstractRendererClassName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLRenderSetBaseName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLBindGroupBaseName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLFrameBufferBaseName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLRenderClassBaseName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLComputeClassBaseName) ||
+            mVisitor.checkDerivedClassByName(&record, mUGLPixelLocalRenderClassBaseName))
+        {
+            return {};
+        }
+        std::unordered_set<const clang::CXXRecordDecl *> visited;
+        if (!containsResources(mVisitor.Context->getRecordType(&record), visited))
+        {
+            return {};
+        }
+        std::string result = "\npublic:\n    static constexpr bool __gvm_containsResources = true;\n"
+            "    /// Visits output allocations so successful retrieval can preserve their explicit destruction contract.\n"
+            "    template <class Visitor>\n    void __gvm_visitResources(const Visitor &visitor) const\n    {\n";
+        for (const auto &base : record.bases())
+        {
+            result += "        GVM::Core::Private::visitGraphResources(static_cast<const " +
+                mVisitor.generateTypeCanonicalName(base.getType()) + " &>(*this), visitor);\n";
+        }
+        for (const auto *field : record.fields())
+        {
+            result += "        GVM::Core::Private::visitGraphResources(this->" + field->getNameAsString() + ", visitor);\n";
+        }
+        return result + "    }\n";
     }
 
     std::string CPPGraphEntryEmitter::emitEntry(const clang::FunctionDecl &function)

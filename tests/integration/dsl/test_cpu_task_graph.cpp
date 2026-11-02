@@ -19,3 +19,24 @@ TEST(CpuTaskGraphDslTests, DslHostUsesTheSameSubmissionApi)
     input.scale = 2.0f;
     EXPECT_FLOAT_EQ(CpuGraphFixture::evaluateCpuGraph(input), 255.0f);
 }
+
+/// Resolves a deferred record field both as a callable input and as an exported host result.
+TEST(CpuTaskGraphDslTests, DeferredFieldsRemainTypedAndOwned)
+{
+    GVM::Core::TaskRuntime runtime({.workerCount = 1});
+    auto calculation = runtime.submit(CpuGraphFixture::Entries::buildProjectedGraph, CpuGraphFixture::Input{});
+    ASSERT_TRUE(calculation.wait(5'000'000'000ull));
+    ASSERT_EQ(calculation.status(), GVM::Core::ExecutionStatus::Succeeded) << calculation.error().c_str();
+    EXPECT_FLOAT_EQ(calculation.get(), 127.5f);
+    auto projected = runtime.submit(CpuGraphFixture::Entries::buildProjectedOutput, CpuGraphFixture::Input{});
+    ASSERT_TRUE(projected.wait(5'000'000'000ull));
+    ASSERT_EQ(projected.status(), GVM::Core::ExecutionStatus::Succeeded) << projected.error().c_str();
+    auto values = projected.get();
+    ASSERT_EQ(values.size(), 256u);
+    EXPECT_FLOAT_EQ(values.back(), 255.0f / 256.0f);
+    auto nested = runtime.submit(CpuGraphFixture::Entries::buildNestedProjection, CpuGraphFixture::Input{});
+    ASSERT_TRUE(nested.wait(5'000'000'000ull));
+    ASSERT_EQ(nested.status(), GVM::Core::ExecutionStatus::Succeeded) << nested.error().c_str();
+    EXPECT_FLOAT_EQ(nested.get(), 127.5f);
+
+}

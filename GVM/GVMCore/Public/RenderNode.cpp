@@ -1,5 +1,5 @@
 #include "RenderNode.hpp"
-#include "../Private/GraphBufferAllocation.hpp"
+#include "../Private/GraphResourceAllocation.hpp"
 #include <stdexcept>
 
 namespace GVM::Core
@@ -33,13 +33,28 @@ namespace GVM::Core
     {
         return allocateBuffer(descriptor)->buffer();
     }
-    eastl::shared_ptr<Private::GraphBufferAllocation> RenderNode::allocateBuffer(const RHI::BufferDescriptor &descriptor)
+    RHI::Texture RenderNode::createTexture(const RHI::TextureDescriptor &descriptor)
+    {
+        auto allocation = eastl::make_shared<Private::GraphResourceAllocation>(mDevice, descriptor);
+        mFragment.allocations.push_back(allocation);
+        return allocation->texture();
+    }
+    RHI::TextureView RenderNode::view(RHI::Texture texture)
+    {
+        if (texture.isNull())
+        {
+            throw std::invalid_argument("Graph texture view requires a live texture.");
+        }
+        auto lock = mDevice->lock();
+        return texture->createView();
+    }
+    eastl::shared_ptr<Private::GraphResourceAllocation> RenderNode::allocateBuffer(const RHI::BufferDescriptor &descriptor)
     {
         if (descriptor.size == 0)
         {
             throw std::invalid_argument("Graph buffer allocations must be nonempty.");
         }
-        auto allocation = eastl::make_shared<Private::GraphBufferAllocation>(mDevice, descriptor);
+        auto allocation = eastl::make_shared<Private::GraphResourceAllocation>(mDevice, descriptor);
         mFragment.allocations.push_back(allocation);
         return allocation;
     }
@@ -110,6 +125,16 @@ namespace GVM::Core
             auto render = encoder->beginRenderPass(descriptor);
             try
             {
+                auto target = descriptor.depthStencilAttachment.view;
+                if (!descriptor.colorAttachments.empty())
+                {
+                    target = descriptor.colorAttachments.front().view;
+                }
+                if (!target.isNull())
+                {
+                    render->setViewport(0.0f, 0.0f, float(target->getWidth()), float(target->getHeight()), 0.0f, 1.0f);
+                    render->setScissorRect(0, 0, target->getWidth(), target->getHeight());
+                }
                 for (const auto &task : tasks)
                 {
                     task.drawFn(render);
@@ -189,7 +214,7 @@ namespace GVM::Core
         staging->write(data, size);
         copyBuffer(staging->buffer(), destination);
     }
-    eastl::shared_ptr<Private::GraphBufferAllocation> RenderNode::prepareReadback(RHI::BufferRange source)
+    eastl::shared_ptr<Private::GraphResourceAllocation> RenderNode::prepareReadback(RHI::BufferRange source)
     {
         source = RHI::BufferRange(source.buffer, source.offset, source.size);
         auto staging = allocateBuffer({.label = "GraphReadback", .usage = RHI::BufferUsage::MapRead | RHI::BufferUsage::CopyDst, .size = source.size});

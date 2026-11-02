@@ -1,6 +1,7 @@
 #pragma once
 #include "GraphPass.hpp"
 #include "GraphDevice.hpp"
+#include "PassSchedule.hpp"
 #include <EASTL/atomic.h>
 #include <EASTL/optional.h>
 #include <exception>
@@ -15,6 +16,7 @@ namespace GVM::Core::Private
     public:
         /// Takes ownership of immutable pass captures before any recording callback is scheduled.
         GpuGraphExecution(TaskRuntimeState &runtime, eastl::vector<RenderNodeFragment> fragments,
+            eastl::function<void(uint32_t)> progress,
             eastl::function<void(std::exception_ptr)> completion);
         /// Starts a bounded number of recording lanes on the runtime's existing executor.
         void start() noexcept;
@@ -31,14 +33,17 @@ namespace GVM::Core::Private
         eastl::shared_ptr<GraphDevice> mDevice;
         eastl::vector<GraphPass> mPasses;
         eastl::vector<RHI::CommandEncoder> mEncoders;
-        eastl::vector<uint32_t> mBatchEnds;
+        eastl::vector<bool> mRecorded;
+        eastl::vector<PassBatch> mBatches;
+        eastl::vector<eastl::optional<RHI::Submission>> mSubmissions;
+        eastl::vector<bool> mCompleted;
+        eastl::function<void(uint32_t)> mProgress;
         eastl::function<void(std::exception_ptr)> mCompletion;
         std::mutex mMutex;
         std::exception_ptr mFailure;
         eastl::atomic<bool> mStopping{false};
         uint32_t mRecording = 1;
         uint32_t mNextPass = 0;
-        bool mSubmitted = false;
-        eastl::optional<RHI::Submission> mLastSubmission;
+        uint32_t mNextBatch = 0;
     };
 }

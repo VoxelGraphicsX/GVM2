@@ -20,12 +20,21 @@ namespace UGL
         /// Allocates an existing typed Buffer whose lifetime is managed internally by the graph execution.
         template <class BufferType>
         BufferType createBuffer(eastl::string label, uint count) const;
+        /// Allocates an existing two-dimensional texture whose lifetime belongs to this execution.
+        template <class TextureType>
+        TextureType createTexture(eastl::string label, uint2 extent) const;
+        /// Creates the default view without exposing a resource pointer or changing its ownership.
+        template <class Format, class Usage, class Dimension>
+        TextureView<Format, Usage, Dimension> view(Texture<Format, Usage, Dimension> texture) const;
         /// Captures CPU elements in an upload pass, without mutating a shared queue's pending operations.
         template <class BufferType, class T>
         void writeBuffer(BufferType destination, eastl::vector<T> values) const;
         /// Creates an immutable shader dispatch; the last three arguments are thread counts.
         template <class Shader, class... Arguments>
         ComputePassTaskDescriptor dispatchThreads(Arguments... arguments) const;
+        /// Captures a raster invocation; the final arguments are vertex count, instance count and first indices.
+        template <class Shader, class... Arguments>
+        RenderPassTaskDescriptor draw(Arguments... arguments) const;
         /// Creates one logical compute pass from a set of immutable dispatch descriptors.
         template <class... Tasks>
         void computePass(eastl::string label, Tasks... tasks) const;
@@ -112,7 +121,7 @@ namespace UGL
         bool wait(uint64_t timeoutNanoseconds = std::numeric_limits<uint64_t>::max()) const;
         /// Requests cancellation while accepted operations retain their resources until drained.
         void cancel() const;
-        /// Retrieves an owned successful result without implicitly waiting.
+        /// Retrieves a successful result without waiting; exported Buffer and Texture allocations require explicit destruction.
         T get() const;
     };
 

@@ -20,8 +20,12 @@ namespace GVM::Core
         ~RenderNode();
         RenderNode(const RenderNode &) = delete;
         RenderNode &operator=(const RenderNode &) = delete;
-        /// Allocates graph-local storage using the existing RHI handle; the execution owns its lifetime.
+        /// Allocates existing buffer storage; successful output retrieval transfers explicit destruction to the caller.
         RHI::Buffer createBuffer(const RHI::BufferDescriptor &descriptor);
+        /// Allocates existing texture storage; successful output retrieval transfers explicit destruction to the caller.
+        RHI::Texture createTexture(const RHI::TextureDescriptor &descriptor);
+        /// Obtains the texture's default view through the serialized object-creation boundary.
+        RHI::TextureView view(RHI::Texture texture);
         /// Captures a complete ordered list of dispatches as one independently recordable compute pass.
         void computePass(const eastl::string &label, eastl::vector<ComputePassTaskDescriptor> tasks);
         /// Captures a framebuffer and draw list; distinct graphics passes remain GPU-ordered.
@@ -70,6 +74,14 @@ namespace GVM::Core
             auto values = eastl::make_tuple(eastl::move(arguments)...);
             return dispatch<Shader>(values, eastl::make_index_sequence<sizeof...(Arguments) - 3>{});
         }
+        /// Captures a raster invocation with creation inputs followed by four ordinary draw arguments.
+        template <class Shader, class... Arguments>
+        RenderPassTaskDescriptor draw(Arguments... arguments)
+        {
+            static_assert(sizeof...(Arguments) >= 4, "Draw requires four draw arguments.");
+            auto values = eastl::make_tuple(eastl::move(arguments)...);
+            return captureDraw<Shader>(values, eastl::make_index_sequence<sizeof...(Arguments) - 4>{});
+        }
 
     private:
         friend class Private::TaskExecutionState;
@@ -81,11 +93,11 @@ namespace GVM::Core
         /// Enforces the runtime's per-execution pass limit before appending another operation.
         void append(Private::GraphPass pass);
         /// Creates a private allocation owner retained by this invocation and its execution.
-        eastl::shared_ptr<Private::GraphBufferAllocation> allocateBuffer(const RHI::BufferDescriptor &descriptor);
+        eastl::shared_ptr<Private::GraphResourceAllocation> allocateBuffer(const RHI::BufferDescriptor &descriptor);
         /// Snapshots host bytes synchronously, then captures an upload pass.
         void upload(RHI::BufferRange destination, const void *data, uint64_t size);
         /// Emits an owned staging copy for a typed readback node.
-        eastl::shared_ptr<Private::GraphBufferAllocation> prepareReadback(RHI::BufferRange source);
+        eastl::shared_ptr<Private::GraphResourceAllocation> prepareReadback(RHI::BufferRange source);
         /// Publishes a typed CPU resolver that runs only after this fragment's GPU completion.
         void resolveAfterGpu(eastl::function<eastl::any()> resolver);
         /// Constructs shader objects under the graph device lock while retaining immutable argument snapshots.
@@ -97,6 +109,16 @@ namespace GVM::Core
             return shader.dispatchThreads(eastl::get<Indices>(values)...,
                 eastl::get<sizeof...(Indices)>(values), eastl::get<sizeof...(Indices) + 1>(values),
                 eastl::get<sizeof...(Indices) + 2>(values));
+        }
+        /// Creates a shader and immutable draw arguments while the device object cache is protected.
+        template <class Shader, class Tuple, size_t... Indices>
+        RenderPassTaskDescriptor captureDraw(Tuple &values, eastl::index_sequence<Indices...>)
+        {
+            auto lock = mDevice->lock();
+            Shader shader(&mDevice->device(), eastl::get<Indices>(values)...);
+            return shader.draw(eastl::get<Indices>(values)...,
+                eastl::get<sizeof...(Indices)>(values), eastl::get<sizeof...(Indices) + 1>(values),
+                eastl::get<sizeof...(Indices) + 2>(values), eastl::get<sizeof...(Indices) + 3>(values));
         }
         eastl::shared_ptr<Private::GraphDevice> mDevice;
         Private::RenderNodeFragment mFragment;

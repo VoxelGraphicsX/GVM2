@@ -21,6 +21,7 @@ set(UGLC_CODEGEN_SOURCES
     CodeGen/ShaderDeclarationEmissionPlanner.cpp
     CodeGen/ShaderReferenceVisitor.cpp
     CodeGen/SpaceManager.cpp
+    CodeGen/TaskProjectionBuilder.cpp
     CodeGen/CPP/CPPBindGroupTypeConvertor.cpp
     CodeGen/CPP/CPPFunctionConvertor.cpp
     CodeGen/CPP/CPPGraphEntryEmitter.cpp

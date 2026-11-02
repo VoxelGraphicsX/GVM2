@@ -61,9 +61,10 @@ namespace GVM::Core
         {
             constexpr bool buildsSubgraph = requires { typename Callable::RenderNodeProtocol; };
             using Result = typename Private::TaskResult<Callable, buildsSubgraph, typename Private::TaskArgument<Arguments>::Value...>::Value;
-            static_assert(buildsSubgraph || ((!eastl::is_same_v<typename Private::TaskArgument<Arguments>::Value, RHI::Buffer> && !eastl::is_same_v<typename Private::TaskArgument<Arguments>::Value, RHI::BufferRange>) && ...),
+            static_assert(buildsSubgraph || ((!Private::containsGraphResources<typename Private::TaskArgument<Arguments>::Value>) && ...),
                 "GPU resources can only be consumed by RenderNode builders or ReadbackNode adapters.");
-            static_assert(buildsSubgraph || (!eastl::is_same_v<Result, RHI::Buffer> && !eastl::is_same_v<Result, RHI::BufferRange>), "CPU tasks cannot produce GPU resources.");
+            static_assert(buildsSubgraph || !Private::containsGraphResources<Result>, "CPU tasks cannot produce GPU resources.");
+            static_assert(buildsSubgraph || !Private::containsGraphResources<Callable>, "CPU callables cannot capture GPU resources.");
             static_assert(!eastl::is_reference_v<Result> && !eastl::is_pointer_v<Result>, "Task results must own their values.");
             static_assert((!eastl::is_pointer_v<Arguments> && ...), "Task inputs cannot borrow pointer storage.");
             Private::TaskDefinition definition;
@@ -123,9 +124,9 @@ namespace GVM::Core
             {
                 using Value = typename Argument::Value;
                 static_assert(!eastl::is_void_v<Value>, "A void task is not a value argument.");
-                return [index = argument.mIndex](const Private::TaskResults &results) -> Value
+                return [index = argument.mIndex, resolve = argument.mResolve](const Private::TaskResults &results) -> Value
                 {
-                    return eastl::any_cast<const Value &>(results[index]);
+                    return resolve(results[index]);
                 };
             }
             else

@@ -1871,10 +1871,13 @@ function createPipelineSelectionCases(enabled) {
 export function getTestRegistry(sourceDir, profile) {
   return [
     ...[
+      ['projection-write', 'InvalidTaskProjectionWrite.hpp', 'Deferred task field projections cannot be assigned'],
+      ['view-export', 'InvalidTaskViewExport.hpp', 'GPU results must export the parent Texture allocation'],
+      ['texture-cpu', 'InvalidTaskTextureCpu.hpp', 'CPU graph tasks cannot contain GPU resources'],
+      ['attachment-export', 'InvalidTaskAttachmentExport.hpp', 'Graph results require CPU values or Buffer/Texture allocation handles'],
       ['resource', 'InvalidTaskResource.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['buffer-element', 'InvalidTaskBufferElement.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['render-mutable', 'InvalidTaskRenderMutable.hpp', 'RenderNode build must use const configuration'],
-      ['buffer-export', 'InvalidTaskBufferExport.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['buffer-cpu', 'InvalidTaskBufferCpu.hpp', 'CPU graph tasks cannot contain GPU resources'],
       ['reference', 'InvalidTaskReference.hpp', 'pointers, references'],
       ['address', 'InvalidTaskAddress.hpp', 'address-of'],

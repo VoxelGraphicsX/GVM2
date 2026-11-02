@@ -44,7 +44,7 @@ target_sources(
         Private/PassResourceAccess.cpp
         Private/PassSchedule.cpp
         Private/GraphDevice.cpp
-        Private/GraphBufferAllocation.cpp
+        Private/GraphResourceAllocation.cpp
         Private/GpuGraphExecution.cpp
         Private/GpuGraphService.cpp
         Public/RenderNode.cpp

@@ -1,7 +1,7 @@
 #include "TaskExecutionState.hpp"
 #include "TaskRuntimeState.hpp"
 #include "GpuGraphExecution.hpp"
-#include "GraphBufferAllocation.hpp"
+#include "GraphResourceAllocation.hpp"
 #include "../Public/RenderNode.hpp"
 
 #include <EASTL/algorithm.h>
@@ -150,8 +150,12 @@ namespace GVM::Core::Private
         {
             throw std::runtime_error(mDiagnostic);
         }
-        lock.unlock();
-        return mFinalResult;
+        auto result = mFinalResult;
+        for (const auto &allocation : mAllocations)
+        {
+            allocation->releaseOwnership();
+        }
+        return result;
     }
 
     void TaskExecutionState::prepare(eastl::function<TaskGraphOutput()> builder) noexcept
@@ -180,10 +184,12 @@ namespace GVM::Core::Private
                 eastl::vector<eastl::vector<uint32_t>> successors(tasks.size());
                 eastl::vector<uint32_t> pending(tasks.size());
                 eastl::vector<uint32_t> ready;
-                ready.reserve(tasks.size());
+                // A readback enters the ready list once for expansion and once for CPU resolution.
+                ready.reserve(tasks.size() * 2);
                 TaskResults results(tasks.size());
                 eastl::vector<RenderNodeFragment> fragments(tasks.size());
                 eastl::vector<eastl::function<eastl::any()>> resolvers(tasks.size());
+                eastl::vector<bool> gpuValuesReady(tasks.size(), false);
                 eastl::vector<uint32_t> deferred;
                 deferred.reserve(tasks.size());
                 for (uint32_t index = 0; index < tasks.size(); ++index)
@@ -207,8 +213,11 @@ namespace GVM::Core::Private
                     mResults = eastl::move(results);
                     mFragments = eastl::move(fragments);
                     mGpuResolvers = eastl::move(resolvers);
+                    mGpuValuesReady = eastl::move(gpuValuesReady);
                     mDeferredGpuNodes = eastl::move(deferred);
                     mOutput = output.index;
+                    mResolveOutput = output.resolve;
+                    mOutputResources = output.resources;
                     mRemaining = static_cast<uint32_t>(mTasks.size());
                     mPrepared = true;
                 }
@@ -291,13 +300,22 @@ namespace GVM::Core::Private
         try
         {
             bool proceed;
+            eastl::function<eastl::any()> resolve;
             {
                 std::lock_guard lock(mMutex);
                 proceed = mStopStatus == ExecutionStatus::Pending;
+                if (proceed && mGpuValuesReady[index])
+                {
+                    resolve = eastl::move(mGpuResolvers[index]);
+                }
             }
             if (proceed)
             {
-                if (mTasks[index].buildsSubgraph)
+                if (resolve)
+                {
+                    value = resolve();
+                }
+                else if (mTasks[index].buildsSubgraph)
                 {
                     RenderNode node(mRuntime->gpuDevice(), mRuntime->maximumPasses());
                     // Retain GPU builder captures until accepted passes complete; Args may reference literal input resources.
@@ -312,6 +330,11 @@ namespace GVM::Core::Private
                     deferred = bool(fragment.resolve);
                     if (deferred)
                     {
+                        if (fragment.passes.empty())
+                        {
+                            throw std::logic_error("A GPU readback requires a producing pass.");
+                        }
+                        fragment.passes.back().completionNode = index;
                         mGpuResolvers[index] = eastl::move(fragment.resolve);
                         mDeferredGpuNodes.push_back(index);
                     }
@@ -337,12 +360,14 @@ namespace GVM::Core::Private
     void TaskExecutionState::finish(uint32_t index, eastl::any value, std::exception_ptr failure, bool deferred) noexcept
     {
         bool terminal;
+        eastl::shared_ptr<GpuGraphExecution> failedGpu;
         {
             std::lock_guard lock(mMutex);
             if (failure && !mFailure)
             {
                 mFailure = failure;
                 mStopStatus = ExecutionStatus::Failed;
+                failedGpu = mGpuExecution;
             }
             --mInFlight;
             if (index != Preparation && !deferred)
@@ -354,6 +379,10 @@ namespace GVM::Core::Private
                 }
             }
             terminal = finishLocked();
+        }
+        if (failedGpu)
+        {
+            failedGpu->cancel();
         }
         if (terminal)
         {
@@ -385,8 +414,10 @@ namespace GVM::Core::Private
             {
                 std::lock_guard lock(mMutex);
                 fragments.swap(mFragments);
+                mActiveGpuNodes.swap(mDeferredGpuNodes);
             }
             auto gpu = eastl::make_shared<GpuGraphExecution>(*mRuntime, eastl::move(fragments),
+                [self = shared_from_this()](uint32_t index) { self->gpuValueReady(index); },
                 [self = shared_from_this()](std::exception_ptr failure) { self->gpuFinished(failure); });
             {
                 std::lock_guard lock(mMutex);
@@ -403,6 +434,20 @@ namespace GVM::Core::Private
         {
             gpuFinished(std::current_exception());
         }
+    }
+
+    void TaskExecutionState::gpuValueReady(uint32_t index) noexcept
+    {
+        {
+            std::lock_guard lock(mMutex);
+            if (mStopStatus != ExecutionStatus::Pending || mGpuValuesReady[index])
+            {
+                return;
+            }
+            mGpuValuesReady[index] = true;
+            mReady.push_back(index);
+        }
+        dispatchReady();
     }
 
     void TaskExecutionState::gpuFinished(std::exception_ptr failure) noexcept
@@ -428,27 +473,6 @@ namespace GVM::Core::Private
 
     void TaskExecutionState::finishGpu(std::exception_ptr failure) noexcept
     {
-        eastl::vector<eastl::any> values;
-        try
-        {
-            bool proceed;
-            {
-                std::lock_guard lock(mMutex);
-                proceed = !failure && mStopStatus == ExecutionStatus::Pending;
-            }
-            if (proceed)
-            {
-                values.reserve(mDeferredGpuNodes.size());
-                for (uint32_t index : mDeferredGpuNodes)
-                {
-                    values.push_back(mGpuResolvers[index]());
-                }
-            }
-        }
-        catch (...)
-        {
-            failure = std::current_exception();
-        }
         bool terminal;
         eastl::shared_ptr<GpuGraphExecution> completedGpu;
         {
@@ -458,17 +482,20 @@ namespace GVM::Core::Private
                 mFailure = failure;
                 mStopStatus = ExecutionStatus::Failed;
             }
-            for (size_t offset = 0; offset < mDeferredGpuNodes.size(); ++offset)
+            for (uint32_t index : mActiveGpuNodes)
             {
-                const auto index = mDeferredGpuNodes[offset];
-                --mRemaining;
-                if (mStopStatus == ExecutionStatus::Pending)
+                if (!mGpuValuesReady[index])
                 {
-                    publishLocked(index, eastl::move(values[offset]));
+                    --mRemaining;
+                    mGpuResolvers[index] = nullptr;
+                    if (mStopStatus == ExecutionStatus::Pending)
+                    {
+                        mStopStatus = ExecutionStatus::Failed;
+                        mDiagnostic = "GPU wave completed without its observable result.";
+                    }
                 }
-                mGpuResolvers[index] = nullptr;
             }
-            mDeferredGpuNodes.clear();
+            mActiveGpuNodes.clear();
             mGpuActive = false;
             --mInFlight;
             completedGpu = eastl::move(mGpuExecution);
@@ -511,7 +538,20 @@ namespace GVM::Core::Private
         }
         if (mPrepared && mRemaining == 0 && !mGpuPending)
         {
-            mFinalResult = eastl::move(mResults[mOutput]);
+            try
+            {
+                mFinalResult = mResolveOutput ? mResolveOutput(mResults[mOutput]) : eastl::move(mResults[mOutput]);
+                if (mOutputResources)
+                {
+                    mExportedResources = mOutputResources(mFinalResult);
+                }
+            }
+            catch (...)
+            {
+                mFailure = std::current_exception();
+                mStatus = ExecutionStatus::Failed;
+                return true;
+            }
             mStatus = ExecutionStatus::Succeeded;
             return true;
         }
@@ -525,10 +565,26 @@ namespace GVM::Core::Private
         eastl::vector<uint32_t>().swap(mPending);
         eastl::vector<uint32_t>().swap(mReady);
         TaskResults().swap(mResults);
+        mResolveOutput = nullptr;
+        mOutputResources = nullptr;
         eastl::vector<RenderNodeFragment>().swap(mFragments);
         eastl::vector<eastl::function<eastl::any()>>().swap(mGpuResolvers);
+        eastl::vector<bool>().swap(mGpuValuesReady);
         eastl::vector<uint32_t>().swap(mDeferredGpuNodes);
-        eastl::vector<eastl::shared_ptr<GraphBufferAllocation>>().swap(mAllocations);
+        eastl::vector<uint32_t>().swap(mActiveGpuNodes);
+        for (auto allocation = mAllocations.begin(); allocation != mAllocations.end();)
+        {
+            if (mStatus != ExecutionStatus::Succeeded ||
+                eastl::find(mExportedResources.begin(), mExportedResources.end(), (*allocation)->resource()) == mExportedResources.end())
+            {
+                allocation = mAllocations.erase(allocation);
+            }
+            else
+            {
+                ++allocation;
+            }
+        }
+        eastl::vector<const void *>().swap(mExportedResources);
         mRuntime->complete();
         {
             std::lock_guard lock(mMutex);

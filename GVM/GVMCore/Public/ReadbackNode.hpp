@@ -1,7 +1,7 @@
 #pragma once
 #include "IRenderNode.hpp"
 #include "RenderNode.hpp"
-#include "../Private/GraphBufferAllocation.hpp"
+#include "../Private/GraphResourceAllocation.hpp"
 
 namespace GVM::Core
 {

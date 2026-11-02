@@ -41,6 +41,7 @@
 #include <CodeGen/DiagnosticError.hpp>
 #include <CodeGen/Diagnostics.hpp>
 #include <CodeGen/CPP/CPPVisitor.hpp>
+#include <CodeGen/TaskProjectionBuilder.hpp>
 #include <CodeGen/GeneratedShaderArtifactSupport.hpp>
 #include <CodeGen/ShaderBackendRegistry.hpp>
 #include <CodeGen/SingleHeaderGenerator.hpp>
@@ -374,6 +375,15 @@ public:
     /** Clears the borrowed Sema reference when Clang detaches it. */
     void ForgetSema() override { Sema = nullptr; }
 
+    /** Makes deferred record fields available while parsing graph expressions. */
+    void HandleTagDeclDefinition(clang::TagDecl *declaration) override
+    {
+        if (Sema != nullptr)
+        {
+            UGLC::CodeGen::TaskProjectionBuilder::complete(*Sema, *declaration);
+        }
+    }
+
     /** Instantiates shader entries before source verification and lowering. */
     void HandleTranslationUnit(clang::ASTContext &context) override
     {
@@ -462,13 +472,34 @@ private:
 };
 
 /** Generates host code after any isolated shader frontend has been destroyed. */
-class BaseGeneratorASTConsumer : public clang::ASTConsumer
+class BaseGeneratorASTConsumer : public clang::SemaConsumer
 {
 public:
     /** Creates a host generator with optional prepared shader modules. */
     BaseGeneratorASTConsumer(clang::Rewriter *rewriter, clang::ASTContext *context,
                              UGLC::CodeGen::ShaderSourcePipelineOptions options = {})
         : Visitor(rewriter, context, options), Options(options) {}
+
+    /** Borrows the frontend semantic analyzer for source-only task field generation. */
+    void InitializeSema(clang::Sema &sema) override
+    {
+        Sema = &sema;
+    }
+
+    /** Releases the semantic analyzer before its frontend is destroyed. */
+    void ForgetSema() override
+    {
+        Sema = nullptr;
+    }
+
+    /** Makes deferred record fields available before host graph member lookup. */
+    void HandleTagDeclDefinition(clang::TagDecl *declaration) override
+    {
+        if (Sema != nullptr)
+        {
+            UGLC::CodeGen::TaskProjectionBuilder::complete(*Sema, *declaration);
+        }
+    }
 
     /** Rewrites the independent host AST using the prepared shader interface. */
     void HandleTranslationUnit(clang::ASTContext &context) override
@@ -485,6 +516,7 @@ public:
     }
 
 private:
+    clang::Sema *Sema = nullptr;
     UGLC::CodeGen::CPP::CPPVisitor Visitor;
     UGLC::CodeGen::ShaderSourcePipelineOptions Options;
 };

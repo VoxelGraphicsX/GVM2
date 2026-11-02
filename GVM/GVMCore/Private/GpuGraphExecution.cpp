@@ -7,8 +7,8 @@
 namespace GVM::Core::Private
 {
     GpuGraphExecution::GpuGraphExecution(TaskRuntimeState &runtime, eastl::vector<RenderNodeFragment> fragments,
-        eastl::function<void(std::exception_ptr)> completion)
-        : mRuntime(runtime), mDevice(runtime.gpuDevice()), mCompletion(eastl::move(completion))
+        eastl::function<void(uint32_t)> progress, eastl::function<void(std::exception_ptr)> completion)
+        : mRuntime(runtime), mDevice(runtime.gpuDevice()), mProgress(eastl::move(progress)), mCompletion(eastl::move(completion))
     {
         for (auto &fragment : fragments)
         {
@@ -22,8 +22,18 @@ namespace GVM::Core::Private
             throw std::length_error("GPU graph exceeds the runtime pass budget.");
         }
         const PassSchedule schedule(mPasses);
-        mBatchEnds = schedule.batchEnds(mPasses, runtime.maximumPassesPerBatch());
+        mBatches = schedule.batches(mPasses, runtime.maximumPassesPerBatch());
+        eastl::vector<GraphPass> ordered;
+        ordered.reserve(mPasses.size());
+        for (uint32_t index : schedule.order())
+        {
+            ordered.push_back(eastl::move(mPasses[index]));
+        }
+        mPasses = eastl::move(ordered);
         mEncoders.resize(mPasses.size());
+        mRecorded.resize(mPasses.size(), false);
+        mSubmissions.resize(mBatches.size());
+        mCompleted.resize(mBatches.size(), false);
     }
     void GpuGraphExecution::start() noexcept
     {
@@ -90,7 +100,11 @@ namespace GVM::Core::Private
                 auto encoder = mDevice->queue()->createCommandEncoder();
                 mPasses[index].record(encoder);
                 encoder->end();
-                mEncoders[index] = eastl::move(encoder);
+                {
+                    std::lock_guard lock(mMutex);
+                    mEncoders[index] = eastl::move(encoder);
+                    mRecorded[index] = true;
+                }
             }
         }
         catch (...)
@@ -102,58 +116,86 @@ namespace GVM::Core::Private
     }
     bool GpuGraphExecution::advance() noexcept
     {
-        {
-            std::lock_guard lock(mMutex);
-            if (mRecording != 0)
-            {
-                return false;
-            }
-        }
         try
         {
-            if (!mSubmitted)
+            while (mNextBatch < mBatches.size() && !mStopping.load(eastl::memory_order_acquire))
             {
-                mSubmitted = true;
-                uint32_t begin = 0;
-                for (uint32_t end : mBatchEnds)
+                const uint32_t begin = mNextBatch == 0 ? 0 : mBatches[mNextBatch - 1].end;
+                const auto &batch = mBatches[mNextBatch];
+                eastl::vector<RHI::CommandEncoder> encoders;
                 {
-                    if (mStopping.load(eastl::memory_order_acquire))
+                    std::lock_guard lock(mMutex);
+                    bool ready = true;
+                    for (uint32_t index = begin; index < batch.end; ++index)
+                    {
+                        ready = ready && mRecorded[index];
+                    }
+                    if (!ready)
                     {
                         break;
                     }
-                    eastl::vector<RHI::CommandEncoder> batch(mEncoders.begin() + begin, mEncoders.begin() + end);
-                    eastl::vector<RHI::Submission> waits;
-                    if (mLastSubmission)
-                    {
-                        waits.push_back(*mLastSubmission);
-                    }
-                    auto lock = mDevice->lock();
-                    mLastSubmission = mDevice->queue()->submit(batch, waits);
-                    begin = end;
+                    encoders.assign(mEncoders.begin() + begin, mEncoders.begin() + batch.end);
                 }
-            }
-            if (mLastSubmission && !mLastSubmission->isComplete())
-            {
-                return false;
+                eastl::vector<RHI::Submission> waits;
+                for (uint32_t predecessor : batch.waits)
+                {
+                    waits.push_back(*mSubmissions[predecessor]);
+                }
+                auto lock = mDevice->lock();
+                mSubmissions[mNextBatch] = mDevice->queue()->submit(encoders, waits);
+                ++mNextBatch;
             }
         }
         catch (...)
         {
             fail(std::current_exception());
-            // A previously accepted batch still owns its resources until completion or device loss.
+        }
+        bool drained = true;
+        for (uint32_t batch = 0; batch < mNextBatch; ++batch)
+        {
+            if (mCompleted[batch])
+            {
+                continue;
+            }
             try
             {
-                if (mLastSubmission && !mLastSubmission->isComplete())
+                if (!mSubmissions[batch]->isComplete())
                 {
-                    return false;
+                    drained = false;
+                    continue;
+                }
+                mCompleted[batch] = true;
+                if (!mStopping.load(eastl::memory_order_acquire))
+                {
+                    const uint32_t begin = batch == 0 ? 0 : mBatches[batch - 1].end;
+                    for (uint32_t index = begin; index < mBatches[batch].end; ++index)
+                    {
+                        if (mPasses[index].completionNode != UINT32_MAX)
+                        {
+                            mProgress(mPasses[index].completionNode);
+                        }
+                    }
                 }
             }
             catch (...)
             {
+                // Device loss terminates this completion; other accepted batches still drain.
+                mCompleted[batch] = true;
+                fail(std::current_exception());
             }
         }
+        std::exception_ptr failure;
+        {
+            std::lock_guard lock(mMutex);
+            if (mRecording != 0 || !drained ||
+                (!mStopping.load(eastl::memory_order_acquire) && mNextBatch != mBatches.size()))
+            {
+                return false;
+            }
+            failure = mFailure;
+        }
         auto completion = eastl::move(mCompletion);
-        completion(mFailure);
+        completion(failure);
         return true;
     }
 }

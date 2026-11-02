@@ -35,7 +35,7 @@ namespace GVM::Core
         eastl::any executionResult(const eastl::shared_ptr<TaskExecutionState> &state);
     }
 
-    /// Retains one asynchronous execution and returns owned results only after success.
+    /// Retains one execution; successful get returns owned CPU data or GPU allocations requiring explicit destruction.
     template <class T>
     class Execution final
     {
@@ -66,7 +66,8 @@ namespace GVM::Core
         {
             Private::cancelExecution(mState);
         }
-        /// Returns an owned successful value; throws if not ready, cancelled, rejected or failed.
+        /// Returns a successful value; exported GPU allocations must be explicitly destroyed through the existing device API.
+        /// Unretrieved GPU outputs remain owned by this execution; copied resource handles do not create separate allocations.
         T get() const
         {
             auto result = Private::executionResult(mState);

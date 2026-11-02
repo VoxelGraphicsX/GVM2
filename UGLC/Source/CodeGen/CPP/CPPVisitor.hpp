@@ -251,6 +251,8 @@ namespace UGLC::CodeGen::CPP
 
         virtual std::string translateCallExpr(const clang::CallExpr *E) override;
         virtual std::string translateCXXMemberCallExpr(const clang::CXXMemberCallExpr *E) override;
+        /// Preserves deferred task field access instead of reading host result storage during construction.
+        std::string translateMemberExpr(const clang::MemberExpr *expression) override;
         std::string inferBindGroupVisibilityExpr(const clang::CXXRecordDecl *bindGroupDecl);
 
         /** Lowers host C-style vector conversions through the constructor path. */

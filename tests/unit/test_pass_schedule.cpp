@@ -85,4 +85,48 @@ namespace
         EXPECT_TRUE(tail.conflicts({&resource, UINT64_MAX - 1, 1, false}));
         EXPECT_FALSE(tail.conflicts({&resource, UINT64_MAX - 1, 0, true}));
     }
+    /// Orders graphics after business dependencies even when their stable declaration IDs are reversed.
+    TEST(PassScheduleTests, GraphicsChainFollowsBusinessTopology)
+    {
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Render), makePass(GraphPassKind::Compute), makePass(GraphPassKind::Render)};
+        passes[0].controlPredecessors = {1};
+        passes[1].controlPredecessors = {2};
+        const PassSchedule schedule(passes);
+        EXPECT_EQ(schedule.order(), (eastl::vector<uint32_t>{2, 1, 0}));
+        EXPECT_EQ(schedule.predecessors()[0], (eastl::vector<uint32_t>{1, 2}));
+        EXPECT_EQ(schedule.batches(passes, 64).size(), 3u);
+        passes[2].controlPredecessors = {0};
+        EXPECT_THROW(PassSchedule cyclic(passes), std::invalid_argument);
+    }
+
+    /// Keeps ordinary resource hazards inside batches without adding redundant same-queue submission waits.
+    TEST(PassScheduleTests, ResourceBatchesDoNotAddExecutionWaits)
+    {
+        const int resource = 0;
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Compute, {{&resource, 0, 16, true}}),
+            makePass(GraphPassKind::Compute, {{&resource, 0, 16, false}})};
+        const auto batches = PassSchedule(passes).batches(passes, 1);
+        ASSERT_EQ(batches.size(), 2u);
+        EXPECT_TRUE(batches[0].waits.empty());
+        EXPECT_TRUE(batches[1].waits.empty());
+        passes[1].controlPredecessors = {0};
+        EXPECT_EQ(PassSchedule(passes).batches(passes, 64)[1].waits, (eastl::vector<uint32_t>{0}));
+    }
+
+    /// Schedules a ready observable branch before unrelated work and closes its batch immediately.
+    TEST(PassScheduleTests, ReadbackDoesNotWaitForUnrelatedPasses)
+    {
+        const int resource = 0;
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Compute, {{&resource, 0, 16, true}}),
+            makePass(GraphPassKind::Compute),
+            makePass(GraphPassKind::Transfer, {{&resource, 0, 16, false}})};
+        passes[2].completionNode = 5;
+        const PassSchedule schedule(passes);
+        EXPECT_EQ(schedule.order(), (eastl::vector<uint32_t>{0, 2, 1}));
+        EXPECT_EQ(schedule.batchEnds(passes, 64), (eastl::vector<uint32_t>{2, 3}));
+    }
+
 }

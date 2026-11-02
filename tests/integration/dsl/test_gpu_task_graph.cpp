@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <GVMTestCommon.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKTesting.hpp>
 #include "generate_result.hpp"
 #include "GpuGraphTestNode.hpp"
 #include "GpuGraphTestExecutor.hpp"
@@ -368,4 +369,242 @@ TEST(GpuTaskGraphTests, ExistingBufferInputKeepsItsOwnerContract)
     }
     EXPECT_FALSE(input.isNull());
     device->freeBuffer(input);
+}
+
+/// Publishes a readback while an unrelated pass is still recording on the same injected executor.
+TEST(GpuTaskGraphTests, ReadbackAdvancesBeforeUnrelatedRecordingFinishes)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    GVM::Core::TaskRuntime runtime(*instance->createDevice(), {.workerCount = 2});
+    auto probe = eastl::make_shared<GpuGraphRecordingProbe>();
+    probe->released = false;
+    auto execution = runtime.submit([probe](GpuGraphFixture::Input input)
+    {
+        GVM::Core::TaskGraph graph;
+        auto values = graph.add(GpuGraphFixture::generate, input);
+        auto buffer = graph.add(GpuGraphFixture::Upload{}, values);
+        auto copied = graph.add(GVM::Core::ReadbackNode<float>{}, buffer);
+        graph.add(GpuGraphTestNode(probe), 1u);
+        return graph.add([probe](eastl::vector<float> result)
+        {
+            {
+                std::lock_guard lock(probe->mutex);
+                probe->released = true;
+            }
+            probe->changed.notify_all();
+            return GpuGraphFixture::sum(result);
+        }, copied);
+    }, GpuGraphFixture::Input{});
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 127.5f);
+}
+
+/// Keeps readback bursts within a small executor queue while preserving ordinary CPU continuations.
+TEST(GpuTaskGraphTests, ReadbackContinuationsRespectAdmissionBudget)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    GVM::Core::ThreadExecutor executor(1, 2);
+    GVM::Core::TaskRuntime runtime(*instance->createDevice(), executor, {.maximumInFlightTasksPerExecution = 1});
+    auto probe = eastl::make_shared<GpuGraphRecordingProbe>();
+    probe->released = false;
+    auto execution = runtime.submit([probe](GpuGraphFixture::Input input)
+    {
+        GVM::Core::TaskGraph graph;
+        auto values = graph.add(GpuGraphFixture::generate, input);
+        auto buffer = graph.add(GpuGraphFixture::Upload{}, values);
+        auto copied = graph.add(GVM::Core::ReadbackNode<float>{}, buffer);
+        auto output = graph.add([probe](eastl::vector<float> result)
+        {
+            std::unique_lock lock(probe->mutex);
+            probe->started = 1;
+            probe->changed.notify_all();
+            if (!probe->changed.wait_for(lock, std::chrono::seconds(3), [&probe] { return probe->released; }))
+            {
+                throw std::runtime_error("Readback admission probe was not released.");
+            }
+            return GpuGraphFixture::sum(result);
+        }, copied);
+        for (uint32_t index = 0; index < 32; ++index)
+        {
+            graph.add(GVM::Core::ReadbackNode<float>{}, buffer);
+        }
+        return output;
+    }, GpuGraphFixture::Input{});
+    {
+        std::unique_lock lock(probe->mutex);
+        EXPECT_TRUE(probe->changed.wait_for(lock, std::chrono::seconds(3), [&probe] { return probe->started == 1; }));
+    }
+    EXPECT_FALSE(execution.wait(100'000'000ull));
+    {
+        std::lock_guard lock(probe->mutex);
+        probe->released = true;
+    }
+    probe->changed.notify_all();
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 127.5f);
+}
+
+/// Projects one GPU output without introducing a CPU resource task or a separate public buffer type.
+TEST(GpuTaskGraphTests, GeneratedGpuFieldsPreserveProducerDependencies)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    GVM::Core::TaskRuntime runtime(*instance->createDevice(), {.workerCount = 2});
+    auto execution = runtime.submit(GpuGraphFixture::Entries::buildProjectedGpuGraph, GpuGraphFixture::Input{});
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 255.0f);
+}
+
+/// Validates actual DSL raster shader execution and render-to-compute texture synchronization.
+TEST(GpuTaskGraphTests, GeneratedRasterGraphUsesExistingTextureAndFramebufferTypes)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    GVM::Core::TaskRuntime runtime(*instance->createDevice(), {.workerCount = 2});
+    auto execution = runtime.submit(GpuGraphFixture::Entries::buildRasterGraph, GpuGraphFixture::Input{});
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 1.0f);
+}
+
+/// Measures the actual single-queue submission reduction without assuming a GPU speedup.
+TEST(GpuTaskGraphTests, VulkanSingleQueueBatchesReduceSubmissions)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    auto *device = instance->createDevice();
+    if (!GVM::RHI::Vulkan::Testing::isVulkanDevice(device))
+    {
+        GTEST_SKIP() << "Vulkan-only submission counters.";
+    }
+    auto *queue = device->getQueue({});
+    const auto before = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(queue);
+    {
+        GVM::Core::TaskRuntime runtime(*device, {.workerCount = 1, .maximumPassesPerBatch = 1});
+        auto execution = runtime.submit(GpuGraphFixture::Entries::buildGraph, GpuGraphFixture::Input{});
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        EXPECT_FLOAT_EQ(execution.get(), 446.5f);
+    }
+    const auto unbatched = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(queue) - before;
+    {
+        GVM::Core::TaskRuntime runtime(*device, {.workerCount = 2, .maximumPassesPerBatch = 64});
+        auto execution = runtime.submit(GpuGraphFixture::Entries::buildGraph, GpuGraphFixture::Input{});
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        EXPECT_FLOAT_EQ(execution.get(), 446.5f);
+    }
+    const auto batched = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(queue) - before - unbatched;
+    EXPECT_EQ(unbatched, 5u);
+    EXPECT_EQ(batched, 1u);
+    RecordProperty("unbatched_submissions", int(unbatched));
+    RecordProperty("batched_submissions", int(batched));
+}
+
+/// Transfers successful GPU allocations to the existing explicit device destruction contract.
+TEST(GpuTaskGraphTests, ExportedBuffersOutliveExecutionAndRuntimeUntilExplicitDestruction)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    auto *device = instance->createDevice();
+    GpuGraphFixture::BranchOutputs outputs;
+    {
+        GVM::Core::TaskRuntime runtime(*device, {.workerCount = 2});
+        auto execution = runtime.submit(GpuGraphFixture::Entries::buildBufferOutputs, GpuGraphFixture::Input{});
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        outputs = execution.get();
+        EXPECT_EQ(execution.get().scaled, outputs.scaled);
+    }
+    auto *queue = device->getQueue({});
+    auto scaled = queue->readBufferAsync(outputs.scaled);
+    auto biased = queue->readBufferAsync(outputs.biased);
+    ASSERT_TRUE(queue->submit({}, {}).wait(10'000'000'000ull));
+    scaled->wait();
+    biased->wait();
+    float lastScaled = 0.0f;
+    float firstBiased = 0.0f;
+    std::memcpy(&lastScaled, scaled->getData().data() + 255 * sizeof(float), sizeof(float));
+    std::memcpy(&firstBiased, biased->getData().data(), sizeof(float));
+    EXPECT_FLOAT_EQ(lastScaled, 255.0f / 128.0f);
+    EXPECT_FLOAT_EQ(firstBiased, 0.25f);
+    device->freeBuffer(outputs.scaled);
+    device->freeBuffer(outputs.biased);
+    queue->submit({});
+    EXPECT_TRUE(outputs.scaled.isNull());
+    EXPECT_TRUE(outputs.biased.isNull());
+}
+
+/// Exports an ordinary texture handle and verifies its raster contents after runtime destruction.
+TEST(GpuTaskGraphTests, ExportedTextureUsesExplicitDestruction)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    auto *device = instance->createDevice();
+    GVM::RHI::Texture texture;
+    {
+        GVM::Core::TaskRuntime runtime(*device, {.workerCount = 2});
+        auto execution = runtime.submit(GpuGraphFixture::Entries::buildImage, GpuGraphFixture::Input{});
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        texture = execution.get();
+    }
+    auto *queue = device->getQueue({});
+    auto readback = queue->readTextureAsync({.texture = texture}, {.bytesPerRow = 4, .rowsPerImage = 1}, {1, 1, 1});
+    ASSERT_TRUE(queue->submit({}, {}).wait(10'000'000'000ull));
+    readback->wait();
+    EXPECT_EQ(readback->getData()[1], 255);
+    device->freeTexture(texture);
+    queue->submit({});
+    EXPECT_TRUE(texture.isNull());
+}
+
+/// Counts a graph allocation label using the existing backend resource snapshot interface.
+static uint32_t countGraphAllocations(GVM::RHI::DeviceImpl &device, const eastl::string &label)
+{
+    uint32_t count = 0;
+    for (const auto &resource : device.getDiagnosticsResourceSnapshot().entries)
+    {
+        if (resource.label == label)
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+/// Reclaims successful outputs that were never retrieved instead of leaking an implicit ownership transfer.
+TEST(GpuTaskGraphTests, UnretrievedGpuOutputIsReclaimed)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    auto *device = instance->createDevice();
+    auto *queue = device->getQueue({});
+    GVM::Core::TaskRuntime runtime(*device, {.workerCount = 1});
+    {
+        auto execution = runtime.submit(GpuGraphFixture::Entries::buildBuffer, GpuGraphFixture::Input{});
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        queue->submit({});
+        EXPECT_EQ(countGraphAllocations(*device, "GraphInput"), 1u);
+    }
+    queue->submit({});
+    EXPECT_EQ(countGraphAllocations(*device, "GraphInput"), 0u);
+}
+
+/// Treats copied buffer handles as aliases of the final version rather than content snapshots.
+TEST(GpuTaskGraphTests, AliasedFieldsObserveFinalResourceVersion)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    GVM::Core::TaskRuntime runtime(*instance->createDevice(), {.workerCount = 2});
+    auto execution = runtime.submit(GpuGraphFixture::Entries::buildAliasedOutputGraph, GpuGraphFixture::Input{});
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 255.0f);
 }

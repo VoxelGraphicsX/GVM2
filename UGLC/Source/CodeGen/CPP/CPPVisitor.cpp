@@ -429,9 +429,17 @@ namespace UGLC::CodeGen::CPP
                 (decl->isThisDeclarationADefinition() && isArgumentRecord(*decl)))
             {
                 auto result = getLineDirective(decl->getBeginLoc()) + replaceUGLClass(decl); // generateRecordDefinition(decl);
+                if (const auto resources = mGraphEntryEmitter->emitResourceVisitor(*decl); !resources.empty())
+                {
+                    result.insert(result.rfind('}'), resources);
+                }
 
                 clang::SourceRange bodyRange = decl->getSourceRange();
                 Rewriter->ReplaceText(bodyRange, result);
+            }
+            else if (const auto resources = mGraphEntryEmitter->emitResourceVisitor(*decl); !resources.empty())
+            {
+                Rewriter->InsertText(decl->getBraceRange().getEnd(), resources, false);
             }
 
             return true;
@@ -2265,6 +2273,15 @@ namespace UGLC::CodeGen::CPP
         }
         return BaseASTVisitor::translateCallExpr(E);
     }
+    std::string CPPVisitor::translateMemberExpr(const clang::MemberExpr *expression)
+    {
+        if (const auto projection = mGraphEntryEmitter->translateProjection(*expression))
+        {
+            return *projection;
+        }
+        return BaseASTVisitor::translateMemberExpr(expression);
+    }
+
     std::string CPPVisitor::translateCXXMemberCallExpr(const clang::CXXMemberCallExpr *E)
     {
         if (const auto graphCall = mGraphEntryEmitter->translateCall(*E))
