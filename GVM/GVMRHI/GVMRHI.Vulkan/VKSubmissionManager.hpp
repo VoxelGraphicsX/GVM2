@@ -51,6 +51,8 @@ namespace GVM::RHI::Vulkan
 
         void init(VKDevice &device, const eastl::string &queueName);
         void destroy();
+        /// Releases retained encoders without reporting completion after the device idle wait returned device loss.
+        void discardLostSubmissions(const eastl::function<void(InFlightSubmission &)> &discard);
 
         // Executes one already-assembled queue submit and begins timeline-backed tracking.
         [[nodiscard]]
@@ -68,6 +70,10 @@ namespace GVM::RHI::Vulkan
 
         [[nodiscard]]
         size_t getInFlightCount() const;
+        /// Returns the next timeline value while the device-wide submission lock is held.
+        uint64_t nextValue() const;
+        /// Builds a device-side wait for one accepted value on this manager's retained timeline.
+        vk::SemaphoreSubmitInfo timelineWait(uint64_t value) const;
 
         [[nodiscard]]
         uint64_t getUserSubmitCount() const;

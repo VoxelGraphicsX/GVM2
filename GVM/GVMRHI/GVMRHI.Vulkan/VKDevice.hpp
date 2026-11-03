@@ -35,6 +35,16 @@ namespace GVM::RHI::Vulkan
         void init(VKInstance *instance);
 
         Queue getMainQueue() const override;
+        /// Returns a stable compatible queue; unsupported indices and diagnostics presentation alias the main queue.
+        Queue getQueue(const QueueDescriptor &descriptor) override;
+        /// Returns the other timeline owner, or null when the device has a single queue.
+        VKQueue *otherQueue(const VKQueue &queue) const;
+        /// Orders device-wide resource history transactions and native queue submissions.
+        std::recursive_mutex &submissionMutex();
+        /// Reports the auxiliary family for sharing private argument pages across reusable encoders.
+        uint32_t computeFamily() const;
+        /// Selects the single-queue fallback in isolated tests before constructing a graph runtime.
+        void useSingleQueueForTesting();
         TimestampQuerySupport getTimestampQuerySupport() const override;
         PassCounterQuerySupport getPassCounterQuerySupport() const override;
         /// Returns Vulkan memory topology inferred from the selected physical device memory types.
@@ -151,6 +161,10 @@ namespace GVM::RHI::Vulkan
         VmaAllocator mAllocator = nullptr;
         VKArgumentResources mArgumentResources{*this};
         VKQueue *mMainQueue = nullptr;
+        VKQueue *mComputeQueue = nullptr;
+        uint32_t mComputeFamily = VK_QUEUE_FAMILY_IGNORED;
+        bool mSingleQueueForTesting = false;
+        std::recursive_mutex mSubmissionMutex;
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
         Queue mDiagnosticsOverlayQueue = nullptr;
 #endif

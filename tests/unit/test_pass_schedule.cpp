@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <EASTL/algorithm.h>
 #include <GVMCore/Private/PassSchedule.hpp>
 
 namespace
@@ -129,4 +130,51 @@ namespace
         EXPECT_EQ(schedule.batchEnds(passes, 64), (eastl::vector<uint32_t>{2, 3}));
     }
 
+    /// Places two independent compute producers on distinct queues and joins their writes before a graphics consumer.
+    TEST(PassScheduleTests, IndependentComputeBranchesFanOutAndJoin)
+    {
+        const int resource = 0;
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Compute, {{&resource, 0, 4, true}}),
+            makePass(GraphPassKind::Compute, {{&resource, 4, 4, true}}),
+            makePass(GraphPassKind::Render, {{&resource, 0, 8, false}}),
+            makePass(GraphPassKind::Render)};
+        PassSchedule schedule(passes);
+        const auto batches = schedule.place(passes, 16, {1, 0});
+        ASSERT_EQ(schedule.order(), (eastl::vector<uint32_t>{0, 1, 2, 3}));
+        ASSERT_EQ(batches.size(), 4u);
+        EXPECT_EQ(batches[0].queue, 1u);
+        EXPECT_EQ(batches[1].queue, 0u);
+        EXPECT_EQ(batches[2].queue, 0u);
+        EXPECT_EQ(batches[2].waits, (eastl::vector<uint32_t>{0}));
+        EXPECT_EQ(batches[2].previousOnQueue, 1u);
+        EXPECT_EQ(batches[3].previousOnQueue, 2u);
+    }
+
+    /// Keeps a graphics-compute-graphics chain acyclic across batch boundaries and preserves the aliased fast path.
+    TEST(PassScheduleTests, QueueAlternationPreservesControlBoundaries)
+    {
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Render), makePass(GraphPassKind::Compute), makePass(GraphPassKind::Render)};
+        passes[1].controlPredecessors = {0};
+        passes[2].controlPredecessors = {1};
+        PassSchedule schedule(passes);
+        const auto batches = schedule.place(passes, 32, {1, 0});
+        ASSERT_EQ(batches.size(), 3u);
+        EXPECT_EQ(batches[0].queue, 0u);
+        EXPECT_EQ(batches[1].queue, 1u);
+        EXPECT_EQ(batches[2].queue, 0u);
+        EXPECT_EQ(batches[1].waits, (eastl::vector<uint32_t>{0}));
+        EXPECT_NE(eastl::find(batches[2].waits.begin(), batches[2].waits.end(), 1u), batches[2].waits.end());
+        PassSchedule single(passes);
+        const auto expected = single.batches(passes, 32);
+        const auto aliased = single.place(passes, 32, {});
+        ASSERT_EQ(aliased.size(), expected.size());
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            EXPECT_EQ(aliased[index].end, expected[index].end);
+            EXPECT_EQ(aliased[index].waits, expected[index].waits);
+            EXPECT_EQ(aliased[index].queue, 0u);
+        }
+    }
 }

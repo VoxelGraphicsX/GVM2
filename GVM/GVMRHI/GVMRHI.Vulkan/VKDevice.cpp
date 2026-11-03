@@ -169,11 +169,35 @@ namespace GVM::RHI::Vulkan
     void VKDevice::createNativeDevice()
     {
         const VulkanCapabilitySurvey &capabilitySurvey = mCapabilities.getSurvey();
-        const float queuePriority = 1.0f;
-        vk::DeviceQueueCreateInfo queueCreateInfo = {};
-        queueCreateInfo.queueFamilyIndex = mCapabilities.getGraphicsQueueFamilyIndex();
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        const uint32_t mainFamily = mCapabilities.getGraphicsQueueFamilyIndex();
+        const auto &families = mCapabilities.getQueueFamilyProperties();
+        const float priorities[] = {1.0f, 1.0f};
+        vk::DeviceQueueCreateInfo queues[2]{};
+        queues[0].queueFamilyIndex = mainFamily;
+        queues[0].queueCount = 1;
+        queues[0].pQueuePriorities = priorities;
+        uint32_t familyCount = 1;
+        if (families[mainFamily].queueCount >= 2)
+        {
+            mComputeFamily = mainFamily;
+            queues[0].queueCount = 2;
+        }
+        else
+        {
+            for (uint32_t index = 0; index < families.size(); ++index)
+            {
+                if (index != mainFamily && families[index].queueCount != 0 &&
+                    (families[index].queueFlags & vk::QueueFlagBits::eCompute))
+                {
+                    mComputeFamily = index;
+                    queues[1].queueFamilyIndex = index;
+                    queues[1].queueCount = 1;
+                    queues[1].pQueuePriorities = priorities;
+                    familyCount = 2;
+                    break;
+                }
+            }
+        }
 
         eastl::vector<const char *> enabledDeviceExtensions;
         if (mCapabilities.hasSelectedDeviceExtension(PortabilitySubsetExtensionName))
@@ -255,8 +279,8 @@ namespace GVM::RHI::Vulkan
 
         vk::DeviceCreateInfo deviceCreateInfo = {};
         deviceCreateInfo.pNext = &enabledFeatures2;
-        deviceCreateInfo.queueCreateInfoCount = 1;
-        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+        deviceCreateInfo.queueCreateInfoCount = familyCount;
+        deviceCreateInfo.pQueueCreateInfos = queues;
         deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(enabledDeviceExtensions.size());
         deviceCreateInfo.ppEnabledExtensionNames = enabledDeviceExtensions.data();
 
@@ -324,6 +348,12 @@ namespace GVM::RHI::Vulkan
         try
         {
             mMainQueue->init(this, mCapabilities.getGraphicsQueueFamilyIndex(), mDevice->getQueue(mCapabilities.getGraphicsQueueFamilyIndex(), 0), "MainQueue");
+            if (mComputeFamily != VK_QUEUE_FAMILY_IGNORED)
+            {
+                mComputeQueue = new VKQueue();
+                mComputeQueue->init(this, mComputeFamily, mDevice->getQueue(mComputeFamily,
+                    mComputeFamily == mCapabilities.getGraphicsQueueFamilyIndex() ? 1 : 0), "ComputeQueue");
+            }
             if (mDiagnosticsOverlayConfig.enabled != False)
             {
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
@@ -343,6 +373,8 @@ namespace GVM::RHI::Vulkan
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            delete mComputeQueue;
+            mComputeQueue = nullptr;
             delete mMainQueue;
             mMainQueue = nullptr;
             throw;
@@ -527,6 +559,36 @@ namespace GVM::RHI::Vulkan
 
 
 
+    Queue VKDevice::getQueue(const QueueDescriptor &descriptor)
+    {
+        if (descriptor.prefer == QueuePreference::Compute && descriptor.index == 0 && mComputeQueue != nullptr &&
+            !mSingleQueueForTesting && getMainQueue() == mMainQueue)
+        {
+            return mComputeQueue;
+        }
+        return DeviceImpl::getQueue(descriptor);
+    }
+
+    VKQueue *VKDevice::otherQueue(const VKQueue &queue) const
+    {
+        return &queue == mMainQueue ? mComputeQueue : mMainQueue;
+    }
+
+    std::recursive_mutex &VKDevice::submissionMutex()
+    {
+        return mSubmissionMutex;
+    }
+
+    uint32_t VKDevice::computeFamily() const
+    {
+        return mComputeFamily;
+    }
+
+    void VKDevice::useSingleQueueForTesting()
+    {
+        mSingleQueueForTesting = true;
+    }
+
     Queue VKDevice::getMainQueue() const
     {
         ensureAlive("VKDevice::getMainQueue");
@@ -582,6 +644,12 @@ namespace GVM::RHI::Vulkan
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            if (mComputeQueue != nullptr)
+            {
+                mComputeQueue->destroy();
+                delete mComputeQueue;
+                mComputeQueue = nullptr;
+            }
             mMainQueue->destroy();
             delete mMainQueue;
             mMainQueue = nullptr;

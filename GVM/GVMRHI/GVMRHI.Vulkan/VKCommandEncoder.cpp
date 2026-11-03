@@ -99,6 +99,10 @@ namespace GVM::RHI::Vulkan
 
     RenderPassEncoder VKCommandEncoder::beginRenderPass(const RenderPassDescriptor &pass)
     {
+        if (!(mDevice->getCapabilities().getQueueFamilyProperties()[mQueue->getQueueFamilyIndex()].queueFlags & vk::QueueFlagBits::eGraphics))
+        {
+            throw std::invalid_argument("The selected Vulkan queue cannot record render passes.");
+        }
         beginPass("VKCommandEncoder::beginRenderPass");
         RenderPassEncoder encoder = new VKRenderPassEncoder();
         try
@@ -313,6 +317,20 @@ namespace GVM::RHI::Vulkan
         commands.push_back(mCommandBuffer);
     }
 
+    void VKCommandEncoder::recordOwnershipRelease(const VKOwnershipRelease &release)
+    {
+        for (const auto &buffer : release.bufferOwners)
+        {
+            retainBuffer(buffer);
+        }
+        for (const auto &texture : release.imageOwners)
+        {
+            retainTexture(texture);
+        }
+        recordSubmissionBarriers(mCommandBuffer, release.buffers, release.images);
+        mEnded = mNativeEncoded = true;
+    }
+
     void VKCommandEncoder::appendPresentTransition(VKResourceStateDB &state, const VKTexture &texture, eastl::vector<vk::CommandBuffer> &commands)
     {
         eastl::vector<vk::ImageMemoryBarrier2> images;
@@ -352,6 +370,11 @@ namespace GVM::RHI::Vulkan
     {
         if (querySet != nullptr)
         {
+            if (querySet->getType() == QueryType::Timestamp &&
+                mDevice->getCapabilities().getQueueFamilyProperties()[mQueue->getQueueFamilyIndex()].timestampValidBits == 0)
+            {
+                throw std::invalid_argument("The selected Vulkan queue does not support timestamp queries.");
+            }
             mRetainedQuerySets.push_back(querySet);
         }
     }
@@ -382,6 +405,11 @@ namespace GVM::RHI::Vulkan
     size_t VKCommandEncoder::getRetainedTextureCount() const
     {
         return mRetainedTextures.size();
+    }
+
+    const eastl::vector<QuerySet> &VKCommandEncoder::getRetainedQuerySets() const
+    {
+        return mRetainedQuerySets;
     }
 
     const eastl::vector<Texture> &VKCommandEncoder::getRetainedTextures() const
@@ -427,7 +455,12 @@ namespace GVM::RHI::Vulkan
             return;
         }
 
-        static_cast<VKTexture *>(texture.get())->retainReference();
+        auto *native = static_cast<VKTexture *>(texture.get());
+        if (native->isExternalImage() && mQueue != mDevice->getMainQueueImpl())
+        {
+            throw std::invalid_argument("External presentation images require the graphics queue.");
+        }
+        native->retainReference();
         mRetainedTextures.push_back(texture);
     }
 

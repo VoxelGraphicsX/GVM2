@@ -138,6 +138,8 @@ namespace GVM::RHI::Metal
         Private::validateTransferBufferRange("copyBufferToBuffer", sourceBuffer, sourceBuffer->getUsage(), source.offset, copySize, Private::TransferDirection::Source);
         Private::validateTransferBufferRange("copyBufferToBuffer", destinationBuffer, destinationBuffer->getUsage(), destination.offset, copySize, Private::TransferDirection::Destination);
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+        mWeakCommandEncoder->recordAccess({sourceBuffer->getNativeBuffer(), source.offset, copySize, false});
+        mWeakCommandEncoder->recordAccess({destinationBuffer->getNativeBuffer(), destination.offset, copySize, true});
         this->mNativeCommandEncoder->copyFromBuffer(sourceBuffer->getNativeBuffer(), source.offset, destinationBuffer->getNativeBuffer(), destination.offset, copySize);
     }
 
@@ -155,6 +157,8 @@ namespace GVM::RHI::Metal
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
         auto sourceBuffer = static_cast<MBuffer *>(source.buffer.get())->getNativeBuffer();
         auto destinationTexture = static_cast<MTexture *>(destination.texture.get())->getNativeTexture();
+        mWeakCommandEncoder->recordAccess({sourceBuffer, 0, UINT64_MAX, false});
+        mWeakCommandEncoder->recordAccess({destinationTexture, 0, UINT64_MAX, true});
         const Private::BlockInfo blockInfo = Private::getTextureBlockInfo(destination.texture->getFormat());
         const uint64_t tightBytesPerRow = ((copySize.width + blockInfo.width - 1u) / blockInfo.width) * blockInfo.bytes;
         const uint64_t tightRowsPerImage = (copySize.height + blockInfo.height - 1u) / blockInfo.height;
@@ -219,6 +223,8 @@ namespace GVM::RHI::Metal
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
         auto sourceTexture = static_cast<MTexture *>(source.texture.get())->getNativeTexture();
         auto destinationBuffer = static_cast<MBuffer *>(destination.buffer.get())->getNativeBuffer();
+        mWeakCommandEncoder->recordAccess({sourceTexture, 0, UINT64_MAX, false});
+        mWeakCommandEncoder->recordAccess({destinationBuffer, 0, UINT64_MAX, true});
         const Private::BlockInfo blockInfo = Private::getTextureBlockInfo(source.texture->getFormat());
         const uint64_t tightBytesPerRow = ((copySize.width + blockInfo.width - 1u) / blockInfo.width) * blockInfo.bytes;
         const uint64_t tightRowsPerImage = (copySize.height + blockInfo.height - 1u) / blockInfo.height;
@@ -286,6 +292,7 @@ namespace GVM::RHI::Metal
         Private::validateTransferBufferRange("fillBuffer", destinationBuffer, destinationBuffer->getUsage(), source.offset, source.size, Private::TransferDirection::Destination);
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
         NS::Range range = NS::Range(source.offset, source.size);
+        mWeakCommandEncoder->recordAccess({destinationBuffer->getNativeBuffer(), source.offset, source.size, true});
         mNativeCommandEncoder->fillBuffer(destinationBuffer->getNativeBuffer(), range, value);
     }
 

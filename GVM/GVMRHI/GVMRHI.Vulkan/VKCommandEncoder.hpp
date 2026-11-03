@@ -15,6 +15,8 @@
 
 namespace GVM::RHI::Vulkan
 {
+    struct VKOwnershipRelease;
+
     class VKQuerySet;
 
     class VKCommandEncoder final : public CommandEncoderImpl
@@ -55,6 +57,8 @@ namespace GVM::RHI::Vulkan
         void encodeNative();
         /// Appends entry synchronization followed by the body, updating only the pending submission history.
         void appendSubmissionCommands(VKResourceStateDB &state, eastl::vector<vk::CommandBuffer> &commands);
+        /// Records a release-only native command buffer retaining the consumer captures until the release itself retires.
+        void recordOwnershipRelease(const VKOwnershipRelease &release);
         /// Appends presentation synchronization after the last body using the submission's complete resource history.
         void appendPresentTransition(VKResourceStateDB &state, const VKTexture &texture, eastl::vector<vk::CommandBuffer> &commands);
         /// Appends a closed render pass, retaining its commands until execution completes.
@@ -95,6 +99,8 @@ namespace GVM::RHI::Vulkan
 
         [[nodiscard]]
         const eastl::vector<Texture> &getRetainedTextures() const;
+        /// Lists query pools referenced by this recording for cross-queue synchronization at acceptance.
+        const eastl::vector<QuerySet> &getRetainedQuerySets() const;
 
     private:
         /// Records submission-only barriers in a cached command buffer after body recording has finished.

@@ -55,6 +55,11 @@ namespace GVM::RHI::Vulkan
         return mCachedArrayLayerCount;
     }
 
+    bool VKTexture::isExternalImage() const
+    {
+        return !mOwnsAllocation;
+    }
+
     bool VKTexture::is3D() const
     {
         return mDescriptor.dimension == TextureDimension::e3D;

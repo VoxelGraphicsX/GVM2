@@ -12,6 +12,7 @@ struct GpuGraphRecordingProbe
     uint32_t active = 0;
     uint32_t maximumActive = 0;
     bool released = true;
+    uint32_t gatedPass = UINT32_MAX;
     bool fail = false;
     bool observeBuild = false;
     bool allocateProbeBuffer = false;

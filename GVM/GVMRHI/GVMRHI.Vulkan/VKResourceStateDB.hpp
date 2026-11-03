@@ -1,6 +1,7 @@
 #pragma once
 #include "VKCommon.hpp"
 #include "VKDefines.hpp"
+#include "VKQueueFrontier.hpp"
 #include <EASTL/unordered_map.h>
 #include <EASTL/vector.h>
 
@@ -31,6 +32,7 @@ namespace GVM::RHI::Vulkan
         VKBuffer *buffer = nullptr;
         uint64_t offset = 0, size = 0;
         VKResourceAccessState access;
+        VKQueueFrontier frontier;
     };
 
     /// Tracks the actual layout and access history of one image subresource.
@@ -38,6 +40,7 @@ namespace GVM::RHI::Vulkan
     {
         vk::ImageLayout layout = vk::ImageLayout::eUndefined;
         VKResourceAccessState access;
+        VKQueueFrontier frontier;
     };
 
     /// Stores independent aspect/mip/layer cells; updates never replace unrelated layers.
@@ -48,8 +51,17 @@ namespace GVM::RHI::Vulkan
         eastl::vector<VKImageSubresourceState> subresources;
     };
 
+    /// Describes one source-family release and the exact allocations its native barriers must keep alive.
+    struct VKOwnershipRelease
+    {
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        eastl::vector<Buffer> bufferOwners;
+        eastl::vector<Texture> imageOwners;
+    };
+
     /// Owns device resource history at the tail of scheduled work, independent of GPU retirement.
-    /// The current single-queue backend mutates references only under its canonical submission lock.
+    /// Native queues share one device submission lock; workers never mutate the accepted history.
     class VKResourceStateDB final
     {
     public:
@@ -75,8 +87,18 @@ namespace GVM::RHI::Vulkan
         void discardTextureState(const VKTexture &texture);
         /// Clears resource history when the owning device is initialized or destroyed.
         void reset();
-        /// Starts an empty submission overlay; the caller holds the canonical queue submission lock until commit or destruction.
-        void beginSubmission(VKResourceStateDB &history);
+        /// Starts an empty submission overlay; the caller holds the device submission lock until commit or destruction.
+        void beginSubmission(VKResourceStateDB &history, VKQueue &queue, uint64_t value);
+        /// Advances a tentative queue frontier and reports whether exclusive ownership changes family.
+        bool advanceFrontier(VKQueueFrontier &frontier, bool exclusive);
+        /// Pairs a consuming buffer acquire with the matching source-family release.
+        void transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer);
+        /// Pairs a consuming image acquire with the identical release range and layout transition.
+        void transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture);
+        /// Submits any release commands and merges required foreign timeline values before consumer acceptance.
+        void prepareQueueWaits(const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits);
+        /// Reports an accepted release whose acquire was not accepted, for device-loss diagnostics.
+        bool hasUnacquiredRelease() const;
         /// Publishes preallocated touched entries after native submission is accepted; never allocates or throws.
         void commitSubmission() noexcept;
 
@@ -86,6 +108,14 @@ namespace GVM::RHI::Vulkan
         mutable Mutex mMutex;
         eastl::unordered_map<const VKBuffer *, eastl::vector<VKResourceBufferState>> mBuffers;
         eastl::unordered_map<const VKTexture *, VKResourceTextureState> mTextures;
+        VKQueue *mQueue = nullptr;
+        VKQueue *mOther = nullptr;
+        uint32_t mLane = 0;
+        uint64_t mValue = 0;
+        uint64_t mForeignWait = 0;
+        uint64_t mAcceptedRelease = 0;
+        eastl::vector<VKQuerySet *> mQueries;
+        VKOwnershipRelease mRelease;
         VKResourceStateDB *mHistory = nullptr;
     };
 } // namespace GVM::RHI::Vulkan

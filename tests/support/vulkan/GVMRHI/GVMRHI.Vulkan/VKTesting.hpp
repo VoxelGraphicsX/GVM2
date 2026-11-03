@@ -68,6 +68,9 @@ namespace GVM::RHI::Vulkan::Testing
         const PixelLocalDependencyDepthAttachment &depthAttachment,
         uint32_t pixelLocalPassCount,
         const eastl::vector<PixelLocalPassAttachmentAccess> &attachmentAccesses);
+    /// Makes all preferred queues resolve to the canonical queue before constructing a test runtime.
+    void useSingleQueue(DeviceImpl &device);
+
     uint64_t getQueueUserSubmitCount(Queue queue);
     uint64_t getQueueBackendSubmitCount(Queue queue);
     uint64_t getQueuePresentInternalSubmitCount(Queue queue);

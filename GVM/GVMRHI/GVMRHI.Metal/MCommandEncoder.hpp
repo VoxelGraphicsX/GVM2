@@ -33,6 +33,12 @@ namespace GVM::RHI::Metal
         virtual void resolveQuerySet(QuerySet querySet, uint32_t firstQuery, uint32_t queryCount, BufferRange destination) override;
         virtual void end() override;
         void commit();
+        /// Adds a native allocation use to this encoder's immutable submission summary.
+        void recordAccess(MQueueAccess use);
+        /// Conservatively orders legacy, query or indirect captures whose complete accesses are unavailable.
+        void markOpaque();
+        /// Merges captured uses into the pending batch before native submission.
+        void collectAccesses(eastl::vector<MQueueAccess> &uses, bool &opaque) const;
         /// Validates queue ownership, single-use submission and optionally an explicit end boundary.
         void validateSubmission(MTL::CommandQueue &queue, bool requireEnded) const;
         void waitUntilCompleted();
@@ -50,6 +56,8 @@ namespace GVM::RHI::Metal
         MDevice *mDevice = nullptr;
         eastl::vector<QuerySet> mRetainedQuerySets;
         eastl::vector<Buffer> mRetainedBuffers;
+        eastl::vector<MQueueAccess> mAccesses;
+        bool mOpaque = false;
         bool mHasOpenPass = false;
         bool mEnded = false;
         bool mCommitted = false;

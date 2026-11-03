@@ -6,14 +6,15 @@
 namespace
 {
     /// Holds recording at a bounded gate and records overlap independently of command submission.
-    void recordProbe(const eastl::shared_ptr<GpuGraphRecordingProbe> &probe)
+    void recordProbe(const eastl::shared_ptr<GpuGraphRecordingProbe> &probe, uint32_t passIndex = UINT32_MAX)
     {
         std::unique_lock lock(probe->mutex);
         ++probe->started;
         ++probe->active;
         probe->maximumActive = eastl::max(probe->maximumActive, probe->active);
         probe->changed.notify_all();
-        const bool released = probe->changed.wait_for(lock, std::chrono::seconds(5), [&probe] { return probe->released; });
+        const bool released = (probe->gatedPass != UINT32_MAX && probe->gatedPass != passIndex) ||
+            probe->changed.wait_for(lock, std::chrono::seconds(5), [&probe] { return probe->released; });
         --probe->active;
         if (!released || probe->fail)
         {
@@ -52,14 +53,14 @@ uint32_t GpuGraphTestNode::build(GVM::Core::RenderNode &node, uint32_t count) co
                 .clearValue = {float(index == 0), float(index != 0), 0.0f, 1.0f}});
             GVM::Core::RenderPassTaskDescriptor task;
             task.resources.complete = !mOpaque;
-            task.drawFn = [probe = mProbe](GVM::RHI::RenderPassEncoder) { recordProbe(probe); };
+            task.drawFn = [probe = mProbe, index](GVM::RHI::RenderPassEncoder) { recordProbe(probe, index); };
             node.renderPass(eastl::move(descriptor), {eastl::move(task)});
         }
         else
         {
             GVM::Core::ComputePassTaskDescriptor task;
             task.resources.complete = !mOpaque;
-            task.dispatchFn = [probe = mProbe](GVM::RHI::ComputePassEncoder) { recordProbe(probe); };
+            task.dispatchFn = [probe = mProbe, index](GVM::RHI::ComputePassEncoder) { recordProbe(probe, index); };
             node.computePass("GraphComputeProbe", eastl::move(task));
         }
     }

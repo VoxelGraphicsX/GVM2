@@ -245,7 +245,8 @@ namespace GVM::RHI::Vulkan
             eastl::vector<vk::QueueFamilyProperties> queueFamilies = toEastlVector(physicalDevice.getQueueFamilyProperties());
             for (uint32_t familyIndex = 0; familyIndex < queueFamilies.size(); ++familyIndex)
             {
-                if ((queueFamilies[familyIndex].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlags{})
+                if (!(queueFamilies[familyIndex].queueFlags & vk::QueueFlagBits::eGraphics) ||
+                    !(queueFamilies[familyIndex].queueFlags & vk::QueueFlagBits::eCompute))
                 {
                     continue;
                 }

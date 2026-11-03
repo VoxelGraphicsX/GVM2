@@ -23,7 +23,9 @@ namespace GVM::RHI::Metal
     {
     public:
         MQueue();
-        void init(MDevice *device, const eastl::string &queueName);
+        void init(MDevice *device, const eastl::string &queueName, MTL::CommandQueue *native = nullptr);
+        /// Signals previously committed work before the first auxiliary queue is exposed; queued application transfers stay pending.
+        void publishAcceptedTail();
         virtual CommandEncoder createCommandEncoder() override;
 
         virtual void writeBuffer(BufferRange buffer, void const *data, uint64_t size) override;

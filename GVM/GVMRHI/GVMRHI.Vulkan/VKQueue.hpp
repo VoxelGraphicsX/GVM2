@@ -17,6 +17,8 @@
 
 namespace GVM::RHI::Vulkan
 {
+    struct VKOwnershipRelease;
+
     class VKQueue final : public QueueImpl
     {
     public:
@@ -45,6 +47,10 @@ namespace GVM::RHI::Vulkan
         void submit(const eastl::vector<CommandEncoder> &encoders) override;
         /// Submits closed encoders with GPU timeline waits and returns retained completion.
         Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits) override;
+        /// Submits only ownership releases; never consumes pending application uploads or readbacks on the source queue.
+        uint64_t submitOwnershipRelease(const VKOwnershipRelease &release);
+        /// Returns the semaphore dependency for a value accepted by this queue.
+        vk::SemaphoreSubmitInfo timelineWait(uint64_t value) const;
         void destroy() override;
         void waitForSubmission(VKSubmissionSerial serial, const char *waitSource = "unspecified");
         /**
@@ -135,7 +141,7 @@ namespace GVM::RHI::Vulkan
         CommandEncoder mInternalReadbackCommandEncoder;
         BlitPassEncoder mInternalReadbackBlitPassEncoder;
         Private::BufferCopyMultipleRegionExecutor mBufferCopyMultipleRegionExecutor;
-        mutable Mutex mSubmitMutex;
+
         VKSubmissionManager mSubmissionManager;
         VKUploadAllocator mUploadAllocator;
         VKPendingReadbackTracker mPendingReadbackTracker;

@@ -245,6 +245,39 @@ namespace GVM::RHI::Metal
         });
     }
 
+    Queue MDevice::getQueue(const QueueDescriptor &descriptor)
+    {
+        if (descriptor.prefer != QueuePreference::Compute || descriptor.index != 0 || getMainQueue() != mMainQueue)
+        {
+            return DeviceImpl::getQueue(descriptor);
+        }
+        std::lock_guard lock(mQueueHistory.mutex());
+        if (mComputeQueue == nullptr && !mComputeUnavailable)
+        {
+            auto native = NS::TransferPtr(mNativeDevice->newCommandQueue());
+            if (!native)
+            {
+                mComputeUnavailable = true;
+                return getMainQueue();
+            }
+            auto candidate = eastl::make_unique<MQueue>();
+            candidate->init(this, "ComputeQueue", native.get());
+            mMainQueue->publishAcceptedTail();
+            mComputeQueue = candidate.release();
+        }
+        return mComputeQueue != nullptr ? mComputeQueue : getMainQueue();
+    }
+
+    MQueueHistory &MDevice::queueHistory()
+    {
+        return mQueueHistory;
+    }
+
+    bool MDevice::tracksQueue(const MQueue &queue) const
+    {
+        return mComputeQueue != nullptr && (&queue == mComputeQueue || &queue == mMainQueue);
+    }
+
     Queue MDevice::getMainQueue() const
     {
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
@@ -516,7 +549,14 @@ namespace GVM::RHI::Metal
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            if (mComputeQueue != nullptr)
+            {
+                mComputeQueue->destroy();
+                delete mComputeQueue;
+                mComputeQueue = nullptr;
+            }
             this->mMainQueue->destroy();
+            mQueueHistory.clear();
             delete this->mMainQueue;
             this->mMainQueue = nullptr;
         }

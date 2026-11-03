@@ -100,13 +100,11 @@ TEST(GpuTaskGraphTests, RuntimeDestructionDrainsAcceptedGpuWork)
 }
 
 /// Preserves GPU dependencies across the smallest allowed submission batches.
-TEST(GpuTaskGraphTests, SingleQueueOnePassBatchesPreserveDataflow)
+TEST(GpuTaskGraphTests, OnePassBatchesPreserveDataflow)
 {
     eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
         GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
     auto *device = instance->createDevice();
-    EXPECT_EQ(device->getQueue({.prefer = GVM::RHI::QueuePreference::Graphics}),
-        device->getQueue({.prefer = GVM::RHI::QueuePreference::Compute}));
     GVM::Core::TaskRuntime runtime(*device, {.workerCount = 3, .maximumPassesPerBatch = 1});
     auto execution = runtime.submit(GpuGraphFixture::Entries::buildGraph, GpuGraphFixture::Input{});
     ASSERT_TRUE(execution.wait(10'000'000'000ull));
@@ -163,6 +161,46 @@ TEST(GpuTaskGraphTests, IndependentPassesRecordInParallel)
     EXPECT_TRUE(probe->buffer.isNull());
 }
 
+/// Completes a ready second branch on the GPU while the first branch is still held inside its CPU recording callback.
+TEST(GpuTaskGraphTests, ReadyQueueBypassesBlockedFirstRecording)
+{
+    using namespace GVM::RHI;
+    eastl::unique_ptr<InstanceImpl, void (*)(Instance)> instance(GVM::Tests::createTestInstance(), destroyInstance);
+    auto *device = instance->createDevice();
+    auto *graphics = device->getMainQueue();
+    auto *compute = device->getQueue({.prefer = QueuePreference::Compute});
+    if (!Vulkan::Testing::isVulkanDevice(device) || graphics == compute)
+    {
+        GTEST_SKIP() << "This probe uses counters on two native Vulkan queues.";
+    }
+    GVM::Core::TaskRuntime runtime(*device, {.workerCount = 2});
+    auto probe = eastl::make_shared<GpuGraphRecordingProbe>();
+    probe->released = false;
+    probe->gatedPass = 0;
+    const auto before = Vulkan::Testing::getQueueUserSubmitCount(graphics);
+    const auto blockedBefore = Vulkan::Testing::getQueueUserSubmitCount(compute);
+    auto execution = runtime.submit([probe](uint32_t count)
+    {
+        GVM::Core::TaskGraph graph;
+        return graph.add(GpuGraphTestNode(probe), count);
+    }, 2u);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (Vulkan::Testing::getQueueUserSubmitCount(graphics) == before && std::chrono::steady_clock::now() < deadline)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    EXPECT_GT(Vulkan::Testing::getQueueUserSubmitCount(graphics), before);
+    EXPECT_TRUE(graphics->submit({}, {}).wait(1'000'000'000));
+    EXPECT_EQ(Vulkan::Testing::getQueueUserSubmitCount(compute), blockedBefore);
+    {
+        std::lock_guard lock(probe->mutex);
+        probe->released = true;
+    }
+    probe->changed.notify_all();
+    ASSERT_TRUE(execution.wait(5'000'000'000));
+    EXPECT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+}
+
 /// Proves render and compute native Vulkan bodies enter recording on distinct graph workers before any submission.
 TEST(GpuTaskGraphTests, NativeRenderAndComputeRecordOnGraphWorkers)
 {
@@ -173,6 +211,10 @@ TEST(GpuTaskGraphTests, NativeRenderAndComputeRecordOnGraphWorkers)
         GTEST_SKIP() << "The native dispatcher probe is Vulkan-specific.";
     }
     auto *device = instance->createDevice();
+    auto *graphics = device->getMainQueue();
+    auto *compute = device->getQueue({.prefer = GVM::RHI::QueuePreference::Compute});
+    const auto graphicsBefore = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(graphics);
+    const auto computeBefore = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(compute);
     const auto target = device->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment |
         GVM::RHI::TextureUsage::CopySrc, .size = {2, 2, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
     auto callbacks = eastl::make_shared<GpuGraphRecordingProbe>();
@@ -191,6 +233,8 @@ TEST(GpuTaskGraphTests, NativeRenderAndComputeRecordOnGraphWorkers)
         native.release();
         ASSERT_TRUE(execution.wait(10'000'000'000ull));
         EXPECT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        EXPECT_GT(GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(graphics), graphicsBefore);
+        EXPECT_GT(GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(compute), computeBefore);
         auto readback = device->getMainQueue()->readTextureAsync({.texture = target},
             {.bytesPerRow = 8, .rowsPerImage = 2}, {2, 2, 1});
         device->getMainQueue()->submit({});
@@ -554,6 +598,7 @@ TEST(GpuTaskGraphTests, VulkanSingleQueueBatchesReduceSubmissions)
     {
         GTEST_SKIP() << "Vulkan-only submission counters.";
     }
+    GVM::RHI::Vulkan::Testing::useSingleQueue(*device);
     auto *queue = device->getQueue({});
     const auto before = GVM::RHI::Vulkan::Testing::getQueueUserSubmitCount(queue);
     {

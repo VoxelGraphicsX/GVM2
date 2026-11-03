@@ -176,6 +176,113 @@ namespace GVM::Core::Private
         return result;
     }
 
+    eastl::vector<PassBatch> PassSchedule::place(const eastl::vector<GraphPass> &passes, uint32_t limit, PassQueues queues)
+    {
+        if (queues.compute == 0 && queues.transfer == 0)
+        {
+            return batches(passes, limit);
+        }
+        if (limit == 0)
+        {
+            throw std::invalid_argument("GPU batch size must be nonzero.");
+        }
+        const size_t count = passes.size();
+        eastl::vector<uint32_t> depth(count, 1), observable(count, UINT32_MAX), pending(count), readyAt(count, 0);
+        eastl::vector<eastl::vector<uint32_t>> successors(count);
+        for (auto it = mOrder.rbegin(); it != mOrder.rend(); ++it)
+        {
+            const uint32_t index = *it;
+            if (passes[index].completionNode != UINT32_MAX)
+            {
+                observable[index] = eastl::min(observable[index], index);
+            }
+            pending[index] = static_cast<uint32_t>(mPredecessors[index].size());
+            for (uint32_t pred : mPredecessors[index])
+            {
+                successors[pred].push_back(index);
+                depth[pred] = eastl::max(depth[pred], depth[index] + 1);
+                observable[pred] = eastl::min(observable[pred], observable[index]);
+            }
+        }
+        const uint32_t lanes = eastl::max(queues.compute, queues.transfer) + 1;
+        eastl::vector<uint32_t> available(lanes, 0), placement(count, UINT32_MAX);
+        mOrder.clear();
+        while (mOrder.size() < count)
+        {
+            uint32_t next = UINT32_MAX;
+            for (uint32_t index = 0; index < count; ++index)
+            {
+                if (pending[index] == 0 && placement[index] == UINT32_MAX &&
+                    (next == UINT32_MAX || observable[index] < observable[next] ||
+                     (observable[index] == observable[next] && depth[index] > depth[next])))
+                {
+                    next = index;
+                }
+            }
+            const auto &pass = passes[next];
+            uint32_t preferred = 0;
+            if (pass.resources.complete && pass.kind != GraphPassKind::Render)
+            {
+                preferred = pass.kind == GraphPassKind::Compute ? queues.compute : queues.transfer;
+            }
+            const uint32_t lane = eastl::max(readyAt[next], available[preferred]) <=
+                eastl::max(readyAt[next], available[0]) ? preferred : 0;
+            placement[next] = lane;
+            available[lane] = eastl::max(readyAt[next], available[lane]) + 1;
+            mOrder.push_back(next);
+            for (uint32_t successor : successors[next])
+            {
+                --pending[successor];
+                readyAt[successor] = eastl::max(readyAt[successor], available[lane]);
+            }
+        }
+        eastl::vector<PassBatch> result;
+        eastl::vector<uint32_t> passBatch(count), last(lanes, UINT32_MAX);
+        bool close = true;
+        uint32_t batchBegin = 0;
+        for (uint32_t offset = 0; offset < count; ++offset)
+        {
+            const uint32_t index = mOrder[offset];
+            const uint32_t lane = placement[index];
+            const auto &pass = passes[index];
+            bool open = close || !pass.resources.complete || result.back().queue != lane ||
+                offset - batchBegin >= limit;
+            for (uint32_t pred : mPredecessors[index])
+            {
+                open = open || placement[pred] != lane;
+            }
+            for (uint32_t pred : mControlPredecessors[index])
+            {
+                open = open || passBatch[pred] + 1 == result.size();
+            }
+            if (open)
+            {
+                batchBegin = offset;
+                result.push_back({offset + 1, {}, lane, last[lane]});
+                last[lane] = static_cast<uint32_t>(result.size() - 1);
+            }
+            auto &batch = result.back();
+            batch.end = offset + 1;
+            passBatch[index] = last[lane];
+            for (uint32_t pred : mPredecessors[index])
+            {
+                const uint32_t dependency = passBatch[pred];
+                const bool control = eastl::find(mControlPredecessors[index].begin(), mControlPredecessors[index].end(), pred) != mControlPredecessors[index].end();
+                if ((placement[pred] != lane || control) && dependency != passBatch[index] &&
+                    eastl::find(batch.waits.begin(), batch.waits.end(), dependency) == batch.waits.end())
+                {
+                    batch.waits.push_back(dependency);
+                }
+            }
+            close = !pass.resources.complete || pass.completionNode != UINT32_MAX;
+            for (uint32_t successor : successors[index])
+            {
+                close = close || placement[successor] != lane;
+            }
+        }
+        return result;
+    }
+
     eastl::vector<uint32_t> PassSchedule::batchEnds(const eastl::vector<GraphPass> &passes, uint32_t maximumBatchSize) const
     {
         eastl::vector<uint32_t> result;

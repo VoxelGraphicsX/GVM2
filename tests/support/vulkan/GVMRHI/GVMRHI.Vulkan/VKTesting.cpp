@@ -25,6 +25,11 @@ namespace GVM::RHI::Vulkan::Testing
         return dynamic_cast<GVM::RHI::Vulkan::VKDevice *>(device) != nullptr;
     }
 
+    void useSingleQueue(DeviceImpl &device)
+    {
+        dynamic_cast<VKDevice &>(device).useSingleQueueForTesting();
+    }
+
     uint64_t getQueueUserSubmitCount(Queue queue)
     {
         auto *vkQueue = static_cast<GVM::RHI::Vulkan::VKQueue *>(queue);

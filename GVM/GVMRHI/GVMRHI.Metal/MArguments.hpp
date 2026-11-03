@@ -2,6 +2,7 @@
 
 #include <GVMRHI/GVMRHI.hpp>
 #include <Metal/Metal.hpp>
+#include "MQueueHistory.hpp"
 #include <EASTL/fixed_vector.h>
 #include <GVMRHI/Private/ArgumentPagePool.hpp>
 #include <GVMRHI/Private/RenderPassRecorder.hpp>
@@ -39,6 +40,8 @@ namespace GVM::RHI::Metal
         ~MArguments() override;
         /** Returns the layout that must match the selected pipeline before any native command is recorded. */
         const PipelineLayout &getLayout() const { return mLayout; }
+        /// Returns canonical native allocation ranges retained by this immutable argument snapshot.
+        const eastl::vector<MQueueAccess> &queueAccesses() const;
         /** Returns the already encoded values, addresses, and byte lengths. */
         eastl::span<const uint8_t> getBytes() const { return mBytes; }
         /** Declares the buffer and texture access and stage visibility prepared for this snapshot. */
@@ -54,6 +57,7 @@ namespace GVM::RHI::Metal
     private:
         /** Retains a captured GPU object and prepares its immutable stage and access requirements once. */
         void retainResource(NS::Object &allocation, MTL::Resource *resource, MTL::ResourceUsage usage, ShaderStageFlags visibility);
+        eastl::vector<MQueueAccess> mQueueAccesses;
         PipelineLayout mLayout;
         eastl::fixed_vector<uint8_t, 128> mBytes;
         eastl::fixed_vector<MArgumentResourceUse, 8> mResources;

@@ -41,6 +41,7 @@ target_sources(
         VKRenderPipeline.cpp
         VKResourceLifetime.cpp
         VKResourceRegistry.cpp
+        VKQueueFrontier.cpp
         VKResourceStateDB.cpp
         VKRetireManager.cpp
         VKSampler.cpp

@@ -83,6 +83,10 @@ namespace GVM::RHI::Vulkan
         template <class State>
         bool equalBufferAccess(const State &a, const State &b)
         {
+            if constexpr (requires { a.frontier; })
+            {
+                return a.access == b.access && a.frontier == b.frontier;
+            }
             return a.access == b.access;
         }
 
@@ -104,7 +108,7 @@ namespace GVM::RHI::Vulkan
         /// Tests whether image ranges share the same layout transition and dependency scopes.
         bool sameImageDependency(const vk::ImageMemoryBarrier2 &a, const vk::ImageMemoryBarrier2 &b)
         {
-            return a.image == b.image && a.oldLayout == b.oldLayout && a.newLayout == b.newLayout && a.srcStageMask == b.srcStageMask && a.dstStageMask == b.dstStageMask && a.srcAccessMask == b.srcAccessMask && a.dstAccessMask == b.dstAccessMask && a.srcQueueFamilyIndex == b.srcQueueFamilyIndex && a.dstQueueFamilyIndex == b.dstQueueFamilyIndex && a.subresourceRange.aspectMask == b.subresourceRange.aspectMask;
+            return a.srcQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED && a.image == b.image && a.oldLayout == b.oldLayout && a.newLayout == b.newLayout && a.srcStageMask == b.srcStageMask && a.dstStageMask == b.dstStageMask && a.srcAccessMask == b.srcAccessMask && a.dstAccessMask == b.dstAccessMask && a.srcQueueFamilyIndex == b.srcQueueFamilyIndex && a.dstQueueFamilyIndex == b.dstQueueFamilyIndex && a.subresourceRange.aspectMask == b.subresourceRange.aspectMask;
         }
 
         /// Compacts adjacent mip ranges after their layer ranges have been coalesced.
@@ -506,7 +510,12 @@ namespace GVM::RHI::Vulkan
                     continue;
                 }
                 vk::MemoryBarrier2 dependency{};
-                if (resolveAccess(range.access, summary.entry, false, dependency))
+                const bool transfer = state.advanceFrontier(range.frontier, summary.exit.hasProducer);
+                if (transfer)
+                {
+                    range.access = {};
+                }
+                if (resolveAccess(range.access, summary.entry, false, dependency) || transfer)
                 {
                     vk::BufferMemoryBarrier2 barrier{};
                     barrier.srcStageMask = dependency.srcStageMask;
@@ -517,6 +526,10 @@ namespace GVM::RHI::Vulkan
                     barrier.buffer = buffer.getNativeBuffer();
                     barrier.offset = range.offset;
                     barrier.size = range.size;
+                    if (transfer)
+                    {
+                        state.transferOwnership(barrier, buffer);
+                    }
                     buffers.push_back(barrier);
                 }
                 // Read-only bodies must keep the incoming producer and its established visibility.
@@ -562,7 +575,13 @@ namespace GVM::RHI::Vulkan
                         auto &cell = history.subresources[index];
                         vk::MemoryBarrier2 dependency{};
                         const bool exclusive = summary.exclusiveEntry && isReadOnlyAccess(summary.entry.accesses);
-                        if (resolveAccess(cell.access, summary.entry, cell.layout != summary.entryLayout || exclusive, dependency))
+                        const bool layoutChange = cell.layout != summary.entryLayout;
+                        const bool transfer = state.advanceFrontier(cell.frontier, layoutChange || summary.exit.hasProducer);
+                        if (transfer)
+                        {
+                            cell.access = {};
+                        }
+                        if (resolveAccess(cell.access, summary.entry, layoutChange || exclusive, dependency) || transfer)
                         {
                             vk::ImageMemoryBarrier2 barrier{};
                             barrier.srcStageMask = dependency.srcStageMask;
@@ -574,6 +593,10 @@ namespace GVM::RHI::Vulkan
                             barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
                             barrier.image = texture.getNativeImage();
                             barrier.subresourceRange = {local.planeAspects[plane], mip, 1, layer, 1};
+                            if (transfer)
+                            {
+                                state.transferOwnership(barrier, texture);
+                            }
                             appendImageBarrier(images, barrier);
                         }
                         if (summary.exit.hasProducer)

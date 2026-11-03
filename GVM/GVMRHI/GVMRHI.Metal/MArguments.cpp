@@ -47,6 +47,7 @@ namespace GVM::RHI::Metal
             std::memcpy(mBytes.data() + field.lengthOffset, &length, sizeof(length));
             if (field.visibility != 0)
             {
+                mQueueAccesses.push_back({&native, range.offset, length, field.type == BufferBindingType::Storage});
                 retainResource(native, &native, field.type == BufferBindingType::Storage ?
                     MTL::ResourceUsageRead | MTL::ResourceUsageWrite : MTL::ResourceUsageRead, field.visibility);
             }
@@ -93,6 +94,8 @@ namespace GVM::RHI::Metal
                 handle = view->getResourceId();
                 if (field.entry.visibility != 0)
                 {
+                    mQueueAccesses.push_back({parentTexture->getNativeTexture(), 0, UINT64_MAX,
+                        storage && field.entry.storageTexture.access != StorageTextureAccess::ReadOnly});
                     auto *native = view->getNativeTextureView();
                     retainResource(*native, native, storage ? MTL::ResourceUsageRead | MTL::ResourceUsageWrite : MTL::ResourceUsageRead,
                         field.entry.visibility);
@@ -146,6 +149,11 @@ namespace GVM::RHI::Metal
         {
             mPool->removeSnapshotBytes(mReserved);
         }
+    }
+
+    const eastl::vector<MQueueAccess> &MArguments::queueAccesses() const
+    {
+        return mQueueAccesses;
     }
 
     void MArguments::retainResource(NS::Object &allocation, MTL::Resource *resource, MTL::ResourceUsage usage, ShaderStageFlags visibility)

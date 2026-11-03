@@ -1,5 +1,10 @@
 #include "VKResourceStateDB.hpp"
 #include "VKBuffer.hpp"
+#include "VKQueue.hpp"
+#include "VKCommandEncoder.hpp"
+#include "VKQuerySet.hpp"
+#include "VKDevice.hpp"
+#include <EASTL/algorithm.h>
 #include "VKBufferRangeStateUtils.hpp"
 #include "VKSyncUtils.hpp"
 #include "VKTexture.hpp"
@@ -158,6 +163,7 @@ namespace GVM::RHI::Vulkan
 
     void VKResourceStateDB::recordExternalTextureState(VKTexture &texture, TextureAspectFlags aspect, uint32_t mip, uint32_t mipCount, uint32_t layer, uint32_t layerCount, vk::ImageLayout layout, vk::PipelineStageFlags2 stages, vk::AccessFlags2 accesses)
     {
+        ScopedLock submitLock(texture.getDevice().submissionMutex());
         auto &state = editTexture(texture);
         const auto range = resolveTextureSubresourceRange(&texture, aspect, mip, mipCount, layer, layerCount);
         for (size_t plane = 0; plane < state.planeAspects.size(); ++plane)
@@ -219,22 +225,131 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mMutex);
         mBuffers.clear();
         mTextures.clear();
+        mAcceptedRelease = 0;
+        mRelease.images.clear();
+        mRelease.buffers.clear();
         mHistory = nullptr;
     }
 
-    void VKResourceStateDB::beginSubmission(VKResourceStateDB &history)
+    void VKResourceStateDB::beginSubmission(VKResourceStateDB &history, VKQueue &queue, uint64_t value)
     {
         if (&history == this || mHistory != nullptr || !mBuffers.empty() || !mTextures.empty())
         {
             throw std::logic_error("A submission resource overlay must start empty and borrow a distinct history.");
         }
         mHistory = &history;
+        mQueue = &queue;
+        mOther = queue.getDevice()->otherQueue(queue);
+        mLane = &queue == queue.getDevice()->getMainQueueImpl() ? 0 : 1;
+        mValue = value;
+    }
+
+    bool VKResourceStateDB::advanceFrontier(VKQueueFrontier &frontier, bool exclusive)
+    {
+        if (mOther == nullptr)
+        {
+            return false;
+        }
+        return frontier.advance(mLane, mQueue->getQueueFamilyIndex(), mValue, exclusive, mForeignWait);
+    }
+
+    namespace
+    {
+        /// Makes matching ownership barriers; the release's timeline signal and acquire's wait use ALL_COMMANDS.
+        template<class Barrier>
+        Barrier makeRelease(Barrier &acquire, uint32_t source, uint32_t destination)
+        {
+            acquire.srcQueueFamilyIndex = source;
+            acquire.dstQueueFamilyIndex = destination;
+            acquire.srcStageMask = {};
+            acquire.srcAccessMask = {};
+            acquire.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+            acquire.dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
+            Barrier release = acquire;
+            release.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+            release.srcAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
+            release.dstStageMask = {};
+            release.dstAccessMask = {};
+            return release;
+        }
+    }
+
+    void VKResourceStateDB::transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer)
+    {
+        if (mRelease.bufferOwners.empty() || mRelease.bufferOwners.back() != buffer.getHandle())
+        {
+            mRelease.bufferOwners.push_back(buffer.getHandle());
+        }
+        mRelease.buffers.push_back(makeRelease(acquire, mOther->getQueueFamilyIndex(), mQueue->getQueueFamilyIndex()));
+    }
+
+    void VKResourceStateDB::transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture)
+    {
+        if (mRelease.imageOwners.empty() || mRelease.imageOwners.back() != texture.getHandle())
+        {
+            mRelease.imageOwners.push_back(texture.getHandle());
+        }
+        mRelease.images.push_back(makeRelease(acquire, mOther->getQueueFamilyIndex(), mQueue->getQueueFamilyIndex()));
+    }
+
+    void VKResourceStateDB::prepareQueueWaits(const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits)
+    {
+        if (mOther == nullptr)
+        {
+            return;
+        }
+        for (const auto &encoder : users)
+        {
+            for (const auto &query : static_cast<VKCommandEncoder *>(encoder.get())->getRetainedQuerySets())
+            {
+                auto *native = static_cast<VKQuerySet *>(query.get());
+                mForeignWait = eastl::max(mForeignWait, native->lastUse(1 - mLane));
+                mQueries.push_back(native);
+            }
+        }
+        if (!mRelease.buffers.empty() || !mRelease.images.empty())
+        {
+            // A subsequent acquire failure is terminal. Preserve the accepted release receipt and exact ranges for diagnostics.
+            mForeignWait = mOther->submitOwnershipRelease(mRelease);
+            ScopedLock lock(mHistory->mMutex);
+            mHistory->mAcceptedRelease = mForeignWait;
+            mHistory->mRelease.buffers.swap(mRelease.buffers);
+            mHistory->mRelease.images.swap(mRelease.images);
+        }
+        if (mForeignWait == 0)
+        {
+            return;
+        }
+        const auto wait = mOther->timelineWait(mForeignWait);
+        for (auto &entry : waits)
+        {
+            if (entry.semaphore == wait.semaphore)
+            {
+                entry.value = eastl::max(entry.value, wait.value);
+                entry.stageMask |= wait.stageMask;
+                return;
+            }
+        }
+        waits.push_back(wait);
+    }
+
+    bool VKResourceStateDB::hasUnacquiredRelease() const
+    {
+        ScopedLock lock(mMutex);
+        return mAcceptedRelease != 0;
     }
 
     void VKResourceStateDB::commitSubmission() noexcept
     {
         ScopedLock lock(mMutex);
         ScopedLock historyLock(mHistory->mMutex);
+        for (auto *query : mQueries)
+        {
+            query->acceptUse(mLane, mValue);
+        }
+        mHistory->mAcceptedRelease = 0;
+        mHistory->mRelease.buffers.clear();
+        mHistory->mRelease.images.clear();
         for (auto &entry : mBuffers)
         {
             mHistory->mBuffers.at(entry.first).swap(entry.second);

@@ -206,7 +206,14 @@ namespace GVM::RHI::Vulkan
         VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bufferInfo.size = page.size;
         bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        const uint32_t families[] = {mDevice.getCapabilities().getGraphicsQueueFamilyIndex(), mDevice.computeFamily()};
+        if (families[1] != VK_QUEUE_FAMILY_IGNORED && families[1] != families[0])
+        {
+            // Private argument pages may be recycled on another family after their submission retires.
+            bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            bufferInfo.queueFamilyIndexCount = 2;
+            bufferInfo.pQueueFamilyIndices = families;
+        }
         VmaAllocationCreateInfo allocationInfo{};
         allocationInfo.usage = VMA_MEMORY_USAGE_AUTO;
         allocationInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -235,7 +242,12 @@ namespace GVM::RHI::Vulkan
     bool VKArgumentPagePool::waitForSubmittedWork()
     {
         VKQueue *queue = mDevice.getMainQueueImpl();
-        return queue != nullptr && queue->waitForOldestPendingSubmission();
+        if (queue == nullptr)
+        {
+            return false;
+        }
+        auto *other = mDevice.otherQueue(*queue);
+        return queue->waitForOldestPendingSubmission() || (other != nullptr && other->waitForOldestPendingSubmission());
     }
 
     VKArgumentStorage::VKArgumentStorage(VKDevice &device) : mDevice(device), mPool(device.getArgumentResources().getPagePool()) {}

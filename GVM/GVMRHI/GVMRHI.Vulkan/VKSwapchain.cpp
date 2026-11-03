@@ -1011,6 +1011,8 @@ namespace
 
     void VKSwapchain::presentDirectSwapchainImage()
     {
+        // Queue presentation and ownership releases on the graphics timeline require common host synchronization.
+        ScopedLock queueLock(mDevice->submissionMutex());
         GVMCpuProbeScopeDetail(
             this,
             SwapchainLogCategory,
@@ -1204,6 +1206,7 @@ namespace
             GVMLogWarn(this, SwapchainLogCategory, "event=swapchain_wait_all_present_frames_queue_idle_begin");
             try
             {
+                ScopedLock queueLock(mDevice->submissionMutex());
                 (void)mQueue->getNativeQueue().waitIdle();
             }
             catch (const vk::DeviceLostError &error)

@@ -53,6 +53,15 @@ namespace GVM::RHI::Vulkan
         mLastFrontNotReadyLoggedAgeMs = 0.0;
     }
 
+    void VKSubmissionManager::discardLostSubmissions(const eastl::function<void(InFlightSubmission &)> &discard)
+    {
+        for (auto &submission : mInFlightSubmissions)
+        {
+            discard(submission);
+        }
+        mInFlightSubmissions.clear();
+    }
+
     void VKSubmissionManager::destroy()
     {
         mInFlightSubmissions.clear();
@@ -165,6 +174,17 @@ namespace GVM::RHI::Vulkan
             ++mPresentInternalSubmitCount;
         }
         return submissionId;
+    }
+
+    uint64_t VKSubmissionManager::nextValue() const
+    {
+        return mNextSubmissionId;
+    }
+
+    vk::SemaphoreSubmitInfo VKSubmissionManager::timelineWait(uint64_t value) const
+    {
+        return vk::SemaphoreSubmitInfo{}.setSemaphore(mTimeline->nativeSemaphore()).setValue(value)
+            .setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
     }
 
     size_t VKSubmissionManager::getInFlightCount() const

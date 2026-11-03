@@ -35,6 +35,8 @@ namespace GVM::Core::Private
         eastl::vector<RHI::CommandEncoder> mEncoders;
         eastl::vector<bool> mRecorded;
         eastl::vector<PassBatch> mBatches;
+        eastl::vector<uint32_t> mPassQueues;
+        bool mMultipleQueues = false;
         eastl::vector<eastl::optional<RHI::Submission>> mSubmissions;
         eastl::vector<bool> mCompleted;
         eastl::function<void(uint32_t)> mProgress;

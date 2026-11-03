@@ -1,5 +1,7 @@
 #include "VKSubmissionTimeline.hpp"
 #include "VKDevice.hpp"
+#include <chrono>
+#include <EASTL/algorithm.h>
 
 namespace GVM::RHI::Vulkan
 {
@@ -42,7 +44,24 @@ namespace GVM::RHI::Vulkan
             }
             const auto semaphore = mSemaphore.get();
             const auto waitInfo = vk::SemaphoreWaitInfo{}.setSemaphores(semaphore).setValues(value);
-            return mDevice.waitSemaphores(waitInfo, timeoutNanoseconds) == vk::Result::eSuccess;
+            const auto started = std::chrono::steady_clock::now();
+            uint64_t remaining = timeoutNanoseconds;
+            for (;;)
+            {
+                if (mDevice.waitSemaphores(waitInfo, eastl::min(remaining, uint64_t{50'000'000})) == vk::Result::eSuccess)
+                {
+                    mLostState->throwIfLost("Submission::wait");
+                    return true;
+                }
+                mLostState->throwIfLost("Submission::wait");
+                const auto elapsed = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - started).count());
+                if (elapsed >= timeoutNanoseconds)
+                {
+                    return false;
+                }
+                remaining = timeoutNanoseconds - elapsed;
+            }
         }
         catch (const vk::DeviceLostError &error)
         {

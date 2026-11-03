@@ -12,6 +12,7 @@
 #include <Metal/Metal.hpp>
 #include <Utils/ResourcePool.hpp>
 #include <dispatch/dispatch.h>
+#include "MQueueHistory.hpp"
 
 #include "MUtilShaders/MIndirectBufferConvertShaderExecutor.hpp"
 namespace GVM::RHI::Metal
@@ -23,6 +24,12 @@ namespace GVM::RHI::Metal
         MDevice();
         void init(MInstance *instance);
         virtual Queue getMainQueue() const override;
+        /// Lazily acquires the preferred compute queue, keeping graphics, overlay and unavailable requests canonical.
+        Queue getQueue(const QueueDescriptor &descriptor) override;
+        /// Returns the device submission history shared by managed Metal queues.
+        MQueueHistory &queueHistory();
+        /// Reports whether this queue participates in the managed two-queue hazard domain under the submission lock.
+        bool tracksQueue(const MQueue &queue) const;
         virtual TimestampQuerySupport getTimestampQuerySupport() const override;
         virtual PassCounterQuerySupport getPassCounterQuerySupport() const override;
         /// Returns Metal device memory topology as reported by the selected native device.
@@ -126,6 +133,9 @@ namespace GVM::RHI::Metal
         DeviceMemoryProperties mMemoryProperties = {};
         RuntimeDiagnosticsOverlayConfig mDiagnosticsOverlayConfig = {};
         MQueue *mMainQueue = nullptr;
+        MQueue *mComputeQueue = nullptr;
+        MQueueHistory mQueueHistory;
+        bool mComputeUnavailable = false;
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
         Queue mDiagnosticsOverlayQueue = nullptr;
 #endif

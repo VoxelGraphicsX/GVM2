@@ -353,19 +353,60 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
         GVM::RHI::destroyInstance(overlayInstance);
     }
 
-    /// Verifies preferred queue selection preserves canonical identity on current single-queue backends.
-    TEST_F(RhiSmokeTest, PreferredQueuesAliasTheCanonicalQueue)
+    /// Verifies queue preferences have stable identities and unsupported indices fall back to the graphics queue.
+    TEST_F(RhiSmokeTest, PreferredQueuesAreStableAndUnsupportedIndicesFallBack)
     {
         using namespace GVM::RHI;
         const auto mainQueue = device->getMainQueue();
+        EXPECT_EQ(device->getQueue({.prefer = QueuePreference::Graphics}), mainQueue);
         for (QueuePreference preference : {QueuePreference::Graphics, QueuePreference::Compute, QueuePreference::Transfer})
         {
             const auto preferred = device->getQueue({.prefer = preference});
-            EXPECT_EQ(preferred, mainQueue);
+            EXPECT_NE(preferred, nullptr);
             EXPECT_EQ(device->getQueue({.prefer = preference}), preferred);
             EXPECT_EQ(device->getQueue({.prefer = preference, .index = 4096}), mainQueue);
         }
         EXPECT_THROW(device->getQueue({.prefer = static_cast<QueuePreference>(255)}), std::invalid_argument);
+    }
+
+    /// Exercises implicit RAW, WAR and WAW ordering across real queues without flushing a producer's pending writes.
+    TEST_F(RhiSmokeTest, CrossQueueCopiesPreserveAcceptedRangeHistory)
+    {
+        using namespace GVM::RHI;
+        auto *first = device->getMainQueue();
+        auto *second = device->getQueue({.prefer = QueuePreference::Compute});
+        if (first == second)
+        {
+            GTEST_SKIP() << "Only one queue is exposed by this device.";
+        }
+        const std::array<uint32_t, 4> initial{3, 5, 7, 11};
+        const std::array<uint32_t, 4> replacement{13, 17, 19, 23};
+        auto source = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = sizeof(initial)});
+        auto snapshot = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = sizeof(initial)});
+        first->writeBuffer({source, 0, sizeof(initial)}, initial.data(), sizeof(initial));
+        first->submit({});
+        first->writeBuffer({source, 0, sizeof(initial)}, replacement.data(), sizeof(initial));
+        auto encoder = second->createCommandEncoder();
+        auto copy = encoder->beginBlitPass({});
+        copy->copyBufferToBuffer({source, 4, 8}, {snapshot, 0, 8});
+        copy->end();
+        encoder->end();
+        EXPECT_THROW(first->submit({encoder}), std::invalid_argument);
+        EXPECT_THROW(first->submit({encoder}, {}), std::invalid_argument);
+        second->submit({encoder});
+        auto saved = first->readBufferAsync({snapshot, 0, 8});
+        auto current = first->readBufferAsync({source, 0, sizeof(initial)});
+        ASSERT_TRUE(first->submit({}, {}).wait(5'000'000'000ull));
+        saved->wait();
+        current->wait();
+        const auto originalBytes = saved->getData();
+        const auto updatedBytes = current->getData();
+        ASSERT_EQ(originalBytes.size(), 8u);
+        ASSERT_EQ(updatedBytes.size(), sizeof(initial));
+        EXPECT_EQ(std::memcmp(originalBytes.data(), initial.data() + 1, 8), 0);
+        EXPECT_EQ(std::memcmp(updatedBytes.data(), replacement.data(), sizeof(initial)), 0);
+        device->freeBuffer(snapshot);
+        device->freeBuffer(source);
     }
 
     /// Verifies an empty batch still produces a GPU completion and repeated waits remain valid.

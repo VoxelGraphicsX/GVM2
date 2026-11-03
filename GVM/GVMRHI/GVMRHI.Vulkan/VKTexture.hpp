@@ -48,6 +48,8 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]]
         bool isInSteadyStateLayout() const;
 
+        /// Identifies externally owned swapchain images, which must use the presentation queue.
+        bool isExternalImage() const;
         [[nodiscard]] bool is3D() const;
         [[nodiscard]] const TextureDescriptor &getDescriptor() const;
 

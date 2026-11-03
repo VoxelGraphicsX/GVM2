@@ -58,4 +58,13 @@ namespace GVM::RHI::Vulkan
     {
         return mQueryPool.get();
     }
+    uint64_t VKQuerySet::lastUse(uint32_t lane) const
+    {
+        return mLastUse[lane];
+    }
+
+    void VKQuerySet::acceptUse(uint32_t lane, uint64_t value)
+    {
+        mLastUse[lane] = value;
+    }
 } // namespace GVM::RHI::Vulkan

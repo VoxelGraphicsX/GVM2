@@ -18,6 +18,29 @@
 
 namespace
 {
+    PFN_vkQueueSubmit2 nativeQueueSubmit = nullptr;
+    VkQueue rejectedQueue = VK_NULL_HANDLE;
+
+    PFN_vkGetSemaphoreCounterValue nativeCounterValue = nullptr;
+    VkSemaphore heldTimeline = VK_NULL_HANDLE;
+
+    /// Withholds one queue's retirement observation while every other timeline reports its real driver value.
+    VKAPI_ATTR VkResult VKAPI_CALL holdRetirement(VkDevice device, VkSemaphore semaphore, uint64_t *value)
+    {
+        const auto result = nativeCounterValue(device, semaphore, value);
+        if (result == VK_SUCCESS && semaphore == heldTimeline)
+        {
+            *value = 0;
+        }
+        return result;
+    }
+
+    /// Rejects only the consumer queue while forwarding real ownership releases on the producer queue.
+    VKAPI_ATTR VkResult VKAPI_CALL rejectAcquireSubmit(VkQueue queue, uint32_t count, const VkSubmitInfo2 *info, VkFence fence)
+    {
+        return queue == rejectedQueue ? VK_ERROR_OUT_OF_HOST_MEMORY : nativeQueueSubmit(queue, count, info, fence);
+    }
+
     /** Owns a headless device for constructor Args execution and native allocation lifetime checks. */
     class ConstructorArgumentsTest : public GVM::Tests::ShaderReadbackTest
     {
@@ -63,15 +86,21 @@ namespace
     }
 
     /** Records one immutable task without submitting it, allowing tests to choose submission order independently. */
-    GVM::RHI::CommandEncoder recordArgumentDispatch(GVM::RHI::DeviceImpl &device, const GVM::Core::ComputePassTaskDescriptor &task)
+    GVM::RHI::CommandEncoder recordArgumentDispatch(GVM::RHI::QueueImpl &queue, const GVM::Core::ComputePassTaskDescriptor &task)
     {
-        auto encoder = device.getMainQueue()->createCommandEncoder();
+        auto encoder = queue.createCommandEncoder();
         auto pass = encoder->beginComputePass({});
         task.dispatchFn(pass);
         pass->end();
         encoder->end();
         return encoder;
     }
+    /// Records a constructor Args dispatch on the canonical queue for single-queue fixtures.
+    GVM::RHI::CommandEncoder recordArgumentDispatch(GVM::RHI::DeviceImpl &device, const GVM::Core::ComputePassTaskDescriptor &task)
+    {
+        return recordArgumentDispatch(*device.getMainQueue(), task);
+    }
+
 }
 
 TEST_F(ConstructorArgumentsTest, CapturesReplacementValuesAndRangesBeforeDeferredRecording)
@@ -2113,6 +2142,120 @@ TEST_F(ConstructorArgumentsTest, SamplesStorageTextureWritesInFinalSubmissionOrd
     device->getMainQueue()->submit({samePass});
     proxy->graphicsQueue(0)->readBuffer(output, result.data(), sizeof(result))->submit();
     EXPECT_EQ(result[0], 111u);
+}
+
+/// Checks write, sample, overwrite and sample across real native queues on a single mip with no caller-supplied waits.
+TEST_F(ConstructorArgumentsTest, CrossQueueImageOwnershipPreservesSampledValues)
+{
+    using namespace GVM::RHI;
+    auto *graphics = device->getMainQueue();
+    auto *compute = device->getQueue({.prefer = QueuePreference::Compute});
+    if (graphics == compute)
+    {
+        GTEST_SKIP() << "A second queue is unavailable.";
+    }
+    GVM::Core::DeviceProxy proxy(device);
+    const auto image = createArgumentTexture(*device, 2);
+    const auto view = image->createView({.baseMipLevel = 1, .mipLevelCount = 1});
+    const auto sampler = createArgumentSampler(*device);
+    const auto output = createArgumentOutput(proxy);
+    auto writer = proxy->createComputeClass<ArgumentStorageTextureCompute>(view, float4(0));
+    auto reader = proxy->createComputeClass<ArgumentTextureCompute>(view, sampler, BufferRange(output), 0u);
+    for (uint32_t index = 0; index < 2; ++index)
+    {
+        compute->submit({recordArgumentDispatch(*compute, writer->dispatchThreads(view, float4(index == 0 ? 0.8f : 0.4f, 0, 0, 1), 1, 1, 1))});
+        graphics->submit({recordArgumentDispatch(*graphics, reader->dispatchThreads(view, sampler, BufferRange(output, index * 4, 4), 3u, 1, 1, 1))});
+    }
+    eastl::array<uint32_t, 2> observed{};
+    proxy->graphicsQueue(0)->readBuffer(BufferRange(output, 0, sizeof(observed)), observed.data(), sizeof(observed))->submit();
+    EXPECT_EQ(observed, (eastl::array<uint32_t, 2>{207, 105}));
+}
+
+/// Retains the accepted source release on a rejected acquire; no later consumer or waiter may report success.
+TEST_F(ConstructorArgumentsTest, RejectedAcquireRetainsAcceptedRelease)
+{
+    using namespace GVM::RHI;
+    auto *graphics = dynamic_cast<Vulkan::VKQueue *>(device->getMainQueue());
+    auto *compute = dynamic_cast<Vulkan::VKQueue *>(device->getQueue({.prefer = QueuePreference::Compute}));
+    if (graphics == nullptr || compute == nullptr || graphics->getQueueFamilyIndex() == compute->getQueueFamilyIndex())
+    {
+        GTEST_SKIP() << "Two Vulkan queue families are required.";
+    }
+    auto buffer = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 16});
+    graphics->fillBuffer({buffer, 0, 16}, 7);
+    const auto accepted = graphics->submit({}, {});
+    auto encoder = compute->createCommandEncoder();
+    auto pass = encoder->beginBlitPass({});
+    pass->fillBuffer({buffer, 0, 16}, 9);
+    pass->end();
+    encoder->end();
+    rejectedQueue = compute->getNativeQueue();
+    nativeQueueSubmit = VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2;
+    VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2 = &rejectAcquireSubmit;
+    EXPECT_THROW(compute->submit({encoder}, {}), DeviceLostError);
+    VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2 = nativeQueueSubmit;
+    rejectedQueue = VK_NULL_HANDLE;
+    EXPECT_TRUE(graphics->getResourceStateDB().hasUnacquiredRelease());
+    EXPECT_TRUE(device->getLostInfo().has_value());
+    EXPECT_THROW(accepted.wait(0), DeviceLostError);
+    EXPECT_THROW(graphics->submit({}, {}), DeviceLostError);
+    device->freeBuffer(buffer);
+}
+
+/// Keeps a freed buffer physically live until both independent queue uses have been observed as retired.
+TEST_F(ConstructorArgumentsTest, CrossQueueBufferRetiresAfterBothTimelines)
+{
+    using namespace GVM::RHI;
+    auto *graphics = dynamic_cast<Vulkan::VKQueue *>(device->getMainQueue());
+    auto *compute = dynamic_cast<Vulkan::VKQueue *>(device->getQueue({.prefer = QueuePreference::Compute}));
+    if (compute == nullptr || graphics == nullptr || graphics == compute)
+    {
+        GTEST_SKIP() << "Two Vulkan timelines are required.";
+    }
+    auto buffer = device->createBuffer({.usage = BufferUsage::CopyDst, .size = 32});
+    graphics->fillBuffer({buffer, 0, 16}, 1);
+    compute->fillBuffer({buffer, 16, 16}, 2);
+    const auto first = graphics->submit({}, {});
+    heldTimeline = compute->timelineWait(0).semaphore;
+    nativeCounterValue = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetSemaphoreCounterValue;
+    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetSemaphoreCounterValue = &holdRetirement;
+    Submission second;
+    try
+    {
+        second = compute->submit({}, {});
+        device->freeBuffer(buffer);
+        EXPECT_TRUE(first.wait(5'000'000'000));
+        graphics->submit({});
+        EXPECT_FALSE(buffer.isNull());
+    }
+    catch (...)
+    {
+        VULKAN_HPP_DEFAULT_DISPATCHER.vkGetSemaphoreCounterValue = nativeCounterValue;
+        throw;
+    }
+    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetSemaphoreCounterValue = nativeCounterValue;
+    ASSERT_TRUE(second.wait(5'000'000'000));
+    graphics->submit({});
+    EXPECT_TRUE(buffer.isNull());
+}
+
+/// Verifies an established image layout permits two same-family readers and that a later writer joins both timelines.
+TEST(VulkanQueueFrontierTests, ReadersSharePreparedLayoutAndWriterJoins)
+{
+    GVM::RHI::Vulkan::VKQueueFrontier frontier;
+    uint64_t wait = 0;
+    EXPECT_FALSE(frontier.advance(0, 3, 2, true, wait));
+    EXPECT_FALSE(frontier.advance(0, 3, 4, false, wait));
+    EXPECT_FALSE(frontier.advance(1, 3, 7, false, wait));
+    EXPECT_EQ(wait, 2u);
+    wait = 0;
+    EXPECT_FALSE(frontier.advance(0, 3, 11, false, wait));
+    EXPECT_EQ(wait, 0u);
+    EXPECT_FALSE(frontier.advance(0, 3, 13, true, wait));
+    EXPECT_EQ(wait, 7u);
+    wait = 0;
+    EXPECT_TRUE(frontier.advance(1, 5, 19, false, wait));
+    EXPECT_EQ(wait, 13u);
 }
 
 /// Reconciles an initial sampled read with later storage writes and sampled reads without assuming recording-time image layouts.
