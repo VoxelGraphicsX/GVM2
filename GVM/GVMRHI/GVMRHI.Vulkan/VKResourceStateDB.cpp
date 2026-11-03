@@ -22,18 +22,44 @@ namespace GVM::RHI::Vulkan
         auto [it, inserted] = mBuffers.try_emplace(&buffer);
         if (inserted)
         {
-            it->second.push_back({&buffer, 0, buffer.getStorageSize(), {}});
+            if (mHistory != nullptr)
+            {
+                ScopedLock historyLock(mHistory->mMutex);
+                auto [history, created] = mHistory->mBuffers.try_emplace(&buffer);
+                if (created)
+                {
+                    history->second.push_back({&buffer, 0, buffer.getStorageSize(), {}});
+                }
+                it->second = history->second;
+            }
+            else
+            {
+                it->second.push_back({&buffer, 0, buffer.getStorageSize(), {}});
+            }
         }
         return it->second;
     }
 
-    VKResourceTextureState &VKResourceStateDB::editTexture(VKTexture &texture)
+    VKResourceTextureState &VKResourceStateDB::editTexture(const VKTexture &texture)
     {
         ScopedLock lock(mMutex);
         auto [it, inserted] = mTextures.try_emplace(&texture);
         if (inserted)
         {
-            it->second = makeTextureState(texture);
+            if (mHistory != nullptr)
+            {
+                ScopedLock historyLock(mHistory->mMutex);
+                auto [history, created] = mHistory->mTextures.try_emplace(&texture);
+                if (created)
+                {
+                    history->second = makeTextureState(texture);
+                }
+                it->second = history->second;
+            }
+            else
+            {
+                it->second = makeTextureState(texture);
+            }
         }
         return it->second;
     }
@@ -193,5 +219,33 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mMutex);
         mBuffers.clear();
         mTextures.clear();
+        mHistory = nullptr;
+    }
+
+    void VKResourceStateDB::beginSubmission(VKResourceStateDB &history)
+    {
+        if (&history == this || mHistory != nullptr || !mBuffers.empty() || !mTextures.empty())
+        {
+            throw std::logic_error("A submission resource overlay must start empty and borrow a distinct history.");
+        }
+        mHistory = &history;
+    }
+
+    void VKResourceStateDB::commitSubmission() noexcept
+    {
+        ScopedLock lock(mMutex);
+        ScopedLock historyLock(mHistory->mMutex);
+        for (auto &entry : mBuffers)
+        {
+            mHistory->mBuffers.at(entry.first).swap(entry.second);
+        }
+        for (auto &entry : mTextures)
+        {
+            auto &target = mHistory->mTextures.at(entry.first);
+            target.planeAspects.swap(entry.second.planeAspects);
+            eastl::swap(target.subresourceCountPerPlane, entry.second.subresourceCountPerPlane);
+            target.subresources.swap(entry.second.subresources);
+        }
+        mHistory = nullptr;
     }
 } // namespace GVM::RHI::Vulkan

@@ -50,7 +50,7 @@ namespace GVM::RHI::Vulkan
 
         mCommandBuffer = mCommandContext->commandBuffer;
         mDevice->setDebugObjectName(vk::ObjectType::eCommandBuffer, reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(mCommandBuffer)), "GVM command buffer");
-        mTaskDependencyResolver.init(queue, queue.getResourceStateDB());
+        mTaskDependencyResolver.init(queue);
         mTransientDescriptorAllocator.init(mDevice);
         mPassSummaryCount = 0u;
 
@@ -74,7 +74,7 @@ namespace GVM::RHI::Vulkan
 
     bool VKCommandEncoder::isEnded() const
     {
-        return mEnded;
+        return mEnded && mNativeEncoded;
     }
 
     bool VKCommandEncoder::isSubmitted() const
@@ -211,15 +211,16 @@ namespace GVM::RHI::Vulkan
         }
 
         mEnded = true;
+        encodeNative();
     }
 
     void VKCommandEncoder::appendPass(RenderPassEncoder pass) { mCommands.push_back(pass); }
     void VKCommandEncoder::appendPass(ComputePassEncoder pass) { mCommands.push_back(pass); }
     void VKCommandEncoder::appendPass(BlitPassEncoder pass) { mCommands.push_back(pass); }
 
-    void VKCommandEncoder::encodeNative(Texture presentTexture)
+    void VKCommandEncoder::encodeNative()
     {
-        if (!mEnded || mSubmitted)
+        if (!mEnded || mSubmitted || mNativeEncodingFailed)
         {
             throw std::logic_error("Only a closed, unsubmitted command encoder can be lowered.");
         }
@@ -227,7 +228,9 @@ namespace GVM::RHI::Vulkan
         {
             return;
         }
-        mTaskDependencyResolver.init(*mQueue, mQueue->getResourceStateDB());
+        // A failed native recording is terminal for this encoder; its pool is reclaimed on abandonment.
+        mNativeEncodingFailed = true;
+        mTaskDependencyResolver.init(*mQueue);
         vk::CommandBufferBeginInfo beginInfo = {};
         beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
         mCommandBuffer.begin(beginInfo);
@@ -264,13 +267,61 @@ namespace GVM::RHI::Vulkan
                     vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);
             }
         }
-        if (!presentTexture.isNull())
-        {
-            mTaskDependencyResolver.synchronizeTextureSubresources(mCommandBuffer, *static_cast<VKTexture *>(presentTexture.get()), vk::ImageLayout::ePresentSrcKHR, {}, {});
-        }
         mTaskDependencyResolver.finalize(mCommandBuffer);
         mCommandBuffer.end();
         mNativeEncoded = true;
+        mNativeEncodingFailed = false;
+    }
+
+    void VKCommandEncoder::recordSubmissionBarriers(vk::CommandBuffer &commandBuffer,
+        const eastl::vector<vk::BufferMemoryBarrier2> &buffers, const eastl::vector<vk::ImageMemoryBarrier2> &images)
+    {
+        if (!commandBuffer)
+        {
+            vk::CommandBufferAllocateInfo allocation{};
+            allocation.commandPool = mCommandContext->commandPool.get();
+            allocation.level = vk::CommandBufferLevel::ePrimary;
+            allocation.commandBufferCount = 1;
+            commandBuffer = mDevice->getNativeDevice().allocateCommandBuffers(allocation).front();
+        }
+        vk::CommandBufferBeginInfo begin{};
+        begin.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+        commandBuffer.begin(begin);
+        vk::DependencyInfo dependency{};
+        dependency.bufferMemoryBarrierCount = static_cast<uint32_t>(buffers.size());
+        dependency.pBufferMemoryBarriers = buffers.data();
+        dependency.imageMemoryBarrierCount = static_cast<uint32_t>(images.size());
+        dependency.pImageMemoryBarriers = images.data();
+        commandBuffer.pipelineBarrier2(dependency);
+        commandBuffer.end();
+    }
+
+    void VKCommandEncoder::appendSubmissionCommands(VKResourceStateDB &state, eastl::vector<vk::CommandBuffer> &commands)
+    {
+        if (!mNativeEncoded || mSubmitted)
+        {
+            throw std::logic_error("Submission reconciliation requires a lowered, unsubmitted encoder.");
+        }
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        mTaskDependencyResolver.prepareSubmission(state, buffers, images);
+        if (!buffers.empty() || !images.empty())
+        {
+            recordSubmissionBarriers(mCommandContext->prologue, buffers, images);
+            commands.push_back(mCommandContext->prologue);
+        }
+        commands.push_back(mCommandBuffer);
+    }
+
+    void VKCommandEncoder::appendPresentTransition(VKResourceStateDB &state, const VKTexture &texture, eastl::vector<vk::CommandBuffer> &commands)
+    {
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        mTaskDependencyResolver.preparePresent(state, texture, images);
+        if (!images.empty())
+        {
+            recordSubmissionBarriers(mCommandContext->epilogue, {}, images);
+            commands.push_back(mCommandContext->epilogue);
+        }
     }
 
     void VKCommandEncoder::retainBindGroup(BindGroup bindGroup)
@@ -498,6 +549,10 @@ namespace GVM::RHI::Vulkan
 
     void VKCommandEncoder::ensureRecordable(const char *apiName) const
     {
+        if (mNativeEncodingFailed)
+        {
+            throw std::logic_error((eastl::string(apiName) + " cannot reuse a failed native recording.").c_str());
+        }
         if (!mBegan || mDevice == nullptr || mQueue == nullptr)
         {
             throw std::runtime_error((eastl::string(apiName) + " was called on an uninitialized Vulkan command encoder.").c_str());

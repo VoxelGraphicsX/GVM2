@@ -56,7 +56,7 @@ namespace GVM::RHI::Vulkan
         /// Returns mutable byte-range state for the buffer.
         eastl::vector<VKResourceBufferState> &editBuffer(VKBuffer &buffer);
         /// Returns mutable image state for the texture.
-        VKResourceTextureState &editTexture(VKTexture &texture);
+        VKResourceTextureState &editTexture(const VKTexture &texture);
         /// Returns an aggregate snapshot for existing backend diagnostics.
         bool tryGetCurrentBufferState(const VKBuffer &buffer, VKResourceBufferState &outState) const;
         /// Queries a uniform image range for native presentation operations.
@@ -75,6 +75,10 @@ namespace GVM::RHI::Vulkan
         void discardTextureState(const VKTexture &texture);
         /// Clears resource history when the owning device is initialized or destroyed.
         void reset();
+        /// Starts an empty submission overlay; the caller holds the canonical queue submission lock until commit or destruction.
+        void beginSubmission(VKResourceStateDB &history);
+        /// Publishes preallocated touched entries after native submission is accepted; never allocates or throws.
+        void commitSubmission() noexcept;
 
     private:
         /// Creates the initial undefined cells for a newly encountered image.
@@ -82,5 +86,6 @@ namespace GVM::RHI::Vulkan
         mutable Mutex mMutex;
         eastl::unordered_map<const VKBuffer *, eastl::vector<VKResourceBufferState>> mBuffers;
         eastl::unordered_map<const VKTexture *, VKResourceTextureState> mTextures;
+        VKResourceStateDB *mHistory = nullptr;
     };
 } // namespace GVM::RHI::Vulkan

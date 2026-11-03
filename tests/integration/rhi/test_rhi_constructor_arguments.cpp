@@ -9,6 +9,8 @@
 #include <GVMRHI/GVMRHI.Vulkan/VKBuffer.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKQueue.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKTexture.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKNativeRecordingProbe.hpp>
+#include <thread>
 #if defined(__APPLE__)
 #include <GVMRHI/GVMRHI.Metal/MComputePipeline.hpp>
 #endif
@@ -1484,6 +1486,152 @@ TEST_F(ConstructorArgumentsTest, ReadsBufferWritesInFinalSubmissionOrder)
     EXPECT_EQ(result[1], 161u);
 }
 
+/// Preserves incoming reads, an intermediate write, and its later visibility when native bodies finish in reverse submission order.
+TEST_F(ConstructorArgumentsTest, ReconcilesReadWriteReadBufferBodiesBeforeFragmentReads)
+{
+    GVM::Core::DeviceProxy proxy(device);
+    const auto buffer = createArgumentOutput(proxy);
+    const auto output = createArgumentOutput(proxy);
+    auto writer = proxy->createComputeClass<ArgumentCompute>(GVM::RHI::BufferRange(buffer), makeArgumentData(10));
+    auto reader = proxy->createComputeClass<ArgumentReadCompute>(GVM::RHI::BufferRange(buffer), GVM::RHI::BufferRange(output), 0u);
+    auto raster = proxy->createRenderClass<ArgumentReadRaster>(GVM::RHI::BufferRange(buffer));
+    const auto texture = proxy->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment | GVM::RHI::TextureUsage::CopySrc,
+        .size = {1, 1, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
+    ArgumentRasterTarget target;
+    target.color = texture->createView();
+    auto final = device->getMainQueue()->createCommandEncoder();
+    auto draw = final->beginRenderPass(target.getRenderPassDescriptor());
+    raster->draw(GVM::RHI::BufferRange(buffer), 3, 1, 0, 0).drawFn(draw);
+    draw->end();
+    final->end();
+    auto middle = device->getMainQueue()->createCommandEncoder();
+    auto compute = middle->beginComputePass({});
+    reader->dispatchThreads(GVM::RHI::BufferRange(buffer), GVM::RHI::BufferRange(output, 0, 4), 0u, 1, 1, 1).dispatchFn(compute);
+    writer->dispatchThreads(GVM::RHI::BufferRange(buffer), makeArgumentData(20), 1, 1, 1).dispatchFn(compute);
+    reader->dispatchThreads(GVM::RHI::BufferRange(buffer), GVM::RHI::BufferRange(output, 4, 4), 0u, 1, 1, 1).dispatchFn(compute);
+    compute->end();
+    middle->end();
+    auto first = recordArgumentDispatch(*device,
+        writer->dispatchThreads(GVM::RHI::BufferRange(buffer), makeArgumentData(10), 1, 1, 1));
+    if (instance->getBackend() == GVM::RHI::GraphicsBackend::Vulkan)
+    {
+        EXPECT_FALSE(GVM::RHI::Vulkan::Testing::getCurrentBufferState(device->getMainQueue(), buffer).initialized);
+    }
+    auto *queue = device->getMainQueue();
+    queue->submit({first, middle, final});
+    auto words = queue->readBufferAsync(GVM::RHI::BufferRange(output, 0, 8));
+    auto pixels = queue->readTextureAsync({.texture = texture}, {.bytesPerRow = 4, .rowsPerImage = 1}, {1, 1, 1});
+    queue->submit({});
+    words->wait();
+    pixels->wait();
+    eastl::array<uint32_t, 2> values{};
+    std::memcpy(values.data(), words->getData().data(), sizeof(values));
+    EXPECT_EQ(values[0], 151u);
+    EXPECT_EQ(values[1], 161u);
+    EXPECT_NEAR(pixels->getData()[0], 161u, 1u);
+}
+
+/// Exercises concurrent cold render-pass pipeline aliases and framebuffers while each worker owns its native command pool.
+TEST_F(ConstructorArgumentsTest, RecordsSharedRenderPipelineOnIndependentNativeContexts)
+{
+    if (instance->getBackend() != GVM::RHI::GraphicsBackend::Vulkan)
+    {
+        GTEST_SKIP() << "The native dispatcher and pipeline-cache checks are Vulkan-specific.";
+    }
+    GVM::Core::DeviceProxy proxy(device);
+    const auto input = createArgumentOutput(proxy);
+    const uint32_t expected = 173;
+    auto *queue = device->getMainQueue();
+    queue->writeBuffer(GVM::RHI::BufferRange(input), &expected, sizeof(expected));
+    queue->submit({});
+    auto raster = proxy->createRenderClass<ArgumentReadRaster>(GVM::RHI::BufferRange(input));
+    eastl::array<GVM::RHI::CommandEncoder, 4> encoders;
+    eastl::array<GVM::RHI::Texture, 4> targets;
+    for (size_t index = 0; index < encoders.size(); ++index)
+    {
+        targets[index] = proxy->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment | GVM::RHI::TextureUsage::CopySrc,
+            .size = {1, 1, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
+        ArgumentRasterTarget target;
+        target.color = targets[index]->createView();
+        encoders[index] = queue->createCommandEncoder();
+        auto draw = encoders[index]->beginRenderPass(target.getRenderPassDescriptor());
+        raster->draw(GVM::RHI::BufferRange(input), 3, 1, 0, 0).drawFn(draw);
+        draw->end();
+    }
+    {
+        GVM::RHI::Vulkan::Testing::VKNativeRecordingProbe native(4);
+        eastl::array<std::thread, 4> workers;
+        eastl::array<std::exception_ptr, 4> failures{};
+        for (size_t index = 0; index < workers.size(); ++index)
+        {
+            workers[index] = std::thread([&, index]
+            {
+                try
+                {
+                    encoders[index]->end();
+                }
+                catch (...)
+                {
+                    failures[index] = std::current_exception();
+                }
+            });
+        }
+        EXPECT_TRUE(native.waitForRecordings());
+        EXPECT_EQ(native.maximumActive(), 4u);
+        EXPECT_EQ(native.threadCount(), 4u);
+        native.release();
+        for (auto &worker : workers)
+        {
+            worker.join();
+        }
+        for (const auto &failure : failures)
+        {
+            ASSERT_EQ(failure, nullptr);
+        }
+    }
+    queue->submit({encoders[3], encoders[2], encoders[1], encoders[0]});
+    for (const auto target : targets)
+    {
+        auto pixels = queue->readTextureAsync({.texture = target}, {.bytesPerRow = 4, .rowsPerImage = 1}, {1, 1, 1});
+        queue->submit({});
+        pixels->wait();
+        EXPECT_NEAR(pixels->getData()[0], expected, 1u);
+    }
+}
+
+/// Rejects both submission entry points after native recording fails without publishing resource writes or losing the device.
+TEST_F(ConstructorArgumentsTest, FailedNativeEndLeavesResourceHistoryAndDeviceUsable)
+{
+    if (instance->getBackend() != GVM::RHI::GraphicsBackend::Vulkan)
+    {
+        GTEST_SKIP() << "Native recording failure injection is Vulkan-specific.";
+    }
+    GVM::Core::DeviceProxy proxy(device);
+    const auto buffer = createArgumentOutput(proxy);
+    auto *queue = device->getMainQueue();
+    {
+        auto encoder = queue->createCommandEncoder();
+        auto copy = encoder->beginBlitPass({});
+        copy->fillBuffer(GVM::RHI::BufferRange(buffer), 91u);
+        copy->end();
+        GVM::RHI::Vulkan::Testing::VKNativeRecordingProbe native(1, true);
+        native.release();
+        EXPECT_THROW(encoder->end(), std::exception);
+        EXPECT_THROW(encoder->end(), std::logic_error);
+        EXPECT_THROW(queue->submit({encoder}, {}), std::invalid_argument);
+        EXPECT_THROW(queue->submit({encoder}), std::logic_error);
+        EXPECT_FALSE(GVM::RHI::Vulkan::Testing::getCurrentBufferState(queue, buffer).initialized);
+    }
+    const uint32_t expected = 319;
+    queue->writeBuffer(GVM::RHI::BufferRange(buffer, 0, 4), &expected, sizeof(expected));
+    auto readback = queue->readBufferAsync(GVM::RHI::BufferRange(buffer, 0, 4));
+    queue->submit({});
+    readback->wait();
+    uint32_t actual = 0;
+    std::memcpy(&actual, readback->getData().data(), sizeof(actual));
+    EXPECT_EQ(actual, expected);
+}
+
 /** Makes a compute write visible to a fragment-stage BDA read in the following submitted render pass. */
 TEST_F(ConstructorArgumentsTest, DrawReadsComputeWritesThroughArguments)
 {
@@ -1965,6 +2113,39 @@ TEST_F(ConstructorArgumentsTest, SamplesStorageTextureWritesInFinalSubmissionOrd
     device->getMainQueue()->submit({samePass});
     proxy->graphicsQueue(0)->readBuffer(output, result.data(), sizeof(result))->submit();
     EXPECT_EQ(result[0], 111u);
+}
+
+/// Reconciles an initial sampled read with later storage writes and sampled reads without assuming recording-time image layouts.
+TEST_F(ConstructorArgumentsTest, ReconcilesReadWriteReadImageBodiesInSubmissionOrder)
+{
+    GVM::Core::DeviceProxy proxy(device);
+    const auto image = createArgumentTexture(*device, 2);
+    const auto view = image->createView({.baseMipLevel = 1, .mipLevelCount = 1});
+    const auto sampler = createArgumentSampler(*device);
+    const auto output = createArgumentOutput(proxy);
+    auto writer = proxy->createComputeClass<ArgumentStorageTextureCompute>(view, float4(0));
+    auto reader = proxy->createComputeClass<ArgumentTextureCompute>(view, sampler, GVM::RHI::BufferRange(output), 0u);
+    auto final = recordArgumentDispatch(*device,
+        reader->dispatchThreads(view, sampler, GVM::RHI::BufferRange(output, 8, 4), 0u, 1, 1, 1));
+    auto middle = device->getMainQueue()->createCommandEncoder();
+    auto compute = middle->beginComputePass({});
+    reader->dispatchThreads(view, sampler, GVM::RHI::BufferRange(output, 0, 4), 0u, 1, 1, 1).dispatchFn(compute);
+    writer->dispatchThreads(view, float4(0.4f, 0, 0, 1), 1, 1, 1).dispatchFn(compute);
+    reader->dispatchThreads(view, sampler, GVM::RHI::BufferRange(output, 4, 4), 0u, 1, 1, 1).dispatchFn(compute);
+    compute->end();
+    middle->end();
+    auto first = recordArgumentDispatch(*device,
+        writer->dispatchThreads(view, float4(0.2f, 0, 0, 1), 1, 1, 1));
+    auto *queue = device->getMainQueue();
+    queue->submit({first, middle, final});
+    auto readback = queue->readBufferAsync(GVM::RHI::BufferRange(output, 0, 12));
+    queue->submit({});
+    readback->wait();
+    eastl::array<uint32_t, 3> values{};
+    std::memcpy(values.data(), readback->getData().data(), sizeof(values));
+    EXPECT_EQ(values[0], 51u);
+    EXPECT_EQ(values[1], 102u);
+    EXPECT_EQ(values[2], 102u);
 }
 
 /** Keeps view mip ranges precise while making compute writes visible to a subsequent fragment texture read. */

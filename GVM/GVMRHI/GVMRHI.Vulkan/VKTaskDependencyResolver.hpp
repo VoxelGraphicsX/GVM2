@@ -2,11 +2,11 @@
 #include "VKCommon.hpp"
 #include "VKResourceStateDB.hpp"
 #include "VKTaskDependencyResolverDiagnostics.hpp"
-#include <EASTL/unordered_set.h>
+#include <EASTL/unordered_map.h>
 
 namespace GVM::RHI::Vulkan
 {
-    /// Generates precise synchronization2 dependencies while lowering ordered commands.
+    /// Resolves encoder-local dependencies and records unresolved entry scopes for ordered submission reconciliation.
     class VKTaskDependencyResolver final
     {
     public:
@@ -28,8 +28,8 @@ namespace GVM::RHI::Vulkan
         };
         /// Clears per-encoder diagnostics, never the queue's resource state.
         void reset();
-        /// Binds this encoder to the single queue state table.
-        void init(const VKQueue &queue, VKResourceStateDB &stateDB);
+        /// Starts independent native recording without reading or modifying the device resource history.
+        void init(const VKQueue &queue);
         /// Makes the selected buffer range ready for its actual next access.
         void synchronizeBufferRange(vk::CommandBuffer commandBuffer, VKBuffer &buffer, uint64_t offset, uint64_t size, vk::PipelineStageFlags2 stages, vk::AccessFlags2 accesses);
         /// Unions all uses at one command boundary before advancing each byte interval once; scratch lists may be moved in.
@@ -42,12 +42,48 @@ namespace GVM::RHI::Vulkan
         static bool transitionImageState(vk::CommandBuffer commandBuffer, vk::Image image, const vk::ImageSubresourceRange &range, vk::ImageLayout &layout, vk::PipelineStageFlags2 &stages, vk::AccessFlags2 &accesses, vk::ImageLayout newLayout, vk::PipelineStageFlags2 newStages, vk::AccessFlags2 newAccesses);
         /// Makes touched CPU-readable buffers visible to the host and reports encoder synchronization metrics.
         void finalize(vk::CommandBuffer commandBuffer);
+        /// Builds this encoder's entry barriers and advances only the supplied uncommitted submission overlay.
+        void prepareSubmission(VKResourceStateDB &state, eastl::vector<vk::BufferMemoryBarrier2> &buffers,
+            eastl::vector<vk::ImageMemoryBarrier2> &images) const;
+        /// Appends the final acquired-image transition after every encoder in the submission has been reconciled.
+        void preparePresent(VKResourceStateDB &state, const VKTexture &texture, eastl::vector<vk::ImageMemoryBarrier2> &images) const;
 
     private:
+        /// Stores accesses requiring incoming synchronization and the exact state produced inside the encoder.
+        struct AccessSummary
+        {
+            VKAccessScope entry;
+            VKResourceAccessState exit;
+            vk::ImageLayout entryLayout = vk::ImageLayout::eUndefined;
+            vk::ImageLayout layout = vk::ImageLayout::eUndefined;
+            bool exclusiveEntry = false;
+            /// Compares the complete entry and exit contract before adjacent byte ranges are merged.
+            bool operator==(const AccessSummary &) const;
+        };
+        /// Tracks one disjoint buffer interval and its independent entry/exit contract.
+        struct BufferSummary
+        {
+            uint64_t offset = 0, size = 0;
+            AccessSummary access;
+        };
+        /// Keeps one independent summary per image aspect, mip and array layer.
+        struct TextureSummary
+        {
+            eastl::vector<vk::ImageAspectFlagBits> planeAspects;
+            uint32_t subresourceCountPerPlane = 0;
+            eastl::vector<AccessSummary> subresources;
+        };
+        /// Finds or creates the encoder's complete partition of a buffer's byte range.
+        eastl::vector<BufferSummary> &bufferSummary(VKBuffer &buffer);
+        /// Finds or creates image cells using immutable texture metadata only.
+        TextureSummary &textureSummary(VKTexture &texture);
+        /// Captures every access before the first local producer and resolves dependencies inside the encoder.
+        static bool advance(AccessSummary &summary, VKAccessScope next, bool layoutChange, vk::MemoryBarrier2 &barrier);
+        /// Establishes the entry layout without encoding an unknown incoming transition in the body.
+        static bool advanceImage(AccessSummary &summary, vk::ImageLayout layout, VKAccessScope next, vk::MemoryBarrier2 &barrier);
         const VKQueue *mQueue = nullptr;
-        VKResourceStateDB *mStateDB = nullptr;
         TaskDependencyResolverDiagnostics mDiagnostics;
-        eastl::unordered_set<VKBuffer *> mBuffers;
-        eastl::unordered_set<const VKTexture *> mTextures;
+        eastl::unordered_map<VKBuffer *, eastl::vector<BufferSummary>> mBuffers;
+        eastl::unordered_map<VKTexture *, TextureSummary> mTextures;
     };
 } // namespace GVM::RHI::Vulkan

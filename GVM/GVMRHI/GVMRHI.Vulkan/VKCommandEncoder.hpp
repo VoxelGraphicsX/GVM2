@@ -30,6 +30,7 @@ namespace GVM::RHI::Vulkan
         BlitPassEncoder beginBlitPass(const BlitPassDescriptor &pass) override;
         ComputePassEncoder beginComputePass(const ComputePassDescriptor &pass) override;
         void resolveQuerySet(QuerySet querySet, uint32_t firstQuery, uint32_t queryCount, BufferRange destination) override;
+        /// Closes and natively records this encoder on the calling thread; different encoders may finish concurrently.
         void end() override;
         /** Copies validated Args to an interval retained until timeline completion. */
         VKArgumentAllocation allocateArguments(Arguments arguments);
@@ -50,8 +51,12 @@ namespace GVM::RHI::Vulkan
         void writePassTimestamp(const PassTimestampWrites &timestampWrites, bool beginning, vk::PipelineStageFlagBits2 stage);
         void onSubmitted();
         void onExecutionCompleted();
-        /// Lowers closed commands in queue order; never called during user recording.
-        void encodeNative(Texture presentTexture = {});
+        /// Lowers a closed encoder using only its exclusive native context and local resource history.
+        void encodeNative();
+        /// Appends entry synchronization followed by the body, updating only the pending submission history.
+        void appendSubmissionCommands(VKResourceStateDB &state, eastl::vector<vk::CommandBuffer> &commands);
+        /// Appends presentation synchronization after the last body using the submission's complete resource history.
+        void appendPresentTransition(VKResourceStateDB &state, const VKTexture &texture, eastl::vector<vk::CommandBuffer> &commands);
         /// Appends a closed render pass, retaining its commands until execution completes.
         void appendPass(RenderPassEncoder pass);
         /// Appends a closed compute pass with its dispatch-local bindings.
@@ -69,8 +74,8 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]]
         vk::CommandBuffer getNativeCommandBuffer() const;
 
-        [[nodiscard]]
-        bool isEnded() const;
+        /// Reports successful native completion; a failed end is never eligible for submission.
+        [[nodiscard]] bool isEnded() const;
 
         /** Returns whether this encoder was already handed to a queue submission. */
         [[nodiscard]]
@@ -92,6 +97,9 @@ namespace GVM::RHI::Vulkan
         const eastl::vector<Texture> &getRetainedTextures() const;
 
     private:
+        /// Records submission-only barriers in a cached command buffer after body recording has finished.
+        void recordSubmissionBarriers(vk::CommandBuffer &commandBuffer,
+            const eastl::vector<vk::BufferMemoryBarrier2> &buffers, const eastl::vector<vk::ImageMemoryBarrier2> &images);
         /** Borrows the identity of a query set retained by its timestamp command. */
         struct WrittenTimestampQuery
         {
@@ -125,6 +133,7 @@ namespace GVM::RHI::Vulkan
         eastl::vector<RecordedCommand> mCommands;
         eastl::unique_ptr<VKArgumentStorage> mArgumentStorage;
         bool mNativeEncoded = false;
+        bool mNativeEncodingFailed = false;
         void ensureRecordable(const char *apiName) const;
         void beginPass(const char *apiName);
         void resetPassTimestampQueriesIfNeeded(VKQuerySet &vkQuerySet, QuerySet querySet, const PassTimestampWrites &timestampWrites);

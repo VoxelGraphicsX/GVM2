@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <GVMTestCommon.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKTesting.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKNativeRecordingProbe.hpp>
 #include "generate_result.hpp"
 #include "GpuGraphTestNode.hpp"
 #include "GpuGraphTestExecutor.hpp"
@@ -160,6 +161,77 @@ TEST(GpuTaskGraphTests, IndependentPassesRecordInParallel)
     // Advance the normal queue collection point before checking physical resource retirement.
     device->getQueue({})->submit({});
     EXPECT_TRUE(probe->buffer.isNull());
+}
+
+/// Proves render and compute native Vulkan bodies enter recording on distinct graph workers before any submission.
+TEST(GpuTaskGraphTests, NativeRenderAndComputeRecordOnGraphWorkers)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    if (instance->getBackend() != GVM::RHI::GraphicsBackend::Vulkan)
+    {
+        GTEST_SKIP() << "The native dispatcher probe is Vulkan-specific.";
+    }
+    auto *device = instance->createDevice();
+    const auto target = device->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment |
+        GVM::RHI::TextureUsage::CopySrc, .size = {2, 2, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
+    auto callbacks = eastl::make_shared<GpuGraphRecordingProbe>();
+    {
+        GVM::RHI::Vulkan::Testing::VKNativeRecordingProbe native(2);
+        GVM::Core::ThreadExecutor executor(2);
+        GVM::Core::TaskRuntime runtime(*device, executor);
+        auto execution = runtime.submit([callbacks, view = target->createView()](uint32_t count)
+        {
+            GVM::Core::TaskGraph graph;
+            return graph.add(GpuGraphTestNode(callbacks, false, view), count);
+        }, 2u);
+        EXPECT_TRUE(native.waitForRecordings());
+        EXPECT_EQ(native.maximumActive(), 2u);
+        EXPECT_EQ(native.threadCount(), 2u);
+        native.release();
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        EXPECT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+        auto readback = device->getMainQueue()->readTextureAsync({.texture = target},
+            {.bytesPerRow = 8, .rowsPerImage = 2}, {2, 2, 1});
+        device->getMainQueue()->submit({});
+        readback->wait();
+        const auto pixels = readback->getData();
+        EXPECT_EQ(pixels[0], 255u);
+        EXPECT_EQ(pixels[1], 0u);
+        EXPECT_EQ(pixels[3], 255u);
+    }
+    device->freeTexture(target);
+}
+
+/// Drains a native recording error and permits a subsequent graph on the same device and injected executor.
+TEST(GpuTaskGraphTests, NativeRecordingFailureLeavesRuntimeUsable)
+{
+    eastl::unique_ptr<GVM::RHI::InstanceImpl, void (*)(GVM::RHI::Instance)> instance(
+        GVM::Tests::createTestInstance(), GVM::RHI::destroyInstance);
+    if (instance->getBackend() != GVM::RHI::GraphicsBackend::Vulkan)
+    {
+        GTEST_SKIP() << "The native dispatcher probe is Vulkan-specific.";
+    }
+    auto *device = instance->createDevice();
+    GVM::Core::ThreadExecutor executor(2);
+    GVM::Core::TaskRuntime runtime(*device, executor);
+    {
+        GVM::RHI::Vulkan::Testing::VKNativeRecordingProbe native(2, true);
+        auto callbacks = eastl::make_shared<GpuGraphRecordingProbe>();
+        auto execution = runtime.submit([callbacks](uint32_t count)
+        {
+            GVM::Core::TaskGraph graph;
+            return graph.add(GpuGraphTestNode(callbacks), count);
+        }, 2u);
+        EXPECT_TRUE(native.waitForRecordings());
+        native.release();
+        ASSERT_TRUE(execution.wait(10'000'000'000ull));
+        EXPECT_EQ(execution.status(), GVM::Core::ExecutionStatus::Failed);
+    }
+    auto next = runtime.submit(GpuGraphFixture::Entries::buildGraph, GpuGraphFixture::Input{});
+    ASSERT_TRUE(next.wait(10'000'000'000ull));
+    EXPECT_EQ(next.status(), GVM::Core::ExecutionStatus::Succeeded) << next.error().c_str();
+    EXPECT_FLOAT_EQ(next.get(), 446.5f);
 }
 
 /// Stops unstarted pass recordings and waits for already accepted callbacks before publishing cancellation.

@@ -1171,18 +1171,30 @@ namespace GVM::RHI::Vulkan
         VKSubmissionSerial submissionSerial = 0u;
         try
         {
-            const Texture presentTexture = hasDirectPresentSync ? directPresentSync.texture->getHandle() : Texture{};
-            for (size_t index = 0; index < encoders.size(); ++index)
-                static_cast<VKCommandEncoder *>(encoders[index].get())->encodeNative(
-                    index + 1 == encoders.size() ? presentTexture : Texture{});
-            // First-use stages become known while lowering, never from broad layout guesses.
+            VKResourceStateDB pending;
+            pending.beginSubmission(getResourceStateDB());
+            eastl::vector<vk::CommandBuffer> orderedCommands;
+            orderedCommands.reserve(encoders.size() * 2 + 1);
+            for (const auto &encoder : encoders)
+            {
+                auto &nativeEncoder = *static_cast<VKCommandEncoder *>(encoder.get());
+                nativeEncoder.encodeNative();
+                nativeEncoder.appendSubmissionCommands(pending, orderedCommands);
+            }
             if (hasDirectPresentSync)
+            {
+                static_cast<VKCommandEncoder *>(encoders.back().get())->appendPresentTransition(
+                    pending, *directPresentSync.texture, orderedCommands);
                 if (!mDevice->getPresentManager().tryGetDirectPresentSubmitSync(directPresentSync.texture, directPresentSync))
+                {
                     throw std::logic_error("Direct-present acquisition disappeared during submission.");
-            submitWaitSemaphores.clear(); submitSignalSemaphores.clear();
+                }
+            }
             prepareSubmitInfoSynchronization(submitTemplate, directPresentSync, submitWaitSemaphores, submitSignalSemaphores);
-            submissionSerial = mSubmissionManager.executeTrackedSubmit(mQueue, commandBuffers, submitWaitSemaphores, submitSignalSemaphores,
+            submissionSerial = mSubmissionManager.executeTrackedSubmit(mQueue, encoders.empty() ? commandBuffers : orderedCommands,
+                submitWaitSemaphores, submitSignalSemaphores,
                 encoders, internalPresentSubmit, noteUserSubmit, submitStatistics, effectiveSubmitKind, completion);
+            pending.commitSubmission();
             if (noteUserSubmit && mDevice != nullptr && mDevice->getAllocator() != nullptr)
             {
                 vmaSetCurrentFrameIndex(mDevice->getAllocator(), static_cast<uint32_t>(submissionSerial));

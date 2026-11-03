@@ -436,6 +436,7 @@ namespace GVM::RHI::Vulkan
 
     vk::Pipeline VKRenderPipeline::getNativePipelineForRenderPassSubpass(vk::RenderPass renderPass, uint32_t subpassIndex)
     {
+        ScopedLock lock(mNativePipelineMutex);
         if (renderPass == vk::RenderPass{})
         {
             throw std::invalid_argument("VKRenderPipeline::getNativePipelineForRenderPassSubpass requires a valid render pass.");
@@ -511,14 +512,18 @@ namespace GVM::RHI::Vulkan
 
     size_t VKRenderPipeline::getNativePipelineCountForTesting() const
     {
+        ScopedLock lock(mNativePipelineMutex);
         size_t count = mPipeline ? 1u : 0u;
         for (const auto &entry : mNativePipelineCacheByRenderPassSubpass)
+        {
             count += entry.pipeline ? 1u : 0u;
+        }
         return count;
     }
 
     size_t VKRenderPipeline::getNativePipelineCacheSizeForTesting() const
     {
+        ScopedLock lock(mNativePipelineMutex);
         return mNativePipelineCacheByRenderPassSubpass.size();
     }
 } // namespace GVM::RHI::Vulkan

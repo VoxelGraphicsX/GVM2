@@ -86,5 +86,6 @@ namespace GVM::RHI::Vulkan
         vk::UniqueDescriptorSetLayout mPixelLocalEmptyDescriptorSetLayout;
         vk::UniquePipelineLayout mPixelLocalPipelineLayout;
         eastl::vector<NativePipelineCacheEntry> mNativePipelineCacheByRenderPassSubpass;
+        mutable Mutex mNativePipelineMutex;
     };
 } // namespace GVM::RHI::Vulkan

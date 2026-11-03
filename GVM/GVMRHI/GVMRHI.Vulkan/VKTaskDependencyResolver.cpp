@@ -80,7 +80,8 @@ namespace GVM::RHI::Vulkan
         }
 
         /// Compares range payloads so adjacent equal intervals can share one state entry.
-        bool equalBufferAccess(const VKResourceBufferState &a, const VKResourceBufferState &b)
+        template <class State>
+        bool equalBufferAccess(const State &a, const State &b)
         {
             return a.access == b.access;
         }
@@ -151,19 +152,63 @@ namespace GVM::RHI::Vulkan
         }
     } // namespace
 
+    bool VKTaskDependencyResolver::AccessSummary::operator==(const AccessSummary &) const = default;
+
     void VKTaskDependencyResolver::reset()
     {
         mQueue = nullptr;
-        mStateDB = nullptr;
         mBuffers.clear();
         mTextures.clear();
         mDiagnostics.reset();
     }
-    void VKTaskDependencyResolver::init(const VKQueue &queue, VKResourceStateDB &stateDB)
+    void VKTaskDependencyResolver::init(const VKQueue &queue)
     {
         reset();
         mQueue = &queue;
-        mStateDB = &stateDB;
+    }
+
+    eastl::vector<VKTaskDependencyResolver::BufferSummary> &VKTaskDependencyResolver::bufferSummary(VKBuffer &buffer)
+    {
+        auto [entry, inserted] = mBuffers.try_emplace(&buffer);
+        if (inserted)
+        {
+            entry->second.push_back({0, buffer.getStorageSize(), {}});
+        }
+        return entry->second;
+    }
+
+    VKTaskDependencyResolver::TextureSummary &VKTaskDependencyResolver::textureSummary(VKTexture &texture)
+    {
+        auto [entry, inserted] = mTextures.try_emplace(&texture);
+        if (inserted)
+        {
+            auto &summary = entry->second;
+            summary.planeAspects = resolveTexturePlaneAspects(&texture);
+            summary.subresourceCountPerPlane = resolveTexturePlaneSubresourceCount(&texture);
+            summary.subresources.resize(summary.planeAspects.size() * summary.subresourceCountPerPlane);
+        }
+        return entry->second;
+    }
+
+    bool VKTaskDependencyResolver::advance(AccessSummary &summary, VKAccessScope next, bool layoutChange, vk::MemoryBarrier2 &barrier)
+    {
+        if (!summary.exit.hasProducer)
+        {
+            summary.entry.stages |= next.stages;
+            summary.entry.accesses |= next.accesses;
+            summary.exclusiveEntry = summary.exclusiveEntry || layoutChange || !isReadOnlyAccess(next.accesses);
+        }
+        return resolveAccess(summary.exit, next, layoutChange, barrier);
+    }
+
+    bool VKTaskDependencyResolver::advanceImage(AccessSummary &summary, vk::ImageLayout layout, VKAccessScope next, vk::MemoryBarrier2 &barrier)
+    {
+        if (!summary.exit.initialized)
+        {
+            summary.entryLayout = layout;
+            summary.layout = layout;
+        }
+        return advance(summary, next, summary.layout != layout, barrier);
     }
 
     void VKTaskDependencyResolver::synchronizeBufferRange(vk::CommandBuffer cb, VKBuffer &buffer, uint64_t offset, uint64_t size, vk::PipelineStageFlags2 stages, vk::AccessFlags2 accesses)
@@ -220,8 +265,7 @@ namespace GVM::RHI::Vulkan
         while (firstRequest < requests.size())
         {
             auto &buffer = *requests[firstRequest].buffer;
-            auto &ranges = mStateDB->editBuffer(buffer);
-            mBuffers.insert(&buffer);
+            auto &ranges = bufferSummary(buffer);
             size_t requestEnd = firstRequest;
             while (requestEnd < requests.size() && requests[requestEnd].buffer == &buffer)
             {
@@ -253,7 +297,7 @@ namespace GVM::RHI::Vulkan
                     continue;
                 }
                 vk::MemoryBarrier2 dependency = {};
-                if (!resolveAccess(range.access, next, false, dependency))
+                if (!advance(range.access, next, false, dependency))
                 {
                     continue;
                 }
@@ -269,7 +313,7 @@ namespace GVM::RHI::Vulkan
                 barriers.push_back(barrier);
                 mDiagnostics.recordBufferBarrier(!isReadOnlyAccess(barrier.srcAccessMask) || !isReadOnlyAccess(barrier.dstAccessMask));
             }
-            mergeAdjacentBufferRangeStates(ranges, equalBufferAccess);
+            mergeAdjacentBufferRangeStates(ranges, equalBufferAccess<BufferSummary>);
             firstRequest = requestEnd;
         }
         if (!barriers.empty())
@@ -296,10 +340,8 @@ namespace GVM::RHI::Vulkan
         {
             auto &texture = *requests[first].view->getTexture();
             const auto layout = requests[first].layout;
-            auto &state = mStateDB->editTexture(texture);
-            mTextures.insert(&texture);
+            auto &state = textureSummary(texture);
             cells.clear();
-            vk::PipelineStageFlags2 firstUseStages{};
             size_t end = first;
             while (end < requests.size() && requests[end].view->getTexture() == &texture)
             {
@@ -307,7 +349,6 @@ namespace GVM::RHI::Vulkan
                 const auto &view = request.view->getDescriptor();
                 const auto range = resolveTextureSubresourceRange(&texture, view.aspect, view.baseMipLevel,
                     view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount);
-                firstUseStages |= request.stages;
                 mDiagnostics.recordTexturePrepare();
                 for (size_t plane = 0; plane < state.planeAspects.size(); ++plane)
                 {
@@ -324,14 +365,6 @@ namespace GVM::RHI::Vulkan
                                 {state.planeAspects[plane], mip, 1, layer, 1}, {request.stages, request.accesses}});
                         }
                     }
-                }
-            }
-            if (mQueue->getDevice()->getPresentManager().setDirectPresentFirstUse(texture, firstUseStages))
-            {
-                for (auto &cell : state.subresources)
-                {
-                    cell.access = {};
-                    cell.access.current.stages = firstUseStages;
                 }
             }
             eastl::sort(cells.begin(), cells.end(), [](const auto &left, const auto &right)
@@ -351,7 +384,7 @@ namespace GVM::RHI::Vulkan
                 auto &cell = state.subresources[use.index];
                 mDiagnostics.recordTexturePrepareSubresource();
                 vk::MemoryBarrier2 dependency{};
-                if (!resolveAccess(cell.access, use.access, cell.layout != layout, dependency))
+                if (!advanceImage(cell, layout, use.access, dependency))
                 {
                     continue;
                 }
@@ -382,17 +415,7 @@ namespace GVM::RHI::Vulkan
         {
             throw std::invalid_argument("Image access requires a live image and explicit pipeline stages.");
         }
-        auto &state = mStateDB->editTexture(texture);
-        if (mQueue->getDevice()->getPresentManager().setDirectPresentFirstUse(texture, stages ? stages : vk::PipelineStageFlagBits2::eColorAttachmentOutput))
-        {
-            // The acquisition semaphore's wait stage must chain into the first layout transition.
-            for (auto &cell : state.subresources)
-            {
-                cell.access = {};
-                cell.access.current.stages = stages ? stages : vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-            }
-        }
-        mTextures.insert(&texture);
+        auto &state = textureSummary(texture);
         mDiagnostics.recordTexturePrepare();
         const auto range = resolveTextureSubresourceRange(&texture, aspect, mip, mipCount, layer, layerCount);
         eastl::vector<vk::ImageMemoryBarrier2> barriers;
@@ -409,7 +432,7 @@ namespace GVM::RHI::Vulkan
                     auto &cell = state.subresources[plane * state.subresourceCountPerPlane + resolveTextureSubresourceIndex(&texture, m, l)];
                     mDiagnostics.recordTexturePrepareSubresource();
                     vk::MemoryBarrier2 dependency = {};
-                    if (!resolveAccess(cell.access, {stages, accesses}, cell.layout != layout, dependency))
+                    if (!advanceImage(cell, layout, {stages, accesses}, dependency))
                     {
                         continue;
                     }
@@ -457,21 +480,177 @@ namespace GVM::RHI::Vulkan
         return true;
     }
 
+    void VKTaskDependencyResolver::prepareSubmission(VKResourceStateDB &state,
+        eastl::vector<vk::BufferMemoryBarrier2> &buffers, eastl::vector<vk::ImageMemoryBarrier2> &images) const
+    {
+        for (const auto &entry : mBuffers)
+        {
+            auto &buffer = *entry.first;
+            const auto &local = entry.second;
+            auto &ranges = state.editBuffer(buffer);
+            for (const auto &range : local)
+            {
+                splitBufferRangeStates(ranges, range.offset);
+                splitBufferRangeStates(ranges, range.offset + range.size);
+            }
+            size_t localIndex = 0;
+            for (auto &range : ranges)
+            {
+                while (local[localIndex].offset + local[localIndex].size <= range.offset)
+                {
+                    ++localIndex;
+                }
+                const auto &summary = local[localIndex].access;
+                if (!summary.exit.initialized)
+                {
+                    continue;
+                }
+                vk::MemoryBarrier2 dependency{};
+                if (resolveAccess(range.access, summary.entry, false, dependency))
+                {
+                    vk::BufferMemoryBarrier2 barrier{};
+                    barrier.srcStageMask = dependency.srcStageMask;
+                    barrier.srcAccessMask = dependency.srcAccessMask;
+                    barrier.dstStageMask = dependency.dstStageMask;
+                    barrier.dstAccessMask = dependency.dstAccessMask;
+                    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.buffer = buffer.getNativeBuffer();
+                    barrier.offset = range.offset;
+                    barrier.size = range.size;
+                    buffers.push_back(barrier);
+                }
+                // Read-only bodies must keep the incoming producer and its established visibility.
+                if (summary.exit.hasProducer)
+                {
+                    range.access = summary.exit;
+                }
+            }
+            mergeAdjacentBufferRangeStates(ranges, equalBufferAccess<VKResourceBufferState>);
+        }
+        for (const auto &entry : mTextures)
+        {
+            auto &texture = *entry.first;
+            const auto &local = entry.second;
+            auto &history = state.editTexture(texture);
+            vk::PipelineStageFlags2 entryStages{};
+            for (const auto &summary : local.subresources)
+            {
+                entryStages |= summary.entry.stages;
+            }
+            if (mQueue->getDevice()->getPresentManager().setDirectPresentFirstUse(texture, entryStages))
+            {
+                // Chain the acquire wait into this submission's first layout transition.
+                for (auto &cell : history.subresources)
+                {
+                    cell.access = {};
+                    cell.access.current.stages = entryStages;
+                }
+            }
+            const auto range = resolveTextureSubresourceRange(&texture, TextureAspect::All, 0, 0, 0, 0);
+            for (size_t plane = 0; plane < local.planeAspects.size(); ++plane)
+            {
+                for (uint32_t mip = range.baseMipLevel; mip < range.mipLevelEnd(); ++mip)
+                {
+                    for (uint32_t layer = range.baseArrayLayer; layer < range.arrayLayerEnd(); ++layer)
+                    {
+                        const auto index = plane * local.subresourceCountPerPlane + resolveTextureSubresourceIndex(&texture, mip, layer);
+                        const auto &summary = local.subresources[index];
+                        if (!summary.exit.initialized)
+                        {
+                            continue;
+                        }
+                        auto &cell = history.subresources[index];
+                        vk::MemoryBarrier2 dependency{};
+                        const bool exclusive = summary.exclusiveEntry && isReadOnlyAccess(summary.entry.accesses);
+                        if (resolveAccess(cell.access, summary.entry, cell.layout != summary.entryLayout || exclusive, dependency))
+                        {
+                            vk::ImageMemoryBarrier2 barrier{};
+                            barrier.srcStageMask = dependency.srcStageMask;
+                            barrier.srcAccessMask = dependency.srcAccessMask;
+                            barrier.dstStageMask = dependency.dstStageMask;
+                            barrier.dstAccessMask = dependency.dstAccessMask;
+                            barrier.oldLayout = cell.layout;
+                            barrier.newLayout = summary.entryLayout;
+                            barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                            barrier.image = texture.getNativeImage();
+                            barrier.subresourceRange = {local.planeAspects[plane], mip, 1, layer, 1};
+                            appendImageBarrier(images, barrier);
+                        }
+                        if (summary.exit.hasProducer)
+                        {
+                            cell.access = summary.exit;
+                        }
+                        cell.layout = summary.layout;
+                    }
+                }
+            }
+        }
+        coalesceImageMips(images);
+    }
+
+    void VKTaskDependencyResolver::preparePresent(VKResourceStateDB &state, const VKTexture &texture,
+        eastl::vector<vk::ImageMemoryBarrier2> &images) const
+    {
+        auto &history = state.editTexture(texture);
+        if (mQueue->getDevice()->getPresentManager().setDirectPresentFirstUse(texture, vk::PipelineStageFlagBits2::eColorAttachmentOutput))
+        {
+            for (auto &cell : history.subresources)
+            {
+                cell.access = {};
+                cell.access.current.stages = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+            }
+        }
+        const auto range = resolveTextureSubresourceRange(&texture, TextureAspect::All, 0, 0, 0, 0);
+        for (size_t plane = 0; plane < history.planeAspects.size(); ++plane)
+        {
+            for (uint32_t mip = range.baseMipLevel; mip < range.mipLevelEnd(); ++mip)
+            {
+                for (uint32_t layer = range.baseArrayLayer; layer < range.arrayLayerEnd(); ++layer)
+                {
+                    auto &cell = history.subresources[plane * history.subresourceCountPerPlane + resolveTextureSubresourceIndex(&texture, mip, layer)];
+                    vk::MemoryBarrier2 dependency{};
+                    if (!resolveAccess(cell.access, {}, cell.layout != vk::ImageLayout::ePresentSrcKHR, dependency))
+                    {
+                        continue;
+                    }
+                    vk::ImageMemoryBarrier2 barrier{};
+                    barrier.srcStageMask = dependency.srcStageMask;
+                    barrier.srcAccessMask = dependency.srcAccessMask;
+                    barrier.dstStageMask = dependency.dstStageMask;
+                    barrier.dstAccessMask = dependency.dstAccessMask;
+                    barrier.oldLayout = cell.layout;
+                    barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+                    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.image = texture.getNativeImage();
+                    barrier.subresourceRange = {history.planeAspects[plane], mip, 1, layer, 1};
+                    appendImageBarrier(images, barrier);
+                    cell.layout = vk::ImageLayout::ePresentSrcKHR;
+                }
+            }
+        }
+        coalesceImageMips(images);
+    }
+
     void VKTaskDependencyResolver::finalize(vk::CommandBuffer cb)
     {
         eastl::vector<vk::BufferMemoryBarrier2> barriers;
         const VKAccessScope hostRead{vk::PipelineStageFlagBits2::eHost, vk::AccessFlagBits2::eHostRead};
-        for (auto *buffer : mBuffers)
+        for (auto &entry : mBuffers)
         {
+            auto *buffer = entry.first;
             if (!buffer->supportsCpuRead())
             {
                 continue;
             }
-            auto &ranges = mStateDB->editBuffer(*buffer);
+            auto &ranges = entry.second;
             for (auto &range : ranges)
             {
+                if (!range.access.exit.initialized)
+                {
+                    continue;
+                }
                 vk::MemoryBarrier2 dependency{};
-                if (!resolveAccess(range.access, hostRead, false, dependency))
+                if (!advance(range.access, hostRead, false, dependency))
                 {
                     continue;
                 }
@@ -487,7 +666,7 @@ namespace GVM::RHI::Vulkan
                 barriers.push_back(barrier);
                 mDiagnostics.recordBufferBarrier(true);
             }
-            mergeAdjacentBufferRangeStates(ranges, equalBufferAccess);
+            mergeAdjacentBufferRangeStates(ranges, equalBufferAccess<BufferSummary>);
         }
         if (!barriers.empty())
         {

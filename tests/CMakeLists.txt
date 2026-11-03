@@ -22,6 +22,7 @@ target_include_directories(GVMTestCommon INTERFACE
 if(GVM_RHI_ENABLE_VULKAN)
     add_library(gvm_vulkan_test_support STATIC
         support/vulkan/GVMRHI/GVMRHI.Vulkan/VKTesting.cpp
+        support/vulkan/GVMRHI/GVMRHI.Vulkan/VKNativeRecordingProbe.cpp
     )
     target_include_directories(gvm_vulkan_test_support PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/support/vulkan

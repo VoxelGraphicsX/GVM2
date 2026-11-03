@@ -7,10 +7,13 @@
 
 namespace GVM::RHI::Vulkan
 {
+    /// Owns an encoder's exclusive pool and its body plus lazily allocated submission barriers until retirement.
     struct VKCommandBufferContext
     {
         vk::UniqueCommandPool commandPool;
         vk::CommandBuffer commandBuffer = nullptr;
+        vk::CommandBuffer prologue = nullptr;
+        vk::CommandBuffer epilogue = nullptr;
     };
 
     class VKQueueCommandContextPool final
