@@ -151,8 +151,54 @@ namespace
         EXPECT_EQ(batches[3].previousOnQueue, 2u);
     }
 
-    /// Keeps a graphics-compute-graphics chain acyclic across batch boundaries and preserves the aliased fast path.
-    TEST(PassScheduleTests, QueueAlternationPreservesControlBoundaries)
+    /// Keeps a short upload/fork/join/readback on one queue when the other queue gains no time after a handoff.
+    TEST(PassScheduleTests, ShortBufferForkStaysInOneSubmission)
+    {
+        const int source = 0, left = 0, right = 0, sum = 0;
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Transfer, {{&source, 0, 16, true}}),
+            makePass(GraphPassKind::Compute, {{&source, 0, 16, false}, {&left, 0, 16, true}}),
+            makePass(GraphPassKind::Compute, {{&source, 0, 16, false}, {&right, 0, 16, true}}),
+            makePass(GraphPassKind::Compute, {{&left, 0, 16, false}, {&right, 0, 16, false}, {&sum, 0, 16, true}}),
+            makePass(GraphPassKind::Transfer, {{&sum, 0, 16, false}})};
+        passes.back().completionNode = 5;
+        PassSchedule schedule(passes);
+        const auto batches = schedule.place(passes, 16, {1, 0});
+        ASSERT_EQ(batches.size(), 1u);
+        EXPECT_EQ(batches.front().queue, 0u);
+        EXPECT_EQ(batches.front().end, passes.size());
+        EXPECT_TRUE(batches.front().waits.empty());
+    }
+
+    /// Allows a dependent compute branch to migrate when queued graphics work more than covers the handoff.
+    TEST(PassScheduleTests, BusyGraphicsQueueCanOffloadDependentCompute)
+    {
+        const int upload = 0;
+        eastl::vector<GraphPass> passes{
+            makePass(GraphPassKind::Transfer, {{&upload, 0, 16, true}}),
+            makePass(GraphPassKind::Render), makePass(GraphPassKind::Render), makePass(GraphPassKind::Render),
+            makePass(GraphPassKind::Compute, {{&upload, 0, 16, false}})};
+        PassSchedule schedule(passes);
+        const auto batches = schedule.place(passes, 16, {1, 0});
+        uint32_t begin = 0;
+        for (const auto &batch : batches)
+        {
+            for (uint32_t offset = begin; offset < batch.end; ++offset)
+            {
+                if (schedule.order()[offset] == 4)
+                {
+                    EXPECT_EQ(batch.queue, 1u);
+                    EXPECT_FALSE(batch.waits.empty());
+                    return;
+                }
+            }
+            begin = batch.end;
+        }
+        FAIL() << "Missing compute pass";
+    }
+
+    /// Preserves explicit batch boundaries without moving a serial graphics-compute-graphics chain off its producer queue.
+    TEST(PassScheduleTests, SerialChainAvoidsQueueHandoffs)
     {
         eastl::vector<GraphPass> passes{
             makePass(GraphPassKind::Render), makePass(GraphPassKind::Compute), makePass(GraphPassKind::Render)};
@@ -162,7 +208,7 @@ namespace
         const auto batches = schedule.place(passes, 32, {1, 0});
         ASSERT_EQ(batches.size(), 3u);
         EXPECT_EQ(batches[0].queue, 0u);
-        EXPECT_EQ(batches[1].queue, 1u);
+        EXPECT_EQ(batches[1].queue, 0u);
         EXPECT_EQ(batches[2].queue, 0u);
         EXPECT_EQ(batches[1].waits, (eastl::vector<uint32_t>{0}));
         EXPECT_NE(eastl::find(batches[2].waits.begin(), batches[2].waits.end(), 1u), batches[2].waits.end());

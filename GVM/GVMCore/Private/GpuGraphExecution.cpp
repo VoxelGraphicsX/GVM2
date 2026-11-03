@@ -31,10 +31,10 @@ namespace GVM::Core::Private
         }
         PassSchedule schedule(mPasses);
         const auto queues = mDevice->candidates();
-        mMultipleQueues = queues.compute != 0 || queues.transfer != 0;
         mBatches = schedule.place(mPasses, runtime.maximumPassesPerBatch(), queues);
         for (const auto &batch : mBatches)
         {
+            mMultipleQueues = mMultipleQueues || batch.queue != mBatches.front().queue;
             mPassQueues.resize(batch.end, batch.queue);
         }
         eastl::vector<GraphPass> ordered;

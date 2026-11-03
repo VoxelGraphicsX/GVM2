@@ -588,6 +588,33 @@ TEST(GpuTaskGraphTests, GeneratedRasterGraphUsesExistingTextureAndFramebufferTyp
     EXPECT_FLOAT_EQ(execution.get(), 1.0f);
 }
 
+/// Reads the GPU result from a dependent raster graph while verifying that an available second queue adds no native submissions.
+TEST(GpuTaskGraphTests, DependentRasterGraphAvoidsNativeQueueHandoffs)
+{
+    using namespace GVM::RHI;
+    eastl::unique_ptr<InstanceImpl, void (*)(Instance)> instance(GVM::Tests::createTestInstance(), destroyInstance);
+    auto *device = instance->createDevice();
+    if (!Vulkan::Testing::isVulkanDevice(device))
+    {
+        GTEST_SKIP() << "The native submission counters require Vulkan.";
+    }
+    auto *graphics = device->getQueue({});
+    auto *compute = device->getQueue({.prefer = QueuePreference::Compute});
+    if (graphics == compute)
+    {
+        GTEST_SKIP() << "Two distinct queue candidates are required.";
+    }
+    GVM::Core::TaskRuntime runtime(*device, {.workerCount = 2});
+    const auto graphicsBefore = Vulkan::Testing::getQueueBackendSubmitCount(graphics);
+    const auto computeBefore = Vulkan::Testing::getQueueBackendSubmitCount(compute);
+    auto execution = runtime.submit(GpuGraphFixture::Entries::buildRasterGraph, GpuGraphFixture::Input{});
+    ASSERT_TRUE(execution.wait(10'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 1.0f);
+    EXPECT_EQ(Vulkan::Testing::getQueueBackendSubmitCount(graphics) - graphicsBefore, 1u);
+    EXPECT_EQ(Vulkan::Testing::getQueueBackendSubmitCount(compute) - computeBefore, 0u);
+}
+
 /// Measures the actual single-queue submission reduction without assuming a GPU speedup.
 TEST(GpuTaskGraphTests, VulkanSingleQueueBatchesReduceSubmissions)
 {

@@ -187,7 +187,7 @@ namespace GVM::Core::Private
             throw std::invalid_argument("GPU batch size must be nonzero.");
         }
         const size_t count = passes.size();
-        eastl::vector<uint32_t> depth(count, 1), observable(count, UINT32_MAX), pending(count), readyAt(count, 0);
+        eastl::vector<uint32_t> depth(count, 1), observable(count, UINT32_MAX), pending(count), finish(count);
         eastl::vector<eastl::vector<uint32_t>> successors(count);
         for (auto it = mOrder.rbegin(); it != mOrder.rend(); ++it)
         {
@@ -210,11 +210,16 @@ namespace GVM::Core::Private
         while (mOrder.size() < count)
         {
             uint32_t next = UINT32_MAX;
+            uint32_t readyCount = 0;
             for (uint32_t index = 0; index < count; ++index)
             {
-                if (pending[index] == 0 && placement[index] == UINT32_MAX &&
-                    (next == UINT32_MAX || observable[index] < observable[next] ||
-                     (observable[index] == observable[next] && depth[index] > depth[next])))
+                if (pending[index] != 0 || placement[index] != UINT32_MAX)
+                {
+                    continue;
+                }
+                ++readyCount;
+                if (next == UINT32_MAX || observable[index] < observable[next] ||
+                    (observable[index] == observable[next] && depth[index] > depth[next]))
                 {
                     next = index;
                 }
@@ -225,15 +230,30 @@ namespace GVM::Core::Private
             {
                 preferred = pass.kind == GraphPassKind::Compute ? queues.compute : queues.transfer;
             }
-            const uint32_t lane = eastl::max(readyAt[next], available[preferred]) <=
-                eastl::max(readyAt[next], available[0]) ? preferred : 0;
+            uint32_t mainStart = available[0], preferredStart = available[preferred];
+            bool mainNeedsWait = false, preferredNeedsWait = false;
+            for (uint32_t pred : mPredecessors[next])
+            {
+                const bool toMain = placement[pred] != 0;
+                const bool toPreferred = placement[pred] != preferred;
+                mainNeedsWait = mainNeedsWait || toMain;
+                preferredNeedsWait = preferredNeedsWait || toPreferred;
+                // One inter-queue handoff costs one logical pass slot. Arrivals overlap; only the latest gates the consumer.
+                mainStart = eastl::max(mainStart, finish[pred] + uint32_t(toMain));
+                preferredStart = eastl::max(preferredStart, finish[pred] + uint32_t(toPreferred));
+            }
+            // On a tie favor locality. An independent root may use the auxiliary queue to leave graphics available for other ready work.
+            const bool preferOnTie = (mainNeedsWait && !preferredNeedsWait) ||
+                (mPredecessors[next].empty() && readyCount > 1);
+            const bool usePreferred = preferred != 0 && (preferredStart < mainStart || (preferredStart == mainStart && preferOnTie));
+            const uint32_t lane = usePreferred ? preferred : 0;
             placement[next] = lane;
-            available[lane] = eastl::max(readyAt[next], available[lane]) + 1;
+            finish[next] = (usePreferred ? preferredStart : mainStart) + 1;
+            available[lane] = finish[next];
             mOrder.push_back(next);
             for (uint32_t successor : successors[next])
             {
                 --pending[successor];
-                readyAt[successor] = eastl::max(readyAt[successor], available[lane]);
             }
         }
         eastl::vector<PassBatch> result;
