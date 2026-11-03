@@ -1,7 +1,22 @@
 #include "VKSyncUtils.hpp"
+#include <EASTL/algorithm.h>
 
 namespace GVM::RHI::Vulkan
 {
+    void mergeTimelineWait(eastl::vector<vk::SemaphoreSubmitInfo> &waits, const vk::SemaphoreSubmitInfo &wait)
+    {
+        for (auto &entry : waits)
+        {
+            if (entry.semaphore == wait.semaphore)
+            {
+                entry.value = eastl::max(entry.value, wait.value);
+                entry.stageMask |= wait.stageMask;
+                return;
+            }
+        }
+        waits.push_back(wait);
+    }
+
     vk::PipelineStageFlags2 normalizeStageMask(vk::PipelineStageFlags2 stageMask)
     {
         return stageMask == vk::PipelineStageFlags2{} ? vk::PipelineStageFlagBits2::eTopOfPipe : stageMask;

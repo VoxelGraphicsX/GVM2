@@ -52,6 +52,8 @@ namespace GVM::RHI::Vulkan
         /// Returns the semaphore dependency for a value accepted by this queue.
         vk::SemaphoreSubmitInfo timelineWait(uint64_t value) const;
         void destroy() override;
+        /// Polls accepted work and publishes mapped data; the caller must hold the device submission lock.
+        void pollCompletedSubmissions();
         void waitForSubmission(VKSubmissionSerial serial, const char *waitSource = "unspecified");
         /**
          * Waits for the oldest pending submission and runs its completed-submission cleanup;
@@ -90,7 +92,6 @@ namespace GVM::RHI::Vulkan
         /** Throws once the queue was marked lost by a failed native submission; waits and polling stay usable. */
         void ensureNotLost() const;
         CommandEncoder createCommandEncoderLocked();
-        void pollCompletedSubmissions();
         void enforceTrackedSubmissionLimitLocked();
         void handleRetiredSubmissionLocked(InFlightSubmission &submission);
         eastl::shared_ptr<VKCommandBufferContext> acquireCommandBufferContextLocked();

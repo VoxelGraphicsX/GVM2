@@ -371,25 +371,14 @@ namespace GVM::RHI::Metal
         const uint64_t readSize = source.size == WholeSize ? remainingBytes : std::min(source.size, remainingBytes);
         if (readSize == 0u)
         {
-            auto emptyReadback = MReadback(new MReadbackImpl());
-            emptyReadback->initStaging(this, Buffer(), 0u);
-            emptyReadback->markReady();
-            return emptyReadback;
+            return MReadback(new MReadbackImpl(mDevice->getLostStateHandle(), nullptr, 0, 0));
         }
         auto *sourceBuffer = static_cast<MBuffer *>(source.buffer.get());
-        auto readback = MReadback(new MReadbackImpl());
         if ((sourceBuffer->getUsage() & BufferUsage::MapRead) != 0)
         {
-            readback->initDirect(this, source.buffer, source.offset, readSize);
-            mPendingAsyncReadbacks.push_back(readback);
-            mPendingBufferReadbacks.push_back({
-                .source = BufferRange(source.buffer, source.offset, readSize),
-                .stagingBuffer = Buffer(),
-                .destination = nullptr,
-                .size = readSize,
-                .usesDirectMapping = true,
-            });
+            auto readback = MReadback(new MReadbackImpl(mDevice->getLostStateHandle(), sourceBuffer->getNativeBuffer(), source.offset, readSize));
             getOrCreateReadbackCommandEncoder();
+            mPendingAsyncReadbacks.push_back(readback);
             return readback;
         }
         if ((sourceBuffer->getUsage() & BufferUsage::CopySrc) == 0)
@@ -401,16 +390,20 @@ namespace GVM::RHI::Metal
             .usage = BufferUsage::CopyDst | BufferUsage::MapRead,
             .size = readSize,
         });
-        getOrCreateReadbackBlitPassEncoder()->copyBufferToBuffer(BufferRange(source.buffer, source.offset, readSize), BufferRange(stagingBuffer, 0, readSize));
-        readback->initStaging(this, stagingBuffer, readSize);
-        mPendingAsyncReadbacks.push_back(readback);
-        mPendingBufferReadbacks.push_back({
-            .source = BufferRange(),
-            .stagingBuffer = stagingBuffer,
-            .destination = nullptr,
-            .size = readSize,
-            .usesDirectMapping = false,
-        });
+        MReadback readback;
+        try
+        {
+            getOrCreateReadbackBlitPassEncoder()->copyBufferToBuffer(BufferRange(source.buffer, source.offset, readSize), BufferRange(stagingBuffer, 0, readSize));
+            auto *native = static_cast<MBuffer *>(stagingBuffer.get())->getNativeBuffer();
+            readback = MReadback(new MReadbackImpl(mDevice->getLostStateHandle(), native, 0, readSize));
+            mPendingAsyncReadbacks.push_back(readback);
+        }
+        catch (...)
+        {
+            mDevice->freeBuffer(stagingBuffer);
+            throw;
+        }
+        mDevice->freeBuffer(stagingBuffer);
         return readback;
     }
 
@@ -431,33 +424,32 @@ namespace GVM::RHI::Metal
             .usage = BufferUsage::CopyDst | BufferUsage::MapRead,
             .size = footprint.stagingBytes,
         });
-        const uint32_t destinationBytesPerRow = dataLayout.bytesPerRow != 0 ? dataLayout.bytesPerRow : static_cast<uint32_t>(footprint.stagingBytesPerRow);
-        getOrCreateReadbackBlitPassEncoder()->copyTextureToBuffer(
-            source,
-            {
-                .layout =
-                    {
-                        .offset = 0,
-                        .bytesPerRow = destinationBytesPerRow,
-                        .rowsPerImage = static_cast<uint32_t>(footprint.rowsPerImage),
-                    },
-                .buffer = stagingBuffer,
-            },
-            readSize);
-        auto readback = MReadback(new MReadbackImpl());
-        readback->initStaging(this, stagingBuffer, footprint.stagingBytes);
-        mPendingAsyncReadbacks.push_back(readback);
-        mPendingTextureReadbacks.push_back({
-            .stagingBuffer = stagingBuffer,
-            .destination = nullptr,
-            .tightRowBytes = footprint.tightRowBytes,
-            .stagingBytesPerRow = footprint.stagingBytesPerRow,
-            .stagingBytesPerImage = footprint.stagingBytesPerImage,
-            .destinationBytesPerRow = footprint.bytesPerRow,
-            .destinationBytesPerImage = footprint.bytesPerImage,
-            .rowCount = footprint.blocksY,
-            .depth = readSize.depth,
-        });
+        MReadback readback;
+        try
+        {
+            const uint32_t destinationBytesPerRow = dataLayout.bytesPerRow != 0 ? dataLayout.bytesPerRow : static_cast<uint32_t>(footprint.stagingBytesPerRow);
+            getOrCreateReadbackBlitPassEncoder()->copyTextureToBuffer(
+                source,
+                {
+                    .layout =
+                        {
+                            .offset = 0,
+                            .bytesPerRow = destinationBytesPerRow,
+                            .rowsPerImage = static_cast<uint32_t>(footprint.rowsPerImage),
+                        },
+                    .buffer = stagingBuffer,
+                },
+                readSize);
+            auto *native = static_cast<MBuffer *>(stagingBuffer.get())->getNativeBuffer();
+            readback = MReadback(new MReadbackImpl(mDevice->getLostStateHandle(), native, 0, footprint.stagingBytes));
+            mPendingAsyncReadbacks.push_back(readback);
+        }
+        catch (...)
+        {
+            mDevice->freeBuffer(stagingBuffer);
+            throw;
+        }
+        mDevice->freeBuffer(stagingBuffer);
         return readback;
     }
 
@@ -680,10 +672,6 @@ namespace GVM::RHI::Metal
                 mDevice->freeBuffer(pending.stagingBuffer);
             }
         }
-        for (auto &asyncReadback : mPendingAsyncReadbacks)
-        {
-            asyncReadback->markReady();
-        }
         mPendingAsyncReadbacks.clear();
         mPendingBufferReadbacks.clear();
         mPendingTextureReadbacks.clear();
@@ -865,8 +853,9 @@ namespace GVM::RHI::Metal
             auto *nativeReadback = static_cast<MCommandEncoder *>(mReadbackCommandEncoder.get())->getNativeCommandEncoder();
             for (auto &asyncReadback : mPendingAsyncReadbacks)
             {
-                asyncReadback->assignCommandBuffer(nativeReadback);
+                asyncReadback->assignCommandBuffer(*nativeReadback);
             }
+            mPendingAsyncReadbacks.clear();
         }
         if (completion)
         {

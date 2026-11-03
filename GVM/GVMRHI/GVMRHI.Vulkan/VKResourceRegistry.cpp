@@ -460,8 +460,14 @@ namespace GVM::RHI::Vulkan
         mRetireManager.reset();
     }
 
+    std::recursive_mutex &VKResourceRegistry::submissionMutex()
+    {
+        return mSubmissionMutex;
+    }
+
     bool VKResourceRegistry::beginDestroy()
     {
+        ScopedLock submitLock(mSubmissionMutex);
         ScopedLock lock(mResourceLifetimeMutex);
         if (mDestroyed)
         {

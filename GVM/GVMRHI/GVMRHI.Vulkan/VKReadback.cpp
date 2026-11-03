@@ -7,88 +7,118 @@
 
 namespace GVM::RHI::Vulkan
 {
-    bool VKReadbackImpl::isDeviceLost() const
+    VKReadbackImpl::VKReadbackImpl(VKQueue &queue)
+        : mQueue(queue), mRegistry(queue.getDevice()->getResourceRegistryHandle())
     {
-        return mQueue != nullptr && mQueue->getDevice() != nullptr && mQueue->getDevice()->getLostState().isLost();
+    }
+
+    VKReadbackImpl::~VKReadbackImpl()
+    {
+        const auto registry = mRegistry.lock();
+        if (!registry)
+        {
+            return;
+        }
+        ScopedLock lock(registry->submissionMutex());
+        if (registry->isDestroyed() || mBuffer.isNull())
+        {
+            return;
+        }
+        if (mUsesDirectMapping)
+        {
+            static_cast<VKBuffer *>(mBuffer.get())->releaseReference();
+        }
+        else
+        {
+            registry->freeBuffer(mBuffer);
+        }
     }
 
     bool VKReadbackImpl::isReady() const
     {
-        return mReady.load(eastl::memory_order_acquire) || isDeviceLost();
+        if (mReady.load(eastl::memory_order_acquire))
+        {
+            return true;
+        }
+        const auto registry = mRegistry.lock();
+        if (!registry)
+        {
+            return true;
+        }
+        ScopedLock lock(registry->submissionMutex());
+        if (registry->isDestroyed() || mQueue.getDevice()->getLostState().isLost())
+        {
+            return true;
+        }
+        if (mSubmissionSerial.load(eastl::memory_order_acquire) != UINT64_MAX)
+        {
+            mQueue.pollCompletedSubmissions();
+        }
+        return mReady.load(eastl::memory_order_acquire);
     }
 
     void VKReadbackImpl::wait()
     {
-        if (!mHasSubmissionSerial)
-        {
-            throw std::logic_error("VKReadback::wait called before the queue submitted the read.");
-        }
-        if (isReady() || isDeviceLost())
+        const auto registry = mRegistry.lock();
+        if (!registry || mReady.load(eastl::memory_order_acquire))
         {
             return;
         }
-        mQueue->waitForSubmission(mSubmissionSerial, "vk_readback_wait");
-        markReady();
+        ScopedLock lock(registry->submissionMutex());
+        if (registry->isDestroyed() || mQueue.getDevice()->getLostState().isLost())
+        {
+            return;
+        }
+        const auto serial = mSubmissionSerial.load(eastl::memory_order_acquire);
+        if (serial == UINT64_MAX)
+        {
+            throw std::logic_error("VKReadback::wait called before the queue submitted the read.");
+        }
+        mQueue.waitForSubmission(serial, "vk_readback_wait");
     }
 
     eastl::span<const uint8_t> VKReadbackImpl::getData() const
     {
-        if (isDeviceLost() && !mReady.load(eastl::memory_order_acquire))
-        {
-            throw DeviceLostError("VKReadback::getData: device lost before the readback completed.");
-        }
         if (!isReady())
         {
             throw std::logic_error("VKReadback::getData called before the readback was ready.");
         }
-        const uint8_t *base = nullptr;
-        if (mUsesDirectMapping && !mSourceBuffer.isNull())
+        const auto registry = mRegistry.lock();
+        if (!registry)
         {
-            base = static_cast<const uint8_t *>(static_cast<VKBuffer *>(mSourceBuffer.get())->getPersistentMappedData());
+            throw DeviceLostError("VKReadback::getData: the owning device no longer exists.");
         }
-        else if (!mStagingBuffer.isNull())
+        ScopedLock lock(registry->submissionMutex());
+        if (registry->isDestroyed() || !mReady.load(eastl::memory_order_acquire))
         {
-            base = static_cast<const uint8_t *>(static_cast<VKBuffer *>(mStagingBuffer.get())->getPersistentMappedData());
+            throw DeviceLostError("VKReadback::getData: mapped storage is no longer available.");
         }
-        if (base == nullptr)
-        {
-            throw std::logic_error("VKReadback::getData has no readable mapped data.");
-        }
-        return eastl::span<const uint8_t>(base + mOffset, mSize);
+        const auto *base = static_cast<const uint8_t *>(static_cast<VKBuffer *>(mBuffer.get())->getPersistentMappedData());
+        return {base + mOffset, mSize};
     }
 
-    void VKReadbackImpl::initDirect(VKQueue *queue, const Buffer &sourceBuffer, uint64_t offset, uint64_t size)
+    void VKReadbackImpl::initDirect(const Buffer &sourceBuffer, uint64_t offset, uint64_t size)
     {
-        mQueue = queue;
-        mSourceBuffer = sourceBuffer;
+        static_cast<VKBuffer *>(sourceBuffer.get())->retainReference();
+        mBuffer = sourceBuffer;
         mOffset = offset;
         mSize = size;
         mUsesDirectMapping = true;
     }
 
-    void VKReadbackImpl::initStaging(VKQueue *queue, const Buffer &stagingBuffer, uint64_t size)
+    void VKReadbackImpl::initStaging(const Buffer &stagingBuffer, uint64_t size)
     {
-        mQueue = queue;
-        mStagingBuffer = stagingBuffer;
-        mOffset = 0u;
+        mBuffer = stagingBuffer;
         mSize = size;
-        mUsesDirectMapping = false;
     }
 
     void VKReadbackImpl::assignSubmissionSerial(VKSubmissionSerial serial)
     {
-        mSubmissionSerial = serial;
-        mHasSubmissionSerial = true;
+        mSubmissionSerial.store(serial, eastl::memory_order_release);
     }
 
     void VKReadbackImpl::markReady()
     {
         mReady.store(true, eastl::memory_order_release);
     }
-
-    VKSubmissionSerial VKReadbackImpl::getSubmissionSerial() const
-    {
-        return mSubmissionSerial;
-    }
-
-} // namespace GVM::RHI::Vulkan
+}

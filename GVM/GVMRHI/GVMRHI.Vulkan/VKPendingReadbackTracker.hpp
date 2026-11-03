@@ -9,6 +9,8 @@
 
 namespace GVM::RHI::Vulkan
 {
+    class VKResourceStateDB;
+
     class VKPendingReadbackTracker final
     {
     public:
@@ -20,13 +22,16 @@ namespace GVM::RHI::Vulkan
         /// Enqueues an async readback whose bytes are produced in stagingBuffer; the tracker holds a reference until the copy completes.
         void enqueueAsyncStaging(uint64_t debugId, const Readback &readback, Buffer stagingBuffer);
 
-        [[nodiscard]] bool hasPending() const;
+        /// Reports whether the next submit must assign a completion value to any queued reads.
+        [[nodiscard]] bool hasUnsubmitted() const;
+        /// Finds the latest writer on the foreign queue needed by a newly queued mapped host read.
+        [[nodiscard]] uint64_t lastDirectWriter(const VKResourceStateDB &history, uint32_t lane) const;
         [[nodiscard]] size_t pendingCount() const;
 
         void assignUnassignedSubmissionSerial(VKSubmissionSerial serial);
 
-        [[nodiscard]]
-        VKSubmissionSerial getLastAssignedSubmissionSerial() const;
+        /// Returns the last serial whose legacy destination pointer must be filled before submit returns.
+        [[nodiscard]] VKSubmissionSerial lastHostCopySerial() const;
 
         void resolveCompleted(VKDevice *device, uint64_t lastRetiredSubmissionId);
         void destroy(VKDevice *device);

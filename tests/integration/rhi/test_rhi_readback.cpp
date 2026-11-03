@@ -2273,6 +2273,73 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
         }
     }
 
+    /// Keeps a direct source readable after explicit free and safely drops submitted and unsubmitted reads after device teardown.
+    TEST_F(RhiExecutionTest, AsyncReadbackReleaseAcrossDeviceTeardown)
+    {
+        using namespace GVM::RHI;
+        auto *queue = device->getMainQueue();
+        auto source = device->createBuffer({.usage = BufferUsage::MapRead | BufferUsage::MapWrite | BufferUsage::CopyDst, .size = 4});
+        auto privateSource = device->createBuffer({.usage = BufferUsage::CopyDst | BufferUsage::CopySrc, .size = 4});
+        source->map();
+        std::memset(source->getMappedRange(0, 4), 73, 4);
+        source->unmap();
+        auto submitted = queue->readBufferAsync({source, 0, 4});
+        device->freeBuffer(source);
+        queue->submit({});
+        submitted->wait();
+        ASSERT_EQ(submitted->getData().size(), 4u);
+        EXPECT_EQ(submitted->getData()[3], 73u);
+        auto pending = queue->readBufferAsync({privateSource, 0, 4});
+        device->freeBuffer(privateSource);
+        destroyInstance(instance);
+        instance = nullptr;
+        device = nullptr;
+        submitted.reset();
+        pending.reset();
+    }
+
+    /// Polls completed reads without Readback::wait and verifies discarded private buffer and texture copies retire.
+    TEST_F(RhiExecutionTest, AsyncReadbacksPollAndRetireTheirStorage)
+    {
+        using namespace GVM::RHI;
+        auto *queue = device->getMainQueue();
+        auto buffer = device->createBuffer({.usage = BufferUsage::CopyDst | BufferUsage::CopySrc, .size = 4});
+        auto texture = device->createTexture({.usage = TextureUsage::CopySrc | TextureUsage::CopyDst,
+            .size = {1, 1, 1}, .format = TextureFormat::RGBA8Unorm});
+        const std::array<uint8_t, 4> texel{7, 13, 19, 255};
+        queue->writeTexture({.texture = texture}, texel.data(), texel.size(), {.bytesPerRow = 4, .rowsPerImage = 1}, {1, 1, 1});
+        queue->submit({});
+        const size_t baseline = device->getDiagnosticsResourceSnapshot().entries.size();
+        Readback first;
+        for (uint8_t value = 1; value <= 4; ++value)
+        {
+            queue->fillBuffer({buffer, 0, 4}, value);
+            auto bytes = queue->readBufferAsync({buffer, 0, 4});
+            auto pixels = queue->readTextureAsync({.texture = texture}, {.bytesPerRow = 4, .rowsPerImage = 1}, {1, 1, 1});
+            auto discarded = queue->readBufferAsync({buffer, 0, 4});
+            discarded.reset();
+            EXPECT_FALSE(bytes->isReady());
+            EXPECT_THROW(bytes->wait(), std::logic_error);
+            ASSERT_TRUE(queue->submit({}, {}).wait(5'000'000'000));
+            ASSERT_TRUE(bytes->isReady());
+            ASSERT_TRUE(pixels->isReady());
+            ASSERT_EQ(bytes->getData().size(), 4u);
+            ASSERT_GE(pixels->getData().size(), texel.size());
+            EXPECT_EQ(bytes->getData()[0], value);
+            EXPECT_EQ(std::memcmp(pixels->getData().data(), texel.data(), texel.size()), 0);
+            if (!first)
+            {
+                first = bytes;
+            }
+        }
+        EXPECT_EQ(first->getData()[0], 1u);
+        first.reset();
+        queue->submit({});
+        EXPECT_EQ(device->getDiagnosticsResourceSnapshot().entries.size(), baseline);
+        device->freeTexture(texture);
+        device->freeBuffer(buffer);
+    }
+
     /// Verifies a texture readback preserves row-pitch layout across each row.
     TEST_F(RhiExecutionTest, ReadTextureAsyncPreservesRowPitchLayout)
     {

@@ -10,6 +10,7 @@
 #include <GVMRHI/GVMRHI.Vulkan/VKQueue.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKTexture.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKNativeRecordingProbe.hpp>
+#include <chrono>
 #include <thread>
 #if defined(__APPLE__)
 #include <GVMRHI/GVMRHI.Metal/MComputePipeline.hpp>
@@ -2200,6 +2201,58 @@ TEST_F(ConstructorArgumentsTest, RejectedAcquireRetainsAcceptedRelease)
     EXPECT_THROW(accepted.wait(0), DeviceLostError);
     EXPECT_THROW(graphics->submit({}, {}), DeviceLostError);
     device->freeBuffer(buffer);
+}
+
+/// Requires a mapped host read to join an outstanding writer on a different queue without blocking async submission.
+TEST_F(ConstructorArgumentsTest, DirectReadbackJoinsForeignWriter)
+{
+    using namespace GVM::RHI;
+    auto *graphics = dynamic_cast<Vulkan::VKQueue *>(device->getMainQueue());
+    auto *compute = dynamic_cast<Vulkan::VKQueue *>(device->getQueue({.prefer = QueuePreference::Compute}));
+    if (graphics == nullptr || compute == nullptr || graphics == compute)
+    {
+        GTEST_SKIP() << "Two Vulkan timelines are required.";
+    }
+    auto native = static_cast<Vulkan::VKDevice *>(device)->getNativeDevice();
+    const auto type = vk::SemaphoreTypeCreateInfo{}.setSemaphoreType(vk::SemaphoreType::eTimeline);
+    auto gate = native.createSemaphoreUnique(vk::SemaphoreCreateInfo{}.setPNext(&type));
+    auto buffer = device->createBuffer({.usage = BufferUsage::MapRead | BufferUsage::MapWrite | BufferUsage::CopyDst, .size = 8});
+    buffer->map();
+    std::memset(buffer->getMappedRange(0, 8), 0, 8);
+    buffer->unmap();
+    const auto wait = vk::SemaphoreSubmitInfo{}.setSemaphore(gate.get()).setValue(1).setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
+    // Bound the gate even if a regression blocks submit(), an assertion fails, or an exception unwinds the test.
+    std::jthread release([&](std::stop_token stop)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        native.signalSemaphore(vk::SemaphoreSignalInfo{}.setSemaphore(gate.get()).setValue(1));
+    });
+    (void)compute->submitTracked(vk::SubmitInfo2{}.setWaitSemaphoreInfos(wait));
+    compute->fillBuffer({buffer, 4, 4}, 42);
+    const auto writer = compute->submit({}, {});
+    auto disjoint = graphics->readBufferAsync({buffer, 0, 4});
+    graphics->submit({});
+    disjoint->wait();
+    auto overlap = graphics->readBufferAsync({buffer, 4, 4});
+    graphics->submit({});
+    EXPECT_FALSE(writer.isComplete());
+    EXPECT_FALSE(overlap->isReady());
+    release.request_stop();
+    EXPECT_TRUE(writer.wait(5'000'000'000));
+    overlap->wait();
+    ASSERT_EQ(overlap->getData().size(), 4u);
+    EXPECT_EQ(overlap->getData()[0], 42u);
+    EXPECT_EQ(disjoint->getData()[0], 0u);
+    device->freeBuffer(buffer);
+    EXPECT_EQ(overlap->getData()[3], 42u);
+    disjoint.reset();
+    overlap.reset();
+    graphics->submit({});
+    EXPECT_TRUE(buffer.isNull());
 }
 
 /// Keeps a freed buffer physically live until both independent queue uses have been observed as retired.

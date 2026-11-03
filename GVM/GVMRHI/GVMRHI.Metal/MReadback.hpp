@@ -2,52 +2,36 @@
 
 #include "MDefines.hpp"
 #include <GVMRHI/GVMRHI.hpp>
+#include <GVMRHI/Private/DeviceLostState.hpp>
 #include <EASTL/atomic.h>
 #include <Metal/Metal.hpp>
 
 namespace GVM::RHI::Metal
 {
-    class MQueue;
-
-    /// Owns one queued buffer or texture readback; becomes ready once the command buffer executing the copy completes.
+    /// Retains the native storage and completion of a single queued CPU read.
     class MReadbackImpl final : public ReadbackImpl
     {
     public:
-        /// Releases the retained command buffer when the readback is destroyed without a wait.
-        virtual ~MReadbackImpl() override;
-        /// Reports whether the executing command buffer has completed; callable from any thread.
-        virtual bool isReady() const override;
-        /// Blocks until the executing command buffer completes; throws std::logic_error if the queue has not submitted the read yet.
-        virtual void wait() override;
-        /// Returns the readback bytes; throws std::logic_error before isReady(). Direct reads alias the source buffer's mapped memory.
-        virtual eastl::span<const uint8_t> getData() const override;
-
-        /// Initializes a direct read over a shared source buffer's mapped memory (no copy).
-        void initDirect(MQueue *queue, const Buffer &sourceBuffer, uint64_t offset, uint64_t size);
-        /// Initializes a staging read: the queue copies the source into stagingBuffer during a later submission.
-        void initStaging(MQueue *queue, const Buffer &stagingBuffer, uint64_t size);
-        /// Assigns the command buffer executing the copy; called by the queue when the readback submission commits.
-        void assignCommandBuffer(MTL::CommandBuffer *commandBuffer);
-        /// Marks the readback ready; called once the executing command buffer completes.
-        void markReady();
-        /// Returns the command buffer executing the copy.
-        MTL::CommandBuffer *getCommandBuffer() const;
+        /// Retains the mapped allocation; a null buffer represents an immediately ready empty range.
+        MReadbackImpl(const eastl::shared_ptr<DeviceLostState> &device, MTL::Buffer *buffer, uint64_t offset, uint64_t size);
+        /// Releases the command buffer retained when the queue accepted this read.
+        ~MReadbackImpl() override;
+        /// Queries native completion without requiring a host wait or a subsequent queue operation.
+        bool isReady() const override;
+        /// Waits for this read only; a nonempty read must have been submitted first.
+        void wait() override;
+        /// Returns mapped bytes while this readback is held, or throws if the data is unavailable.
+        eastl::span<const uint8_t> getData() const override;
+        /// Publishes the single committed command buffer that orders this read.
+        void assignCommandBuffer(MTL::CommandBuffer &commandBuffer);
 
     private:
-        /** Returns true once the owning device is lost; readbacks expose completed-only behavior after loss. */
-        [[nodiscard]] bool isDeviceLost() const;
-
-        MQueue *mQueue = nullptr;
-        Buffer mSourceBuffer;
-        Buffer mStagingBuffer;
-        MTL::CommandBuffer *mCommandBuffer = nullptr;
-        uint64_t mOffset = 0u;
-        uint64_t mSize = 0u;
-        eastl::atomic<bool> mReady{false};
-        bool mUsesDirectMapping = false;
-        bool mHasCommandBuffer = false;
+        eastl::shared_ptr<DeviceLostState> mDevice;
+        NS::SharedPtr<MTL::Buffer> mBuffer;
+        eastl::atomic<MTL::CommandBuffer *> mCommandBuffer{nullptr};
+        uint64_t mOffset;
+        uint64_t mSize;
     };
 
     using MReadback = eastl::intrusive_ptr<MReadbackImpl>;
-
-} // namespace GVM::RHI::Metal
+}

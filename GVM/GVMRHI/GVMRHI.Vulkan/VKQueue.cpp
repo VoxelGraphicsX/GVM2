@@ -4,6 +4,8 @@
 #include "Private/TimeUtils.hpp"
 #include "VKBlitPassEncoder.hpp"
 #include "VKBuffer.hpp"
+#include "VKBufferRangeStateUtils.hpp"
+#include "VKSyncUtils.hpp"
 #include "VKBufferCopyMultipleRegionSpirv.hpp"
 #include "VKCommandEncoder.hpp"
 #include "VKDevice.hpp"
@@ -534,20 +536,19 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mDevice->submissionMutex());
         pollCompletedSubmissions();
         auto *sourceBuffer = static_cast<VKBuffer *>(source.buffer.get());
-        const uint64_t bytesToRead = source.size == WholeSize ? sourceBuffer->getStorageSize() - source.offset : source.size;
-        auto readback = VKReadback(new VKReadbackImpl());
+        const uint64_t bytesToRead = resolveBufferRangeSize("VKQueue::readBufferAsync", sourceBuffer, source.offset, source.size);
+        auto readback = VKReadback(new VKReadbackImpl(*this));
         if (sourceBuffer->isHostVisible() && sourceBuffer->supportsCpuRead() && sourceBuffer->getPersistentMappedData() != nullptr)
         {
             const uint64_t readbackId = mReadbackSequence++;
-            sourceBuffer->retainReference();
-            readback->initDirect(this, source.buffer, source.offset, bytesToRead);
+            readback->initDirect(source.buffer, source.offset, bytesToRead);
             mPendingReadbackTracker.enqueueAsyncDirect(readbackId, readback, BufferRange(source.buffer, source.offset, bytesToRead));
             return readback;
         }
         const uint64_t readbackId = mReadbackSequence++;
         Buffer stagingBuffer = createQueueReadbackBuffer(*mDevice, mQueueName, "_ReadbackBuffer_", readbackId, bytesToRead);
+        readback->initStaging(stagingBuffer, bytesToRead);
         getOrCreateInternalReadbackBlitPassLocked().copyBufferToBuffer(BufferRange(source.buffer, source.offset, bytesToRead), BufferRange(stagingBuffer, 0u, bytesToRead));
-        readback->initStaging(this, stagingBuffer, bytesToRead);
         mPendingReadbackTracker.enqueueAsyncStaging(readbackId, readback, stagingBuffer);
         return readback;
     }
@@ -565,10 +566,10 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mDevice->submissionMutex());
         pollCompletedSubmissions();
         const uint64_t readbackId = mReadbackSequence++;
+        auto readback = VKReadback(new VKReadbackImpl(*this));
         Buffer stagingBuffer = createQueueReadbackBuffer(*mDevice, mQueueName, "_ReadbackTextureBuffer_", readbackId, requiredBytes);
+        readback->initStaging(stagingBuffer, requiredBytes);
         getOrCreateInternalReadbackBlitPassLocked().copyTextureToBuffer(source, stagingBuffer, static_cast<VKBuffer *>(stagingBuffer.get())->getNativeBuffer(), 0u, requiredBytes, dataLayout, readSize);
-        auto readback = VKReadback(new VKReadbackImpl());
-        readback->initStaging(this, stagingBuffer, requiredBytes);
         mPendingReadbackTracker.enqueueAsyncStaging(readbackId, readback, stagingBuffer);
         return readback;
     }
@@ -786,21 +787,7 @@ namespace GVM::RHI::Vulkan
                 {
                     throw std::invalid_argument("Submission dependency belongs to a different backend.");
                 }
-                const auto native = state->dependency(mDevice->getLostStateHandle());
-                bool found = false;
-                for (auto &existing : dependencies)
-                {
-                    if (existing.semaphore == native.semaphore)
-                    {
-                        existing.value = eastl::max(existing.value, native.value);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    dependencies.push_back(native);
-                }
+                mergeTimelineWait(dependencies, state->dependency(mDevice->getLostStateHandle()));
             }
             for (const auto &encoder : encoders)
             {
@@ -811,9 +798,6 @@ namespace GVM::RHI::Vulkan
                 }
             }
         }
-        vk::SubmitInfo2 submitInfo;
-        submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(dependencies.size());
-        submitInfo.pWaitSemaphoreInfos = dependencies.data();
 
         {
             ScopedLock lock(mDevice->submissionMutex());
@@ -837,6 +821,12 @@ namespace GVM::RHI::Vulkan
             if (auto *other = mDevice->otherQueue(*this))
             {
                 other->pollCompletedSubmissions();
+                const uint32_t lane = other == mDevice->getMainQueueImpl() ? 0u : 1u;
+                const uint64_t value = mPendingReadbackTracker.lastDirectWriter(getResourceStateDB(), lane);
+                if (value > other->mSubmissionManager.getLastRetiredSubmissionId())
+                {
+                    mergeTimelineWait(dependencies, other->timelineWait(value));
+                }
             }
             eastl::vector<vk::CommandBuffer> commandBuffers;
             eastl::vector<CommandEncoder> submittedEncoders;
@@ -868,15 +858,16 @@ namespace GVM::RHI::Vulkan
             const size_t internalCommandBufferCount = commandBuffers.size() - userCommandBufferCount;
 
             VKSubmissionSerial submissionSerial = 0u;
-            if (!commandBuffers.empty() || waits != nullptr)
+            if (!commandBuffers.empty() || waits != nullptr || !dependencies.empty())
             {
+                const auto submitInfo = vk::SubmitInfo2{}.setWaitSemaphoreInfos(dependencies);
                 const bool includesUserCommandBuffers = commandBuffers.size() > internalCommandBufferCount;
                 submissionSerial = submitRecordedCommandBuffersLocked(
                     commandBuffers,
                     submittedEncoders,
                     false,
                     includesUserCommandBuffers,
-                    waits != nullptr ? &submitInfo : nullptr,
+                    &submitInfo,
                     selectCollectedSubmitKind(commandBuffers.size(), internalCommandBufferCount, internalContainsDeferredCopies, false),
                     waits != nullptr ? &completion : nullptr);
             }
@@ -893,12 +884,12 @@ namespace GVM::RHI::Vulkan
 
         mDevice->getObjectCache().releaseUnreferenced();
 
-        if (!assignedPendingReadbacks)
+        if (readbackWaitSerial == 0u)
         {
             return completion ? makeSubmission(eastl::move(completion)) : Submission{};
         }
 
-        if (readbackWaitSerial != 0u && !mSubmissionManager.isRetired(readbackWaitSerial))
+        if (!mSubmissionManager.isRetired(readbackWaitSerial))
         {
             waitForSubmission(readbackWaitSerial, "readback_resolve");
         }
@@ -919,7 +910,7 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mDevice->submissionMutex());
         ensureNotLost();
         pollCompletedSubmissions();
-        if (hasPendingInternalCommands() || mPendingReadbackTracker.hasPending())
+        if (hasPendingInternalCommands() || mPendingReadbackTracker.hasUnsubmitted())
         {
             throw std::logic_error("VKQueue::submitTracked cannot bypass explicit user submit while queue-internal commands or pending readbacks still exist.");
         }
@@ -1159,14 +1150,14 @@ namespace GVM::RHI::Vulkan
 
     bool VKQueue::assignPendingReadbackCompletionLocked(VKSubmissionSerial submissionSerial, VKSubmissionSerial &outAssignedSerial)
     {
-        if (!mPendingReadbackTracker.hasPending())
+        if (!mPendingReadbackTracker.hasUnsubmitted())
         {
             return false;
         }
 
         const VKSubmissionSerial readbackSerial = submissionSerial != 0u ? submissionSerial : mSubmissionManager.getMostRecentSubmissionSerial();
         mPendingReadbackTracker.assignUnassignedSubmissionSerial(readbackSerial);
-        outAssignedSerial = mPendingReadbackTracker.getLastAssignedSubmissionSerial();
+        outAssignedSerial = mPendingReadbackTracker.lastHostCopySerial();
         return true;
     }
 

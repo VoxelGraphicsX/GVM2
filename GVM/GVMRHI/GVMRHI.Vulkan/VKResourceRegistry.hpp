@@ -20,6 +20,8 @@ namespace GVM::RHI::Vulkan
     class VKResourceRegistry final
     {
     public:
+        /// Serializes queue acceptance and mapped-read access against the start of device teardown.
+        std::recursive_mutex &submissionMutex();
         /** Binds the registry to its owning device. */
         explicit VKResourceRegistry(VKDevice &device);
 
@@ -72,6 +74,7 @@ namespace GVM::RHI::Vulkan
         void releaseSamplerHandle(Sampler sampler);
 
         VKDevice &mDevice;
+        std::recursive_mutex mSubmissionMutex;
         BufferPool mBufferPool;
         TexturePool mTexturePool;
         TextureViewPool mTextureViewPool;

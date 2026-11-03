@@ -90,6 +90,23 @@ namespace GVM::RHI::Vulkan
         return true;
     }
 
+    uint64_t VKResourceStateDB::lastBufferWriter(const VKBuffer &buffer, uint64_t offset, uint64_t size, uint32_t lane) const
+    {
+        ScopedLock lock(mMutex);
+        uint64_t writer = 0;
+        if (const auto it = mBuffers.find(&buffer); it != mBuffers.end())
+        {
+            for (const auto &range : it->second)
+            {
+                if (bufferRangesOverlap(range.offset, range.size, offset, size))
+                {
+                    writer = eastl::max(writer, range.frontier.writer[lane]);
+                }
+            }
+        }
+        return writer;
+    }
+
     bool VKResourceStateDB::tryGetSharedTextureStateForTransition(const VKTexture &texture, TextureAspectFlags aspect, uint32_t mip, uint32_t mipCount, uint32_t layer, uint32_t layerCount, vk::ImageLayout &layout, vk::PipelineStageFlags2 &stages, vk::AccessFlags2 &accesses) const
     {
         ScopedLock lock(mMutex);
@@ -320,17 +337,7 @@ namespace GVM::RHI::Vulkan
         {
             return;
         }
-        const auto wait = mOther->timelineWait(mForeignWait);
-        for (auto &entry : waits)
-        {
-            if (entry.semaphore == wait.semaphore)
-            {
-                entry.value = eastl::max(entry.value, wait.value);
-                entry.stageMask |= wait.stageMask;
-                return;
-            }
-        }
-        waits.push_back(wait);
+        mergeTimelineWait(waits, mOther->timelineWait(mForeignWait));
     }
 
     bool VKResourceStateDB::hasUnacquiredRelease() const

@@ -15,9 +15,26 @@ namespace GVM::RHI::Vulkan
         constexpr eastl::string_view PendingReadbackTrackerLogCategory = "gvmrhi.vulkan.pending_readback_tracker";
     } // namespace
 
-    bool VKPendingReadbackTracker::hasPending() const
+    bool VKPendingReadbackTracker::hasUnsubmitted() const
     {
-        return !mPendingReadbacks.empty();
+        return eastl::any_of(mPendingReadbacks.begin(), mPendingReadbacks.end(), [](const PendingLinearReadback &read)
+        {
+            return !read.hasSubmissionSerial;
+        });
+    }
+
+    uint64_t VKPendingReadbackTracker::lastDirectWriter(const VKResourceStateDB &history, uint32_t lane) const
+    {
+        uint64_t writer = 0;
+        for (const auto &read : mPendingReadbacks)
+        {
+            if (read.usesDirectMapping && !read.hasSubmissionSerial)
+            {
+                const auto &buffer = *static_cast<const VKBuffer *>(read.source.buffer.get());
+                writer = eastl::max(writer, history.lastBufferWriter(buffer, read.source.offset, read.size, lane));
+            }
+        }
+        return writer;
     }
 
     size_t VKPendingReadbackTracker::pendingCount() const
@@ -91,6 +108,7 @@ namespace GVM::RHI::Vulkan
             .debugId = debugId,
             .source = source,
             .readback = readback,
+            .size = source.size,
             .usesDirectMapping = true,
         });
     }
@@ -105,6 +123,7 @@ namespace GVM::RHI::Vulkan
             .debugId = debugId,
             .stagingBuffer = stagingBuffer,
             .readback = readback,
+            .size = stagingBuffer->getStorageSize(),
             .usesDirectMapping = false,
         });
     }
@@ -143,12 +162,12 @@ namespace GVM::RHI::Vulkan
         }
     }
 
-    VKSubmissionSerial VKPendingReadbackTracker::getLastAssignedSubmissionSerial() const
+    VKSubmissionSerial VKPendingReadbackTracker::lastHostCopySerial() const
     {
         VKSubmissionSerial serial = 0u;
         for (const PendingLinearReadback &pending : mPendingReadbacks)
         {
-            if (!pending.hasSubmissionSerial)
+            if (!pending.hasSubmissionSerial || pending.destination == nullptr)
             {
                 continue;
             }
@@ -186,7 +205,9 @@ namespace GVM::RHI::Vulkan
             auto &buffer = *static_cast<VKBuffer *>(sourceBuffer.get());
             const auto *mapped = static_cast<const uint8_t *>(buffer.getPersistentMappedData());
             if (mapped == nullptr)
+            {
                 throw std::runtime_error("Vulkan readback requires host-visible persistent storage.");
+            }
             // A readback must not use the writable unmap path or publish a fictitious host write.
             buffer.invalidateAllocation(pending.source.offset, pending.size);
             if (pending.readback != nullptr)
@@ -232,6 +253,10 @@ namespace GVM::RHI::Vulkan
                     pending.submissionSerial,
                     pending.size,
                     pending.usesDirectMapping);
+                if (pending.readback != nullptr)
+                {
+                    continue;
+                }
                 if (pending.usesDirectMapping && !pending.source.buffer.isNull())
                 {
                     static_cast<VKBuffer *>(pending.source.buffer.get())->releaseReference();

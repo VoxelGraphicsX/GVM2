@@ -332,7 +332,7 @@ namespace GVM::RHI::Vulkan
 
     void VKDevice::initResourcePoolsAndCaches()
     {
-        mResourceRegistry.init();
+        mResourceRegistry->init();
         mDescriptorPoolStore.init(this);
         mRenderPassFramebufferCache.init(mDevice.get(), mLogger);
         const eastl::vector<uint8_t> &initialPipelineCacheData = mInstance->getDescriptor().pipelineCache.initialData;
@@ -499,7 +499,7 @@ namespace GVM::RHI::Vulkan
     DiagnosticsResourceSnapshot VKDevice::getDiagnosticsResourceSnapshot() const
     {
         ensureAlive("VKDevice::getDiagnosticsResourceSnapshot");
-        return mResourceRegistry.snapshot();
+        return mResourceRegistry->snapshot();
     }
 
     VmaAllocator VKDevice::getAllocator() const
@@ -513,6 +513,11 @@ namespace GVM::RHI::Vulkan
     }
 
     VKResourceRegistry &VKDevice::getResourceRegistry()
+    {
+        return *mResourceRegistry;
+    }
+
+    eastl::weak_ptr<VKResourceRegistry> VKDevice::getResourceRegistryHandle() const
     {
         return mResourceRegistry;
     }
@@ -576,7 +581,7 @@ namespace GVM::RHI::Vulkan
 
     std::recursive_mutex &VKDevice::submissionMutex()
     {
-        return mSubmissionMutex;
+        return mResourceRegistry->submissionMutex();
     }
 
     uint32_t VKDevice::computeFamily() const
@@ -614,7 +619,7 @@ namespace GVM::RHI::Vulkan
     void VKDevice::destroy()
     {
         GVMLogInfo(this, DeviceLogCategory, "event=device_destroy_begin");
-        if (mResourceRegistry.beginDestroy())
+        if (mResourceRegistry->beginDestroy())
         {
             return;
         }
@@ -655,8 +660,8 @@ namespace GVM::RHI::Vulkan
             mMainQueue = nullptr;
         }
 
-        mResourceRegistry.collectReleasedResources();
-        mResourceRegistry.releaseAll();
+        mResourceRegistry->collectReleasedResources();
+        mResourceRegistry->releaseAll();
         mResourceStateDB.reset();
         mPresentManager.reset();
         mFullscreenTextureExecutor = Private::FullscreenTextureExecutor{};
@@ -693,7 +698,7 @@ namespace GVM::RHI::Vulkan
 
     void VKDevice::ensureAlive(const char *apiName) const
     {
-        if (mResourceRegistry.isDestroyed() || !mDevice)
+        if (mResourceRegistry->isDestroyed() || !mDevice)
         {
             throw std::runtime_error((eastl::string(apiName) + " was called on a destroyed Vulkan device.").c_str());
         }
@@ -876,7 +881,7 @@ namespace GVM::RHI::Vulkan
 
     void VKDevice::freeDescriptorSet(vk::DescriptorPool pool, vk::DescriptorSet descriptorSet)
     {
-        if (mResourceRegistry.isDestroyed())
+        if (mResourceRegistry->isDestroyed())
         {
             GVMLogWarn(
                 this, DeviceLogCategory,
@@ -934,7 +939,7 @@ namespace GVM::RHI::Vulkan
         try
         {
             bufferImpl->init(*this, descriptor);
-            return mResourceRegistry.adoptBuffer(*bufferImpl);
+            return mResourceRegistry->adoptBuffer(*bufferImpl);
         }
         catch (...)
         {
@@ -960,7 +965,7 @@ namespace GVM::RHI::Vulkan
         try
         {
             textureImpl->init(this, descriptor);
-            return mResourceRegistry.adoptTexture(*textureImpl);
+            return mResourceRegistry->adoptTexture(*textureImpl);
         }
         catch (...)
         {
@@ -979,7 +984,7 @@ namespace GVM::RHI::Vulkan
         {
             textureImpl->initExternalImage(this, descriptor, image);
             textureImpl->setSteadyStateLayout(vk::ImageLayout::ePresentSrcKHR);
-            return mResourceRegistry.adoptTexture(*textureImpl);
+            return mResourceRegistry->adoptTexture(*textureImpl);
         }
         catch (...)
         {
@@ -997,7 +1002,7 @@ namespace GVM::RHI::Vulkan
         try
         {
             samplerImpl->init(*this, descriptor);
-            return mResourceRegistry.adoptSampler(*samplerImpl);
+            return mResourceRegistry->adoptSampler(*samplerImpl);
         }
         catch (...)
         {
@@ -1009,17 +1014,17 @@ namespace GVM::RHI::Vulkan
 
     void VKDevice::freeBuffer(Buffer buffer)
     {
-        mResourceRegistry.freeBuffer(buffer);
+        mResourceRegistry->freeBuffer(buffer);
     }
 
     void VKDevice::freeTexture(Texture texture)
     {
-        mResourceRegistry.freeTexture(texture);
+        mResourceRegistry->freeTexture(texture);
     }
 
     void VKDevice::freeSampler(Sampler sampler)
     {
-        mResourceRegistry.freeSampler(sampler);
+        mResourceRegistry->freeSampler(sampler);
     }
 
 

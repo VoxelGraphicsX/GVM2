@@ -1,9 +1,13 @@
 #pragma once
 
 #include "VKCommon.hpp"
+#include <EASTL/vector.h>
 
 namespace GVM::RHI::Vulkan
 {
+    /// Combines waits on one native timeline while preserving its largest value and all required stages.
+    void mergeTimelineWait(eastl::vector<vk::SemaphoreSubmitInfo> &waits, const vk::SemaphoreSubmitInfo &wait);
+
     [[nodiscard]]
     vk::PipelineStageFlags2 normalizeStageMask(vk::PipelineStageFlags2 stageMask);
 

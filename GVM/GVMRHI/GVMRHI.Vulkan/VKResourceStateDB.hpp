@@ -71,6 +71,8 @@ namespace GVM::RHI::Vulkan
         VKResourceTextureState &editTexture(const VKTexture &texture);
         /// Returns an aggregate snapshot for existing backend diagnostics.
         bool tryGetCurrentBufferState(const VKBuffer &buffer, VKResourceBufferState &outState) const;
+        /// Finds the last accepted writer on one queue that overlaps a mapped host read.
+        uint64_t lastBufferWriter(const VKBuffer &buffer, uint64_t offset, uint64_t size, uint32_t lane) const;
         /// Queries a uniform image range for native presentation operations.
         bool tryGetSharedTextureStateForTransition(const VKTexture &texture, TextureAspectFlags aspect, uint32_t mip, uint32_t mipCount, uint32_t layer, uint32_t layerCount, vk::ImageLayout &layout, vk::PipelineStageFlags2 &stages, vk::AccessFlags2 &accesses) const;
         /// Records host-side access to a byte range outside a command encoder.

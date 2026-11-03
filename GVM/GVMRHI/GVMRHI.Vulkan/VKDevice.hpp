@@ -99,6 +99,8 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]] VKQueue *getMainQueueImpl() const;
         /** Returns the registry that owns resource pools, live tracking, and retire draining. */
         [[nodiscard]] VKResourceRegistry &getResourceRegistry();
+        /// Allows readbacks to release retained storage only while the device pools still exist.
+        [[nodiscard]] eastl::weak_ptr<VKResourceRegistry> getResourceRegistryHandle() const;
         /// Returns the device-owned resource history; mutations currently require the canonical queue submission lock.
         [[nodiscard]] VKResourceStateDB &getResourceStateDB();
         /// Returns the device-owned resource history for backend queries.
@@ -164,13 +166,12 @@ namespace GVM::RHI::Vulkan
         VKQueue *mComputeQueue = nullptr;
         uint32_t mComputeFamily = VK_QUEUE_FAMILY_IGNORED;
         bool mSingleQueueForTesting = false;
-        std::recursive_mutex mSubmissionMutex;
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
         Queue mDiagnosticsOverlayQueue = nullptr;
 #endif
         Private::FullscreenTextureExecutor mFullscreenTextureExecutor;
         VKPresentManager mPresentManager;
-        VKResourceRegistry mResourceRegistry{*this};
+        eastl::shared_ptr<VKResourceRegistry> mResourceRegistry = eastl::make_shared<VKResourceRegistry>(*this);
         VKResourceStateDB mResourceStateDB;
         eastl::shared_ptr<DeviceLostState> mLostState = eastl::make_shared<DeviceLostState>();
         mutable Mutex mDescriptorPoolMutex;
