@@ -365,6 +365,8 @@ namespace UGLC::CodeGen
 
         // --- 【新增】专门翻译 for 循环的辅助函数 ---
         std::string translateForStmt(const clang::ForStmt *S);
+        /** Translates a C++ range-based for statement through the statement translator. */
+        std::string translateCXXForRangeStmt(const clang::CXXForRangeStmt *S);
         // --- 【新增】专门翻译原生数组下标操作的辅助函数 ---
         virtual std::string translateArraySubscriptExpr(const clang::ArraySubscriptExpr *E);
         // --- 【新增】专门翻译 break 语句的辅助函数 ---

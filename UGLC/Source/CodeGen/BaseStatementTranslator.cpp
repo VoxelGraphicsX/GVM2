@@ -37,6 +37,10 @@ namespace UGLC::CodeGen
         {
             return mVisitor.translateForStmt(forStmt);
         }
+        if (auto *forRangeStmt = llvm::dyn_cast<clang::CXXForRangeStmt>(stmt))
+        {
+            return mVisitor.translateCXXForRangeStmt(forRangeStmt);
+        }
         if (auto *breakStmt = llvm::dyn_cast<clang::BreakStmt>(stmt))
         {
             return mVisitor.translateBreakStmt(breakStmt);
@@ -183,6 +187,53 @@ namespace UGLC::CodeGen
             result += mVisitor.TranslateStmt(stmt->getBody());
         }
 
+        return result;
+    }
+
+    std::string BaseStatementTranslator::translateCXXForRangeStmt(const clang::CXXForRangeStmt *stmt)
+    {
+        std::string result = "for (";
+        if (stmt->getInit() != nullptr)
+        {
+            result += mVisitor.TranslateStmt(stmt->getInit()) + "; ";
+        }
+        const clang::VarDecl *loopVar = stmt->getLoopVariable();
+        const clang::QualType loopType = loopVar->getType();
+        const clang::QualType nonRefType = loopType.getNonReferenceType();
+        std::string typeName = mVisitor.generateTypeCanonicalName(nonRefType);
+        if (nonRefType.isLocalConstQualified() && !typeName.starts_with("const "))
+        {
+            typeName = "const " + typeName;
+        }
+        std::string refSuffix = " ";
+        if (loopType->isRValueReferenceType())
+        {
+            refSuffix = " &&";
+        }
+        else if (loopType->isLValueReferenceType())
+        {
+            refSuffix = " &";
+        }
+        result += typeName + refSuffix + loopVar->getNameAsString() +
+            mVisitor.generateDeclArraySpecifier(nonRefType) + " : " +
+            mVisitor.TranslateExpr(stmt->getRangeInit()) + ")" + mVisitor.NewLine();
+        if (stmt->getBody() != nullptr)
+        {
+            if (llvm::isa<clang::CompoundStmt>(stmt->getBody()))
+            {
+                result += mVisitor.TranslateStmt(stmt->getBody());
+            }
+            else
+            {
+                result += mVisitor.enterScope();
+                result += mVisitor.mSpaceManager.getSpace() + mVisitor.TranslateStmt(stmt->getBody()) + mVisitor.EOS();
+                result += mVisitor.quitScope();
+            }
+        }
+        else
+        {
+            result += mVisitor.enterScope() + mVisitor.quitScope();
+        }
         return result;
     }
 

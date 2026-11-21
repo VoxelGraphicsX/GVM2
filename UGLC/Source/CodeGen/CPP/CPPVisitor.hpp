@@ -44,6 +44,7 @@ namespace UGLC::CodeGen::CPP
         std::vector<std::string> usageInfos;
         std::string typeName;
         std::string dimension; // 2D, 3D, Cube
+        std::string dimensionCanonicalName;
         bool usesPixelLocalAttachment = false;
         bool usesPersistentTextureAccess = false;
     };
@@ -314,7 +315,7 @@ namespace UGLC::CodeGen::CPP
                         mLastTextureInfo.usageInfos.emplace_back(convertTextureUsage(usageName));
                     }
                     mLastTextureInfo.typeName = (translateTemplateArgument(templates.front(), &mTypeConvertor));
-                    mLastTextureInfo.dimension = convertTextureDimension(translateTemplateArgument(templates.at(2), &mTypeConvertor));
+                    mLastTextureInfo.dimensionCanonicalName = translateTemplateArgument(templates.at(2), &mTypeConvertor);
                     secondTemplateArgs = translateTemplateArgument(templates.at(1), &mTypeConvertor);
                 }
             }

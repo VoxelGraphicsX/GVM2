@@ -10,7 +10,9 @@ namespace UGLC::CodeGen::CPP
 
         std::string result = canonicalName;
         if (canonicalName == "UGL::TaskGraph" || canonicalName == "UGL::TaskRuntime" ||
-            canonicalName == "UGL::IRenderNode" || canonicalName == "UGL::ReadbackNode" ||
+            canonicalName == "UGL::IRenderNode" || canonicalName == "UGL::RenderNode" ||
+            canonicalName == "UGL::ReadbackNode" || canonicalName == "UGL::ReadbackTextureNode" ||
+            canonicalName == "UGL::TextureReadbackDescriptor" ||
             canonicalName == "UGL::Task" || canonicalName == "UGL::Execution" || canonicalName == "UGL::ExecutionStatus")
         {
             result = "GVM::Core::" + canonicalName.substr(5);
@@ -18,6 +20,10 @@ namespace UGLC::CodeGen::CPP
         else if (canonicalName == "UGL::Device")
         {
             result = "GVM::Core::DeviceProxy";
+        }
+        else if (canonicalName == "UGL::DeviceImpl")
+        {
+            result = "GVM::RHI::DeviceImpl";
         }
         else if (canonicalName == "UGL::Swapchain")
         {
@@ -110,6 +116,10 @@ namespace UGLC::CodeGen::CPP
         else if (canonicalName == "UGL::PixelLocalPassTaskDescriptor")
         {
             result = "GVM::Core::PixelLocalPassTaskDescriptor";
+        }
+        else if (canonicalName == "UGL::PixelLocalNextPassDescriptor")
+        {
+            result = "GVM::Core::PixelLocalNextPassDescriptor";
         }
         else if (canonicalName == "UGL::PixelLocalAccess")
         {

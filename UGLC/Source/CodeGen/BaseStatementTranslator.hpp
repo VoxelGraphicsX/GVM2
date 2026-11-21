@@ -56,6 +56,9 @@ namespace UGLC::CodeGen
         /** Emits a for loop with initializer, condition, increment, and body. */
         std::string translateForStmt(const clang::ForStmt *stmt);
 
+        /** Emits a C++ range-based for loop with optional initializer, typed loop variable, range, and braced body. */
+        std::string translateCXXForRangeStmt(const clang::CXXForRangeStmt *stmt);
+
         /** Emits a break statement. */
         std::string translateBreakStmt(const clang::BreakStmt *stmt);
 

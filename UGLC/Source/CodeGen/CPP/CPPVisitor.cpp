@@ -417,12 +417,40 @@ namespace UGLC::CodeGen::CPP
             {
                 return true;
             }
-            if (llvm::isa<clang::ClassTemplateSpecializationDecl>(decl))
+            const bool isPartialSpec = llvm::isa<clang::ClassTemplatePartialSpecializationDecl>(decl);
+            const auto *fullSpec = llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
+            if (fullSpec != nullptr && !isPartialSpec && !fullSpec->isExplicitSpecialization())
             {
                 return true;
             }
-            if (decl->getDescribedClassTemplate() != nullptr)
+            if (isPartialSpec || decl->getDescribedClassTemplate() != nullptr)
             {
+                if (decl->isThisDeclarationADefinition() && !checkUGLDerivedClass(decl))
+                {
+                    for (const auto *field : decl->fields())
+                    {
+                        if (!field->getType()->isDependentType() &&
+                            !llvm::isa<clang::TypedefType>(field->getType().getTypePtr()) &&
+                            field->getTypeSourceInfo() != nullptr)
+                        {
+                            if (const auto *fieldRecord = field->getType()->getAsCXXRecordDecl())
+                            {
+                                const std::string qName = fieldRecord->getQualifiedNameAsString();
+                                if (qName == "UGL::Buffer" || qName == "UGL::BufferRange" ||
+                                    qName == "UGL::Texture" || qName == "UGL::TextureView")
+                                {
+                                    Rewriter->ReplaceText(
+                                        field->getTypeSourceInfo()->getTypeLoc().getSourceRange(),
+                                        generateTypeCanonicalName(field->getType()));
+                                }
+                            }
+                        }
+                    }
+                    if (const auto resources = mGraphEntryEmitter->emitTemplateResourceVisitor(*decl); !resources.empty())
+                    {
+                        Rewriter->InsertText(decl->getBraceRange().getEnd(), resources, false);
+                    }
+                }
                 return true;
             }
             if (checkUGLDerivedClass(decl) || recordUsesDirectShaderResourceHandles(decl) ||
@@ -437,9 +465,39 @@ namespace UGLC::CodeGen::CPP
                 clang::SourceRange bodyRange = decl->getSourceRange();
                 Rewriter->ReplaceText(bodyRange, result);
             }
-            else if (const auto resources = mGraphEntryEmitter->emitResourceVisitor(*decl); !resources.empty())
+            else if (decl->isThisDeclarationADefinition())
             {
-                Rewriter->InsertText(decl->getBraceRange().getEnd(), resources, false);
+                for (const auto *field : decl->fields())
+                {
+                    if (!field->getType()->isDependentType() &&
+                        !llvm::isa<clang::TypedefType>(field->getType().getTypePtr()) &&
+                        field->getTypeSourceInfo() != nullptr)
+                    {
+                        if (const auto *fieldRecord = field->getType()->getAsCXXRecordDecl())
+                        {
+                            const std::string qName = fieldRecord->getQualifiedNameAsString();
+                            if (qName == "UGL::Buffer" || qName == "UGL::BufferRange" ||
+                                qName == "UGL::Texture" || qName == "UGL::TextureView")
+                            {
+                                Rewriter->ReplaceText(
+                                    field->getTypeSourceInfo()->getTypeLoc().getSourceRange(),
+                                    generateTypeCanonicalName(field->getType()));
+                            }
+                        }
+                    }
+                }
+                for (const auto *method : decl->methods())
+                {
+                    if (method->isUserProvided() && method->hasBody() && !method->isOutOfLine() &&
+                        mGraphEntryEmitter->isSubgraphMethod(*method))
+                    {
+                        Rewriter->ReplaceText(method->getSourceRange(), generateFunctionDefinition(method));
+                    }
+                }
+                if (const auto resources = mGraphEntryEmitter->emitResourceVisitor(*decl); !resources.empty())
+                {
+                    Rewriter->InsertText(decl->getBraceRange().getEnd(), resources, false);
+                }
             }
 
             return true;
@@ -2328,6 +2386,7 @@ namespace UGLC::CodeGen::CPP
                 {
                     throw std::runtime_error("cannot find LastTextureInfo");
                 }
+                const std::string dimension = convertTextureDimension(mLastTextureInfo.dimensionCanonicalName);
                 std::string result;
 
                 std::string depthExpr = "1u";
@@ -2336,7 +2395,7 @@ namespace UGLC::CodeGen::CPP
                     depthExpr = TranslateExpr(E->getArg(3));
                 }
 
-                result = Callee + "({.label=" + debugLabel + ", .usage = " + stringJoin(mLastTextureInfo.usageInfos, "|") + ", .dimension = " + mLastTextureInfo.dimension + ", .size = {.width = (uint32_t)" + TranslateExpr(E->getArg(1)) + ", .height = (uint32_t)" + TranslateExpr(E->getArg(2)) + ", .depth = (uint32_t)" + depthExpr + "}, .format = " + mLastTextureInfo.typeName;
+                result = Callee + "({.label=" + debugLabel + ", .usage = " + stringJoin(mLastTextureInfo.usageInfos, "|") + ", .dimension = " + dimension + ", .size = {.width = (uint32_t)" + TranslateExpr(E->getArg(1)) + ", .height = (uint32_t)" + TranslateExpr(E->getArg(2)) + ", .depth = (uint32_t)" + depthExpr + "}, .format = " + mLastTextureInfo.typeName;
                 if (llvm::dyn_cast<clang::CXXDefaultArgExpr>(E->getArg(4)) == nullptr)
                 {
                     result += ", .mipLevelCount = " + TranslateExpr(E->getArg(4));
@@ -2465,6 +2524,14 @@ namespace UGLC::CodeGen::CPP
                                                                            sourceManager,
                                                                            Context->getLangOpts());
         std::string result = originalSource.str();
+        if (const auto templateResources = mGraphEntryEmitter->emitTemplateResourceVisitor(*primaryDecl); !templateResources.empty())
+        {
+            const auto closeBrace = result.rfind('}');
+            if (closeBrace != std::string::npos)
+            {
+                result.insert(closeBrace, templateResources);
+            }
+        }
         std::unordered_set<std::string> emittedVariantLabels;
 
         for (auto *specialization : templateDecl->specializations())
@@ -2483,7 +2550,16 @@ namespace UGLC::CodeGen::CPP
             result += NewLine();
             result += getLineDirective(specialization->getBeginLoc());
             pushTemplateSubstitutionContext(specialization);
-            result += replacePlainTemplateSpecializationRecord(primaryDecl);
+            std::string specializedRecord = replacePlainTemplateSpecializationRecord(primaryDecl);
+            if (const auto specResources = mGraphEntryEmitter->emitResourceVisitor(*specialization); !specResources.empty())
+            {
+                const auto closeBrace = specializedRecord.rfind('}');
+                if (closeBrace != std::string::npos)
+                {
+                    specializedRecord.insert(closeBrace, specResources);
+                }
+            }
+            result += specializedRecord;
             popTemplateSubstitutionContext();
         }
 

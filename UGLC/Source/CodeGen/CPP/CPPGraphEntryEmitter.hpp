@@ -27,20 +27,34 @@ namespace UGLC::CodeGen::CPP
 
         /// Identifies the explicit subgraph protocol through ordinary class inheritance.
         bool isRenderRecord(const clang::CXXRecordDecl &record) const;
+        /// Identifies inline non-render methods returning UGL::Task<T> so plain functor classes lower subgraph types.
+        bool isSubgraphMethod(const clang::CXXMethodDecl &method) const;
         /// Describes resource-bearing result records using generated metadata without changing their public fields.
         std::string emitResourceVisitor(const clang::CXXRecordDecl &record) const;
+        /// Emits lazy dependent resource metadata and visitor methods for user-defined class templates.
+        std::string emitTemplateResourceVisitor(const clang::CXXRecordDecl &record) const;
 
     private:
         /// Validates CPU values and explicit-destruction GPU allocation outputs without exporting standalone views.
         void validateResult(const clang::FunctionDecl &function);
         /// Identifies nonstatic user methods that must receive invocation-local state.
         bool isRenderMethod(const clang::FunctionDecl &function) const;
+        /// Returns true if a possibly cv- or reference-qualified type refers to UGL::RenderNode.
+        bool isRenderNodeType(clang::QualType type) const;
+        /// Returns true if a possibly cv- or reference-qualified type refers to UGL::TaskGraph.
+        bool isTaskGraphType(clang::QualType type) const;
+        /// Validates explicit RenderNode & parameters on a function and returns the parameter name when present.
+        std::optional<std::string> validateExplicitRenderNodeParam(const clang::FunctionDecl &function, bool allowExplicitRenderNode) const;
+        /// Validates explicit TaskGraph & parameters on a subgraph builder and returns the parameter name when present.
+        std::optional<std::string> validateExplicitTaskGraphParam(const clang::FunctionDecl &function, bool allowExplicitTaskGraph) const;
         /// Validates a graph target using its inferred CPU or subgraph effects.
         void validateTarget(const clang::FunctionDecl &function);
         /// Lowers registered graph construction intrinsics and synchronous node helpers.
         std::optional<std::string> translateRenderCall(const clang::CXXMemberCallExpr &call);
         /// Rejects resources, borrowed storage and opaque records in ordinary CPU values.
         void validateValue(clang::QualType type, clang::SourceLocation location, bool graphConstruction = false);
+        /// Validates user-defined element constructors and assignments reachable through owning container operations.
+        void validateContainerElementOperations(clang::QualType containerOrElementType, bool graphConstruction);
         /// Validates a callable body and all reachable user functions without revisiting recursion.
         void validateFunction(const clang::FunctionDecl &function, bool graphConstruction);
         /// Checks local state, direct calls and pointer operations in a reachable body.
@@ -55,6 +69,8 @@ namespace UGLC::CodeGen::CPP
         std::string callableExpression(const clang::Expr &expression, const clang::FunctionDecl &function);
         /// Identifies source-only graph result wrappers by their canonical template declaration.
         bool isTask(clang::QualType type) const;
+        /// Identifies an eastl::vector whose elements are UGL::Task<T> values.
+        bool isTaskVector(clang::QualType type) const;
         /// Identifies approved owning EASTL containers whose implementation internals are not DSL storage.
         bool isOwningContainer(const clang::CXXRecordDecl &record) const;
         /// Recognizes fixed built-in vector values whose source emulation contains implementation pointers.
@@ -64,6 +80,7 @@ namespace UGLC::CodeGen::CPP
 
         CPPVisitor &mVisitor;
         const clang::FunctionDecl *mRenderMethod = nullptr;
+        std::string mRenderNodeVarName = "__gvm_node";
         bool mRenderValidation = false;
         bool mExportValidation = false;
         std::unordered_set<const clang::CXXRecordDecl *> mValidatedRenderValues;

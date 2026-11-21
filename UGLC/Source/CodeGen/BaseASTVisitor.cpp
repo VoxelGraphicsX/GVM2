@@ -2016,6 +2016,10 @@ namespace UGLC::CodeGen
     {
         return mStatementTranslator.translateForStmt(S);
     }
+    std::string BaseASTVisitor::translateCXXForRangeStmt(const clang::CXXForRangeStmt *S)
+    {
+        return mStatementTranslator.translateCXXForRangeStmt(S);
+    }
     std::string BaseASTVisitor::translateConditionalOperator(const clang::ConditionalOperator *E)
     {
         return mExpressionTranslator.translateConditionalOperator(E);
