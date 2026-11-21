@@ -21,6 +21,20 @@ namespace GVM::Core
         uint32_t workerCount = 0;
         uint32_t maximumPassesPerExecution = 4096;
         uint32_t maximumPassesPerBatch = 64;
+        /// Enables zero-blocking cross-frame GPU timestamp feedback to refine pass scheduling weights.
+        bool enablePassTimestampFeedback = false;
+        /// GPU pass duration in nanoseconds mapped to one cross-queue handoff cost unit (default 50 us).
+        uint32_t queueHandoffThresholdNs = 50000;
+    };
+
+    /// Snapshot of one GPU pass's smoothed hardware duration and learned scheduler weight.
+    struct PassProfileFeedbackEntry
+    {
+        eastl::string label;
+        uint64_t profileKey = 0;
+        double smoothedDurationNs = 0.0;
+        uint32_t sampleCount = 0;
+        uint16_t learnedWeight = 0;
     };
 
     /// Drives graphs independently of a Renderer; destruction drains only this runtime's work.
@@ -43,6 +57,8 @@ namespace GVM::Core
 
         /// Owns the builder and input snapshot, then builds and evaluates a graph asynchronously.
         /// The builder returns Task<T>; neither submission nor graph joins wait for worker children.
+        /// Separate executions have no implicit ordering. Keep dependent GPU uses in one graph, or
+        /// wait for the previous execution to succeed before reusing an external writable resource.
         template <class Builder, class Input>
         auto submit(Builder builder, Input input)
         {
@@ -53,32 +69,13 @@ namespace GVM::Core
             auto prepare = [builder = eastl::move(builder), input = eastl::move(input)]() mutable
             {
                 auto output = eastl::invoke(builder, eastl::move(input));
-                return Private::TaskGraphOutput{eastl::move(output.mDefinition), output.mIndex,
-                    [resolve = eastl::move(output.mResolve)](const eastl::any &value) -> eastl::any
-                    {
-                        if constexpr (eastl::is_void_v<Value>)
-                        {
-                            return {};
-                        }
-                        else
-                        {
-                            return resolve(value);
-                        }
-                    }, [](const eastl::any &value)
-                    {
-                        eastl::vector<const void *> resources;
-                        if constexpr (!eastl::is_void_v<Value> && Private::containsGraphResources<Value>)
-                        {
-                            Private::visitGraphResources(eastl::any_cast<const Value &>(value), [&resources](const void *resource)
-                            {
-                                resources.push_back(resource);
-                            });
-                        }
-                        return resources;
-                    }};
+                return Private::makeTaskGraphOutput(eastl::move(output));
             };
             return Execution<Value>(submitEntry(eastl::move(prepare)));
         }
+
+        /// Returns the latest learned GPU pass durations and scheduling weights when enablePassTimestampFeedback is active.
+        eastl::vector<PassProfileFeedbackEntry> passProfileSnapshot() const;
 
     private:
         /// Admits an owning entry or returns a terminal rejected execution without invoking it.

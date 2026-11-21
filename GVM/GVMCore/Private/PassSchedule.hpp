@@ -32,7 +32,8 @@ namespace GVM::Core::Private
         /// Groups the planned order without removing graphics, opaque, control or observable completion boundaries.
         eastl::vector<PassBatch> batches(const eastl::vector<GraphPass> &passes, uint32_t maximumBatchSize) const;
         /// Places ready passes by critical path and producer arrival time, accounting for queue handoffs before cutting batches.
-        eastl::vector<PassBatch> place(const eastl::vector<GraphPass> &passes, uint32_t maximumBatchSize, PassQueues queues);
+        eastl::vector<PassBatch> place(const eastl::vector<GraphPass> &passes, uint32_t maximumBatchSize, PassQueues queues,
+            const eastl::vector<uint32_t> &initialAvailable = {});
         /// Returns exclusive batch ends for the single-queue path, bounding submits and graphics ordering.
         eastl::vector<uint32_t> batchEnds(const eastl::vector<GraphPass> &passes, uint32_t maximumBatchSize) const;
     private:

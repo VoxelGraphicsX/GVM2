@@ -5,6 +5,7 @@
 #include <EASTL/type_traits.h>
 #include <EASTL/any.h>
 #include <cstdint>
+#include <exception>
 #include <limits>
 
 namespace GVM::Core
@@ -33,6 +34,41 @@ namespace GVM::Core
         void cancelExecution(const eastl::shared_ptr<TaskExecutionState> &state);
         /// Copies a successful result without waiting, rethrowing an original task failure.
         eastl::any executionResult(const eastl::shared_ptr<TaskExecutionState> &state);
+
+        /// Guards locked access to a completed execution's result and commits GPU ownership transfer only on non-throwing return.
+        class ExecutionResultClaim final
+        {
+        public:
+            /// Locks the execution state and validates terminal completion before accessing the stored result.
+            explicit ExecutionResultClaim(const eastl::shared_ptr<TaskExecutionState> &state);
+            /// Commits single-transfer GPU ownership only when no new exception is active during scope exit.
+            ~ExecutionResultClaim();
+            ExecutionResultClaim(const ExecutionResultClaim &) = delete;
+            ExecutionResultClaim &operator=(const ExecutionResultClaim &) = delete;
+
+            /// Returns the stored result value while the execution lock remains held.
+            eastl::any &value() const noexcept
+            {
+                return *mValue;
+            }
+            /// Reports whether retrieving this result transfers single-claim GPU resource ownership.
+            bool singleTransfer() const noexcept
+            {
+                return mSingleTransfer;
+            }
+            /// Marks that a move-only result is about to be moved out of the execution slot.
+            void noteMoveAttempt() noexcept
+            {
+                mMovedFrom = true;
+            }
+
+        private:
+            const TaskExecutionState *mState = nullptr;
+            eastl::any *mValue = nullptr;
+            int mUncaughtOnEntry = 0;
+            bool mSingleTransfer = false;
+            bool mMovedFrom = false;
+        };
     }
 
     /// Retains one execution; successful get returns owned CPU data or GPU allocations requiring explicit destruction.
@@ -66,15 +102,36 @@ namespace GVM::Core
         {
             Private::cancelExecution(mState);
         }
-        /// Returns a successful value; exported GPU allocations must be explicitly destroyed through the existing device API.
-        /// Unretrieved GPU outputs remain owned by this execution; copied resource handles do not create separate allocations.
+        /// Returns a successful value; CPU results remain repeatable, while exported GPU allocations transfer ownership once and require explicit device destruction.
+        /// Unretrieved GPU outputs remain owned by this execution and are reclaimed on destruction.
         T get() const
         {
-            auto result = Private::executionResult(mState);
+            Private::ExecutionResultClaim claim(mState);
             if constexpr (!eastl::is_void_v<T>)
             {
-                return eastl::any_cast<T>(eastl::move(result));
+                if (claim.singleTransfer())
+                {
+                    if constexpr (eastl::is_nothrow_move_constructible_v<T>)
+                    {
+                        return eastl::any_cast<T>(eastl::move(claim.value()));
+                    }
+                    else if constexpr (eastl::is_copy_constructible_v<T>)
+                    {
+                        return T(eastl::any_cast<const T &>(claim.value()));
+                    }
+                    else
+                    {
+                        claim.noteMoveAttempt();
+                        return eastl::any_cast<T>(eastl::move(claim.value()));
+                    }
+                }
+                return T(eastl::any_cast<const T &>(claim.value()));
             }
+        }
+        /// Explicitly claims the execution result; recommended when retrieving exported GPU allocations with single-transfer ownership.
+        T take() const
+        {
+            return get();
         }
 
     private:

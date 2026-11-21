@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Public/GraphResourceTraits.hpp"
 #include <EASTL/functional.h>
 #include <EASTL/shared_ptr.h>
 #include <EASTL/vector.h>
@@ -15,12 +16,16 @@ namespace GVM::Core::Private
 {
     using TaskResults = eastl::vector<eastl::any>;
 
+    struct TaskGraphOutput;
+
     /// Describes one owning operation and its earlier graph dependencies, independent of workers.
     struct TaskDefinition
     {
         eastl::vector<uint32_t> predecessors;
         eastl::function<eastl::any(const TaskResults &, RenderNode *)> evaluate;
+        eastl::function<TaskGraphOutput(const TaskResults &)> evaluateSubgraph;
         bool buildsSubgraph = false;
+        bool buildsTaskSubgraph = false;
     };
 
     /// Owns a graph definition; execution snapshots isolate callable state between submissions.
@@ -46,26 +51,39 @@ namespace GVM::Core::Private
         eastl::function<eastl::vector<const void *>(const eastl::any &)> resources;
     };
 
-    /// Identifies native resource handles and compiler-described records without inspecting CPU payloads at runtime.
+    /// Identifies native resource handles, trait-described C++ structs, and compiler-described records.
     template <class T>
     inline constexpr bool containsGraphResources = []
     {
-        if constexpr (eastl::is_same_v<T, RHI::Buffer> || eastl::is_same_v<T, RHI::BufferRange> ||
-            eastl::is_same_v<T, RHI::Texture> || eastl::is_same_v<T, RHI::TextureView>)
+        using U = eastl::remove_cvref_t<T>;
+        if constexpr (eastl::is_void_v<U>)
+        {
+            return false;
+        }
+        else if constexpr (eastl::is_same_v<U, RHI::Buffer> || eastl::is_same_v<U, RHI::BufferRange> ||
+            eastl::is_same_v<U, RHI::Texture> || eastl::is_same_v<U, RHI::TextureView>)
         {
             return true;
         }
-        else if constexpr (requires { T::__gvm_containsResources; })
+        else if constexpr (GraphResourceTraits<U>::containsResources)
         {
-            return T::__gvm_containsResources;
+            return true;
         }
-        else if constexpr (eastl::is_array_v<T>)
+        else if constexpr (requires { U::__gvm_containsResources; })
         {
-            return containsGraphResources<eastl::remove_extent_t<T>>;
+            return U::__gvm_containsResources;
         }
-        else if constexpr (requires { typename T::value_type; })
+        else if constexpr (requires { U::__gvm_hasResources(); })
         {
-            return containsGraphResources<typename T::value_type>;
+            return U::__gvm_hasResources();
+        }
+        else if constexpr (eastl::is_array_v<U>)
+        {
+            return containsGraphResources<eastl::remove_extent_t<U>>;
+        }
+        else if constexpr (requires { typename U::value_type; })
+        {
+            return containsGraphResources<typename U::value_type>;
         }
         else
         {
@@ -77,23 +95,28 @@ namespace GVM::Core::Private
     template <class T, class Visitor>
     void visitGraphResources(const T &value, const Visitor &visitor)
     {
-        if constexpr (eastl::is_same_v<T, RHI::Buffer> || eastl::is_same_v<T, RHI::Texture>)
+        using U = eastl::remove_cvref_t<T>;
+        if constexpr (eastl::is_same_v<U, RHI::Buffer> || eastl::is_same_v<U, RHI::Texture>)
         {
             visitor(value.get());
         }
-        else if constexpr (eastl::is_same_v<T, RHI::BufferRange>)
+        else if constexpr (eastl::is_same_v<U, RHI::BufferRange>)
         {
             visitor(value.buffer.get());
         }
-        else if constexpr (eastl::is_same_v<T, RHI::TextureView>)
+        else if constexpr (eastl::is_same_v<U, RHI::TextureView>)
         {
             visitor(value.isNull() ? nullptr : value->getSourceTexture());
         }
-        else if constexpr (requires { value.__gvm_visitResources(visitor); })
+        else if constexpr (GraphResourceTraits<U>::containsResources)
+        {
+            GraphResourceTraits<U>::visit(value, visitor);
+        }
+        else if constexpr (containsGraphResources<U> && requires { value.__gvm_visitResources(visitor); })
         {
             value.__gvm_visitResources(visitor);
         }
-        else if constexpr (containsGraphResources<T> && (eastl::is_array_v<T> || requires { value.begin(); value.end(); }))
+        else if constexpr (containsGraphResources<U> && (eastl::is_array_v<U> || requires { value.begin(); value.end(); }))
         {
             for (const auto &element : value)
             {

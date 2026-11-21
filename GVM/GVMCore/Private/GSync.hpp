@@ -16,6 +16,7 @@ namespace GVM::Core
 
         eastl::function<void(GVM::RHI::ComputePassEncoder)> dispatchFn;
         Private::PassResourceUsage resources;
+        uint16_t weight = 8u;
     };
 
     enum class RenderPassPhaseRequirement
@@ -133,6 +134,144 @@ namespace GVM::Core
                 descriptor.pixelLocalPasses.back().end(),
                 std::data(tasks),
                 std::data(tasks) + std::size(tasks));
+        }
+
+        /// Tracks the top-level render pass phase while expanding ordinary render tasks and pixel-local task groups.
+        struct RenderPassPhaseState
+        {
+            bool hasEncodedPhase = false;
+            bool currentPhaseIsOrdinary = false;
+            uint32_t phaseCount = 0u;
+        };
+
+        /// Counts top-level render pass phases while folding adjacent ordinary render tasks into one phase.
+        struct RenderPassPhaseCounter
+        {
+            uint32_t phaseCount = 0u;
+            bool currentPhaseIsOrdinary = false;
+            bool hasPixelLocalPhase = false;
+        };
+
+        /// Returns the number of non-empty pixel-local subpasses inside a phase group.
+        inline uint32_t getNonEmptyPixelLocalPassCount(const PixelLocalPassTaskDescriptor &tasks)
+        {
+            uint32_t nonEmptyPassCount = 0u;
+            for (const auto &pass : tasks.pixelLocalPasses)
+            {
+                if (!pass.empty())
+                {
+                    ++nonEmptyPassCount;
+                }
+            }
+            return nonEmptyPassCount;
+        }
+
+        /// Rejects pixel-local-only draw tasks used outside pixelLocalPass(...).
+        inline void validateOrdinaryRenderPassTask(const RenderPassTaskDescriptor &task, const char *context)
+        {
+            if (task.phaseRequirement == RenderPassPhaseRequirement::PixelLocalOnly)
+            {
+                throw std::invalid_argument((eastl::string(context) + " cannot execute a pixel-local-only RenderPassTaskDescriptor outside pixelLocalPass(...).").c_str());
+            }
+        }
+
+        /// Validates every task in an ordinary render-pass task range.
+        template <typename TTasks>
+        void validateOrdinaryRenderPassTaskRange(const TTasks &tasks, const char *context)
+        {
+            for (const auto &task : tasks)
+            {
+                validateOrdinaryRenderPassTask(task, context);
+            }
+        }
+
+        /// Opens or reuses an ordinary subpass phase on the active render pass encoder.
+        inline void beginOrdinaryRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state)
+        {
+            if (state.hasEncodedPhase && state.currentPhaseIsOrdinary)
+            {
+                return;
+            }
+            if (state.hasEncodedPhase)
+            {
+                renderpassEncoder->nextPixelLocalPass();
+            }
+            state.hasEncodedPhase = true;
+            state.currentPhaseIsOrdinary = true;
+            ++state.phaseCount;
+        }
+
+        /// Advances the render pass encoder to the next pixel-local subpass phase.
+        inline void beginPixelLocalRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state)
+        {
+            if (state.hasEncodedPhase)
+            {
+                renderpassEncoder->nextPixelLocalPass();
+            }
+            state.hasEncodedPhase = true;
+            state.currentPhaseIsOrdinary = false;
+            ++state.phaseCount;
+        }
+
+        /// Encodes an ordinary task after phase counting has checked its phase requirement.
+        inline void encodeRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state, const RenderPassTaskDescriptor &task)
+        {
+            beginOrdinaryRenderPassPhase(renderpassEncoder, state);
+            task.drawFn(renderpassEncoder);
+        }
+
+        /// Encodes each non-empty pixel-local subpass inside a pixel-local task group.
+        inline void encodeRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state, const PixelLocalPassTaskDescriptor &tasks)
+        {
+            for (const auto &pass : tasks.pixelLocalPasses)
+            {
+                if (pass.empty())
+                {
+                    continue;
+                }
+                beginPixelLocalRenderPassPhase(renderpassEncoder, state);
+                for (const auto &task : pass)
+                {
+                    task.drawFn(renderpassEncoder);
+                }
+            }
+        }
+
+        /// Updates the phase counter for one ordinary render task.
+        inline void countRenderPassPhase(RenderPassPhaseCounter &counter, const RenderPassTaskDescriptor &task, const char *context)
+        {
+            validateOrdinaryRenderPassTask(task, context);
+            if (!counter.currentPhaseIsOrdinary)
+            {
+                ++counter.phaseCount;
+                counter.currentPhaseIsOrdinary = true;
+            }
+        }
+
+        /// Updates the phase counter for one pixel-local task group.
+        inline void countRenderPassPhase(RenderPassPhaseCounter &counter, const PixelLocalPassTaskDescriptor &tasks, const char *)
+        {
+            const uint32_t nonEmptyPassCount = getNonEmptyPixelLocalPassCount(tasks);
+            if (nonEmptyPassCount == 0u)
+            {
+                return;
+            }
+            counter.phaseCount += nonEmptyPassCount;
+            counter.currentPhaseIsOrdinary = false;
+            counter.hasPixelLocalPhase = true;
+        }
+
+        /// Resolves total subpass phase count and whether pixel-local storage is enabled.
+        template <class... Args>
+        RenderPassPhaseCounter resolveRenderPassPhaseCounter(const char *context, const Args &...args)
+        {
+            RenderPassPhaseCounter counter = {};
+            (countRenderPassPhase(counter, args, context), ...);
+            if (counter.phaseCount == 0u)
+            {
+                counter.phaseCount = 1u;
+            }
+            return counter;
         }
     } // namespace Private
 

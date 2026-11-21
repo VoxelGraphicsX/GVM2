@@ -130,3 +130,30 @@ if(GVM_BUILD_SAMPLES AND GVM_BUILD_ADVANCED_SAMPLES)
         DOWNLOAD_ONLY YES
     )
 endif()
+
+if(GVM_ENABLE_UPSTREAM_MARL AND NOT TARGET marl::marl AND NOT TARGET marl)
+    if(GVM_MARL_SOURCE_DIR AND EXISTS "${GVM_MARL_SOURCE_DIR}/CMakeLists.txt")
+        set(MARL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(MARL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(MARL_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+        set(MARL_INSTALL OFF CACHE BOOL "" FORCE)
+        add_subdirectory("${GVM_MARL_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/_deps/marl-local-build" EXCLUDE_FROM_ALL)
+    else()
+        CPMAddPackage(
+            NAME marl
+            GITHUB_REPOSITORY google/marl
+            GIT_TAG main
+            GIT_SUBMODULES ""
+            GIT_SUBMODULES_RECURSE FALSE
+            OPTIONS
+                "MARL_BUILD_EXAMPLES OFF"
+                "MARL_BUILD_TESTS OFF"
+                "MARL_BUILD_BENCHMARKS OFF"
+                "MARL_INSTALL OFF"
+                "MARL_IS_SUBPROJECT ON"
+        )
+    endif()
+    if(TARGET marl AND NOT TARGET marl::marl)
+        add_library(marl::marl ALIAS marl)
+    endif()
+endif()

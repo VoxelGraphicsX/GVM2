@@ -27,6 +27,22 @@ namespace GVM::Core::Private
     {
         return state->result();
     }
+
+    ExecutionResultClaim::ExecutionResultClaim(const eastl::shared_ptr<TaskExecutionState> &state)
+        : mUncaughtOnEntry(std::uncaught_exceptions())
+    {
+        mValue = state->beginResultClaim(mSingleTransfer);
+        mState = state.get();
+    }
+
+    ExecutionResultClaim::~ExecutionResultClaim()
+    {
+        if (mState != nullptr)
+        {
+            const bool succeeded = (std::uncaught_exceptions() == mUncaughtOnEntry);
+            mState->endResultClaim(succeeded, mMovedFrom);
+        }
+    }
 }
 
 template class GVM::Core::Execution<void>;

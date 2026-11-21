@@ -7,137 +7,6 @@
 #include <type_traits>
 namespace GVM::Core
 {
-    namespace Private
-    {
-        /// Tracks the top-level render pass phase while expanding ordinary render tasks and pixel-local task groups.
-        struct RenderPassPhaseState
-        {
-            bool hasEncodedPhase = false;
-            bool currentPhaseIsOrdinary = false;
-            uint32_t phaseCount = 0u;
-        };
-
-        /// Counts top-level render pass phases while folding adjacent ordinary render tasks into one phase.
-        struct RenderPassPhaseCounter
-        {
-            uint32_t phaseCount = 0u;
-            bool currentPhaseIsOrdinary = false;
-            bool hasPixelLocalPhase = false;
-        };
-
-        inline uint32_t getNonEmptyPixelLocalPassCount(const PixelLocalPassTaskDescriptor &tasks)
-        {
-            uint32_t nonEmptyPassCount = 0u;
-            for (const auto &pass : tasks.pixelLocalPasses)
-            {
-                if (!pass.empty())
-                {
-                    ++nonEmptyPassCount;
-                }
-            }
-            return nonEmptyPassCount;
-        }
-
-        inline void validateOrdinaryRenderPassTask(const RenderPassTaskDescriptor &task, const char *context)
-        {
-            if (task.phaseRequirement == RenderPassPhaseRequirement::PixelLocalOnly)
-            {
-                throw std::invalid_argument(std::string(context) + " cannot execute a pixel-local-only RenderPassTaskDescriptor outside pixelLocalPass(...).");
-            }
-        }
-
-        template <typename TTasks>
-        void validateOrdinaryRenderPassTaskRange(const TTasks &tasks, const char *context)
-        {
-            for (const auto &task : tasks)
-            {
-                validateOrdinaryRenderPassTask(task, context);
-            }
-        }
-
-        inline void beginOrdinaryRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state)
-        {
-            if (state.hasEncodedPhase && state.currentPhaseIsOrdinary)
-            {
-                return;
-            }
-            if (state.hasEncodedPhase)
-            {
-                renderpassEncoder->nextPixelLocalPass();
-            }
-            state.hasEncodedPhase = true;
-            state.currentPhaseIsOrdinary = true;
-            ++state.phaseCount;
-        }
-
-        inline void beginPixelLocalRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state)
-        {
-            if (state.hasEncodedPhase)
-            {
-                renderpassEncoder->nextPixelLocalPass();
-            }
-            state.hasEncodedPhase = true;
-            state.currentPhaseIsOrdinary = false;
-            ++state.phaseCount;
-        }
-
-        /** Encodes an ordinary task after phase counting has checked its phase requirement. */
-        inline void encodeRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state, const RenderPassTaskDescriptor &task)
-        {
-            beginOrdinaryRenderPassPhase(renderpassEncoder, state);
-            task.drawFn(renderpassEncoder);
-        }
-
-        inline void encodeRenderPassPhase(GVM::RHI::RenderPassEncoder renderpassEncoder, RenderPassPhaseState &state, const PixelLocalPassTaskDescriptor &tasks)
-        {
-            for (const auto &pass : tasks.pixelLocalPasses)
-            {
-                if (pass.empty())
-                {
-                    continue;
-                }
-                beginPixelLocalRenderPassPhase(renderpassEncoder, state);
-                for (const auto &task : pass)
-                {
-                    task.drawFn(renderpassEncoder);
-                }
-            }
-        }
-
-        inline void countRenderPassPhase(RenderPassPhaseCounter &counter, const RenderPassTaskDescriptor &task)
-        {
-            validateOrdinaryRenderPassTask(task, "QueueProxyImpl::renderPass");
-            if (!counter.currentPhaseIsOrdinary)
-            {
-                ++counter.phaseCount;
-                counter.currentPhaseIsOrdinary = true;
-            }
-        }
-
-        inline void countRenderPassPhase(RenderPassPhaseCounter &counter, const PixelLocalPassTaskDescriptor &tasks)
-        {
-            const uint32_t nonEmptyPassCount = getNonEmptyPixelLocalPassCount(tasks);
-            if (nonEmptyPassCount == 0u)
-            {
-                return;
-            }
-            counter.phaseCount += nonEmptyPassCount;
-            counter.currentPhaseIsOrdinary = false;
-            counter.hasPixelLocalPhase = true;
-        }
-
-        template <class... Args>
-        RenderPassPhaseCounter resolveRenderPassPhaseCounter(const Args &...args)
-        {
-            RenderPassPhaseCounter counter = {};
-            (countRenderPassPhase(counter, args), ...);
-            if (counter.phaseCount == 0u)
-            {
-                counter.phaseCount = 1u;
-            }
-            return counter;
-        }
-    }
     /**
      * Records render, compute and blit passes onto one RHI queue and executes them together with the
      * buffer/texture transfer methods. Queued writes are hoisted ahead of every pass of the next
@@ -201,7 +70,7 @@ namespace GVM::Core
                     renderpassDesp.timestampWrites = timestampScope->timestampWrites;
                     renderpassDesp.counterWrites = timestampScope->counterWrites;
                 }
-                const Private::RenderPassPhaseCounter phaseCounter = Private::resolveRenderPassPhaseCounter(args...);
+                const Private::RenderPassPhaseCounter phaseCounter = Private::resolveRenderPassPhaseCounter("QueueProxyImpl::renderPass", args...);
                 renderpassDesp.pixelLocal.enabled = phaseCounter.hasPixelLocalPhase;
                 renderpassDesp.pixelLocal.passCount = phaseCounter.phaseCount;
                 renderpassEncoder = mCommandEncoder->beginRenderPass(renderpassDesp);

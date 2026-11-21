@@ -10,7 +10,7 @@ namespace GVM::Core::Private
 {
     uint32_t TaskGraphDefinition::append(TaskDefinition definition)
     {
-        if (!definition.evaluate)
+        if (!definition.evaluate && !definition.evaluateSubgraph)
         {
             throw std::invalid_argument("A graph task requires an owning operation.");
         }

@@ -43,10 +43,10 @@ target_sources(
         Private/TaskRuntimeState.cpp
         Private/PassResourceAccess.cpp
         Private/PassSchedule.cpp
+        Private/PassWeightProfiler.cpp
         Private/GraphDevice.cpp
         Private/GraphResourceAllocation.cpp
         Private/GpuGraphExecution.cpp
-        Private/GpuGraphService.cpp
         Public/RenderNode.cpp
 )
 set_target_properties(GVMCore PROPERTIES
@@ -71,3 +71,14 @@ target_include_directories(GVMCore
 
 target_link_libraries(GVMCore PRIVATE EASTL Threads::Threads)
 target_link_libraries(GVMCore PUBLIC EASTL_Helper GVMLoggingSupport GVMRHI)
+
+if(TARGET marl::marl OR TARGET marl)
+    add_library(GVMMarlExecutor INTERFACE)
+    add_library(GVM::MarlExecutor ALIAS GVMMarlExecutor)
+    target_compile_features(GVMMarlExecutor INTERFACE cxx_std_20)
+    if(TARGET marl::marl)
+        target_link_libraries(GVMMarlExecutor INTERFACE GVMCore marl::marl)
+    else()
+        target_link_libraries(GVMMarlExecutor INTERFACE GVMCore marl)
+    endif()
+endif()

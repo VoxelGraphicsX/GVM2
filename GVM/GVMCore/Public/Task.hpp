@@ -12,6 +12,18 @@ namespace GVM::Core
     namespace Private
     {
         class TaskGraphDefinition;
+        struct TaskGraphOutput;
+        template <class U>
+        struct IsTask : eastl::false_type
+        {
+        };
+        template <class U>
+        struct IsTask<Task<U>> : eastl::true_type
+        {
+        };
+        /// Packages a Task<Value> handle into an execution-ready TaskGraphOutput descriptor.
+        template <class Value>
+        TaskGraphOutput makeTaskGraphOutput(Task<Value> &&output);
         /// Lowers a compiler-checked field projection without allocating a task or waiting for its producer.
         template <class Record, class Projection>
         auto projectTask(const Task<Record> &source, Projection projection);
@@ -31,6 +43,8 @@ namespace GVM::Core
     private:
         friend class TaskGraph;
         friend class TaskRuntime;
+        template <class Value>
+        friend Private::TaskGraphOutput Private::makeTaskGraphOutput(Task<Value> &&output);
         template <class Record, class Projection>
         friend auto Private::projectTask(const Task<Record> &source, Projection projection);
         /// Binds a typed output to its producer without retaining an execution or a caller stack.

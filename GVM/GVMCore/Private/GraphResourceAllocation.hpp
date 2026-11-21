@@ -1,8 +1,10 @@
 #pragma once
-#include "GraphDevice.hpp"
+#include <EASTL/shared_ptr.h>
+#include <GVMRHI/GVMRHI.hpp>
 
 namespace GVM::Core::Private
 {
+    class GraphDevice;
     /// Owns one native allocation until graph cleanup or successful output retrieval transfers explicit destruction.
     class GraphResourceAllocation final
     {

@@ -1,4 +1,5 @@
 #include "TaskRuntime.hpp"
+#include "../Private/PassWeightProfiler.hpp"
 #include "../Private/TaskExecutionState.hpp"
 #include "../Private/TaskRuntimeState.hpp"
 
@@ -29,6 +30,15 @@ namespace GVM::Core
     TaskRuntime::~TaskRuntime()
     {
         mState->closeAndWait();
+    }
+
+    eastl::vector<PassProfileFeedbackEntry> TaskRuntime::passProfileSnapshot() const
+    {
+        if (mState == nullptr || mState->passWeightProfiler() == nullptr)
+        {
+            return {};
+        }
+        return mState->passWeightProfiler()->snapshot();
     }
 
     eastl::shared_ptr<Private::TaskExecutionState> TaskRuntime::submitEntry(eastl::function<Private::TaskGraphOutput()> prepare)
