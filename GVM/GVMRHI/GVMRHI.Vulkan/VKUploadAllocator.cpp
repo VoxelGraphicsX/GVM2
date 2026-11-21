@@ -80,7 +80,10 @@ namespace GVM::RHI::Vulkan
         }
     }
 
-    VKUploadSlice VKUploadAllocator::allocateAndWrite(const void *data, uint64_t size, uint64_t alignment)
+    eastl::optional<VKUploadSlice> VKUploadAllocator::tryAllocateAndWrite(
+        const void *data,
+        uint64_t size,
+        uint64_t alignment)
     {
         if (mDevice == nullptr)
         {
@@ -98,12 +101,7 @@ namespace GVM::RHI::Vulkan
         eastl::optional<Private::UploadSlice<VKUploadPage>> slice = mPages.tryAllocate(size, alignment);
         if (!slice.has_value())
         {
-            mPages.addPage(createUploadPage(mDevice, Private::UploadPageAllocator<VKUploadPage>::pageSizeFor(size)));
-            slice = mPages.tryAllocate(size, alignment);
-            if (!slice.has_value())
-            {
-                throw std::runtime_error("VKUploadAllocator failed to sub-allocate from a new upload page.");
-            }
+            return eastl::nullopt;
         }
 
         memcpy(slice->mappedData, data, size);
@@ -112,7 +110,22 @@ namespace GVM::RHI::Vulkan
             throw std::runtime_error("VKUploadAllocator failed to flush upload memory.");
         }
 
-        return {slice->page.buffer, slice->offset, slice->mappedData};
+        return VKUploadSlice{slice->page.buffer, slice->offset, slice->mappedData};
+    }
+
+    VKUploadSlice VKUploadAllocator::allocateAndWrite(const void *data, uint64_t size, uint64_t alignment)
+    {
+        if (auto existing = tryAllocateAndWrite(data, size, alignment))
+        {
+            return *existing;
+        }
+        mPages.addPage(createUploadPage(mDevice, Private::UploadPageAllocator<VKUploadPage>::pageSizeFor(size)));
+        auto created = tryAllocateAndWrite(data, size, alignment);
+        if (!created.has_value())
+        {
+            throw std::runtime_error("VKUploadAllocator failed to sub-allocate from a new upload page.");
+        }
+        return *created;
     }
 
     void VKUploadAllocator::onSubmission(VKSubmissionSerial serial)

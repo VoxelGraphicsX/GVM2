@@ -11,6 +11,8 @@ namespace GVM::RHI::Metal
 		MTextureView();
 		/// Returns the parent allocation identity without exposing a native Metal texture.
 		const TextureImpl *getSourceTexture() const override;
+		/// Returns the resolved subresource descriptor of this Metal texture view.
+		TextureViewDescriptor getViewDescriptor() const override { return mDescriptor; }
 		/** Takes ownership of a retained native view and caches its effective format, dimension, and resource identifier. */
 		void init(MTexture &parentTexture, MTL::Texture *nativeTextureView, const TextureViewDescriptor &descriptor);
 		/// Returns the texture format exposed by this Metal texture view.

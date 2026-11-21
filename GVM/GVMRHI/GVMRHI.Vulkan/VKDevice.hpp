@@ -13,6 +13,8 @@
 #include "VKRenderPassFramebufferCache.hpp"
 #include "VKResourceRegistry.hpp"
 #include "VKResourceStateDB.hpp"
+#include "VKQueueSelection.hpp"
+#include "VKSubmissionTimeline.hpp"
 #include <GVMRHI/Private/FullscreenTextureExecutor.hpp>
 
 #include <GVMRHI/Private/DeviceObjectCache.hpp>
@@ -37,12 +39,14 @@ namespace GVM::RHI::Vulkan
         Queue getMainQueue() const override;
         /// Returns a stable compatible queue; unsupported indices and diagnostics presentation alias the main queue.
         Queue getQueue(const QueueDescriptor &descriptor) override;
-        /// Returns the other timeline owner, or null when the device has a single queue.
-        VKQueue *otherQueue(const VKQueue &queue) const;
+        /// Returns the number of distinct native queues, including auxiliary queues hidden by testing overrides.
+        uint32_t queueCount() const;
+        /// Returns the native queue owning a stable backend timeline index; aliases never receive another index.
+        VKQueue &queue(uint32_t index) const;
         /// Orders device-wide resource history transactions and native queue submissions.
         std::recursive_mutex &submissionMutex();
-        /// Reports the auxiliary family for sharing private argument pages across reusable encoders.
-        uint32_t computeFamily() const;
+        /// Lists distinct selected families for private argument pages shared across reusable encoders.
+        eastl::vector<uint32_t> queueFamilyIndices() const;
         /// Selects the single-queue fallback in isolated tests before constructing a graph runtime.
         void useSingleQueueForTesting();
         TimestampQuerySupport getTimestampQuerySupport() const override;
@@ -136,6 +140,7 @@ namespace GVM::RHI::Vulkan
         VKDescriptorChurnCounters &getDescriptorChurnCounters();
 
         [[nodiscard]] Private::FullscreenTextureExecutor &getFullscreenTextureExecutor();
+        HostTimeline createHostTimeline() override;
 
     private:
         /** Surveys instance physical devices and records the selected device's capabilities. */
@@ -164,7 +169,9 @@ namespace GVM::RHI::Vulkan
         VKArgumentResources mArgumentResources{*this};
         VKQueue *mMainQueue = nullptr;
         VKQueue *mComputeQueue = nullptr;
-        uint32_t mComputeFamily = VK_QUEUE_FAMILY_IGNORED;
+        VKQueue *mTransferQueue = nullptr;
+        eastl::array<VKQueueSelection, MaxDeviceQueues> mQueueSelections{};
+        eastl::vector<VKQueue *> mQueues;
         bool mSingleQueueForTesting = false;
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
         Queue mDiagnosticsOverlayQueue = nullptr;
@@ -181,5 +188,7 @@ namespace GVM::RHI::Vulkan
         Private::DeviceObjectCache mObjectCache;
         RuntimeDiagnosticsOverlayConfig mDiagnosticsOverlayConfig = {};
         VKDescriptorChurnCounters mDescriptorChurnCounters = {};
+        std::mutex mHostTimelinesMutex;
+        eastl::vector<eastl::weak_ptr<VKHostTimelineState>> mHostTimelines;
     };
 } // namespace GVM::RHI::Vulkan

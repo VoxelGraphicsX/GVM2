@@ -1,6 +1,7 @@
 #include "MArguments.hpp"
 #include "MBuffer.hpp"
 #include "MDevice.hpp"
+#include "MEnumUtils.hpp"
 #include "MPipelineLayout.hpp"
 #include "MTexture.hpp"
 #include "MTextureView.hpp"
@@ -47,7 +48,6 @@ namespace GVM::RHI::Metal
             std::memcpy(mBytes.data() + field.lengthOffset, &length, sizeof(length));
             if (field.visibility != 0)
             {
-                mQueueAccesses.push_back({&native, range.offset, length, field.type == BufferBindingType::Storage});
                 retainResource(native, &native, field.type == BufferBindingType::Storage ?
                     MTL::ResourceUsageRead | MTL::ResourceUsageWrite : MTL::ResourceUsageRead, field.visibility);
             }
@@ -94,10 +94,8 @@ namespace GVM::RHI::Metal
                 handle = view->getResourceId();
                 if (field.entry.visibility != 0)
                 {
-                    mQueueAccesses.push_back({parentTexture->getNativeTexture(), 0, UINT64_MAX,
-                        storage && field.entry.storageTexture.access != StorageTextureAccess::ReadOnly});
                     auto *native = view->getNativeTextureView();
-                    retainResource(*native, native, storage ? MTL::ResourceUsageRead | MTL::ResourceUsageWrite : MTL::ResourceUsageRead,
+                    retainResource(*native, native, storage ? translateStorageTextureAccessToMTL(field.entry.storageTexture.access) : MTL::ResourceUsageRead,
                         field.entry.visibility);
                     const auto existingUse = eastl::find_if(mTextureUses.begin(), mTextureUses.end(),
                         [view, access = field.entry.storageTexture.access](const MArgumentTextureUse &use)
@@ -149,11 +147,6 @@ namespace GVM::RHI::Metal
         {
             mPool->removeSnapshotBytes(mReserved);
         }
-    }
-
-    const eastl::vector<MQueueAccess> &MArguments::queueAccesses() const
-    {
-        return mQueueAccesses;
     }
 
     void MArguments::retainResource(NS::Object &allocation, MTL::Resource *resource, MTL::ResourceUsage usage, ShaderStageFlags visibility)

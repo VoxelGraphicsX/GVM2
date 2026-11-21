@@ -573,6 +573,12 @@ namespace GVM::RHI::Private
             /// Destroys overlay-owned resources without taking ownership of the backend queue.
             ~DiagnosticsOverlayQueue() override;
 
+            /// Forwards per-queue timestamp query capabilities from the backend queue.
+            TimestampQuerySupport getTimestampQuerySupport() const override;
+            /// Forwards per-queue minimum image transfer granularity from the backend queue.
+            Extent3D getImageTransferGranularity() const override;
+            /// Forwards per-queue safe unsubmitted command encoder capacity from the backend queue.
+            uint32_t getMaxUnsubmittedCommandEncoderCount() const override;
             /// Creates a wrapped command encoder backed by the real queue.
             CommandEncoder createCommandEncoder() override;
             /// Forwards a buffer upload to the backend queue.
@@ -1370,6 +1376,29 @@ namespace GVM::RHI::Private
         DiagnosticsOverlayQueue::~DiagnosticsOverlayQueue()
         {
             destroy();
+        }
+
+        TimestampQuerySupport DiagnosticsOverlayQueue::getTimestampQuerySupport() const
+        {
+            return mInnerQueue != nullptr ? mInnerQueue->getTimestampQuerySupport() : TimestampQuerySupport{};
+        }
+
+        Extent3D DiagnosticsOverlayQueue::getImageTransferGranularity() const
+        {
+            if (mInnerQueue != nullptr)
+            {
+                return mInnerQueue->getImageTransferGranularity();
+            }
+            return {1u, 1u, 1u};
+        }
+
+        uint32_t DiagnosticsOverlayQueue::getMaxUnsubmittedCommandEncoderCount() const
+        {
+            if (mInnerQueue != nullptr)
+            {
+                return mInnerQueue->getMaxUnsubmittedCommandEncoderCount();
+            }
+            return 1024u;
         }
 
         CommandEncoder DiagnosticsOverlayQueue::createCommandEncoder()

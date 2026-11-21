@@ -4,6 +4,7 @@
 
 #include <EASTL/shared_ptr.h>
 #include <EASTL/vector.h>
+#include <mutex>
 
 namespace GVM::RHI::Vulkan
 {
@@ -23,11 +24,15 @@ namespace GVM::RHI::Vulkan
         void destroy();
 
         [[nodiscard]]
+        eastl::shared_ptr<VKCommandBufferContext> tryAcquire();
+
+        [[nodiscard]]
         eastl::shared_ptr<VKCommandBufferContext> acquire();
 
         void recycle(eastl::shared_ptr<VKCommandBufferContext> context);
 
     private:
+        mutable std::mutex mMutex;
         vk::Device mDevice = nullptr;
         uint32_t mQueueFamilyIndex = 0;
         eastl::vector<eastl::shared_ptr<VKCommandBufferContext>> mAvailableCommandContexts;

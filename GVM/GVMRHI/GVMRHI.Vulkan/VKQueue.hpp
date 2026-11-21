@@ -24,8 +24,13 @@ namespace GVM::RHI::Vulkan
     public:
         VKQueue() = default;
 
-        void init(VKDevice *device, uint32_t queueFamilyIndex, vk::Queue queue, const eastl::string &queueName);
+        void init(VKDevice *device, uint32_t queueFamilyIndex, vk::Queue queue, const eastl::string &queueName, uint32_t deviceQueueIndex);
+        /// Returns the stable index of this native queue in the device's timeline storage.
+        uint32_t getDeviceQueueIndex() const;
 
+        TimestampQuerySupport getTimestampQuerySupport() const override;
+        /// Returns the Vulkan queue family's minimum image transfer granularity in texel blocks.
+        Extent3D getImageTransferGranularity() const override;
         CommandEncoder createCommandEncoder() override;
         /// Publishes an unmapped host write without racing queue state compilation.
         void recordHostWrite(VKBuffer &buffer);
@@ -92,10 +97,12 @@ namespace GVM::RHI::Vulkan
         /** Throws once the queue was marked lost by a failed native submission; waits and polling stay usable. */
         void ensureNotLost() const;
         CommandEncoder createCommandEncoderLocked();
-        void enforceTrackedSubmissionLimitLocked();
+        void enforceTrackedSubmissionLimit(std::unique_lock<std::recursive_mutex> &lock);
+        void waitForTimelineSerialUnlocked(const VKSubmissionTimeline &timeline, VKSubmissionSerial serial, const char *waitSource);
         void handleRetiredSubmissionLocked(InFlightSubmission &submission);
         eastl::shared_ptr<VKCommandBufferContext> acquireCommandBufferContextLocked();
         void recycleCommandBufferContextLocked(eastl::shared_ptr<VKCommandBufferContext> context);
+        [[nodiscard]] VKUploadSlice allocateUploadSliceLocked(const void *data, uint64_t size);
         [[nodiscard]] CommandEncoder getOrCreateInternalCopyCommandEncoderLocked();
         [[nodiscard]] VKBlitPassEncoder &getOrCreateInternalBlitCopyPassLocked();
         [[nodiscard]] ComputePassEncoder getOrCreateInternalComputeCopyPassEncoderLocked();
@@ -118,7 +125,6 @@ namespace GVM::RHI::Vulkan
             VKSubmissionSerial submissionSerial,
             VKSubmissionSerial &outAssignedSerial);
         void processCompletedSubmissionCleanupLocked();
-        void waitTrackedSubmissionLocked(VKSubmissionSerial serial);
         [[nodiscard]]
         VKSubmissionSerial submitRecordedCommandBuffersLocked(
             const eastl::vector<vk::CommandBuffer> &commandBuffers,
@@ -135,6 +141,7 @@ namespace GVM::RHI::Vulkan
         eastl::string mQueueName;
         vk::Queue mQueue;
         uint32_t mQueueFamilyIndex = 0;
+        uint32_t mDeviceQueueIndex = 0;
         VKQueueCommandContextPool mCommandContextPool;
         CommandEncoder mInternalCopyCommandEncoder;
         BlitPassEncoder mInternalBlitCopyPassEncoder;
@@ -147,7 +154,7 @@ namespace GVM::RHI::Vulkan
         VKUploadAllocator mUploadAllocator;
         VKPendingReadbackTracker mPendingReadbackTracker;
         uint64_t mReadbackSequence = 0;
-        bool mDestroyed = false;
+        eastl::atomic<bool> mDestroyed{false};
         /** True after an exception escaped native lowering or vkQueueSubmit2; new GPU work is rejected. */
         /** Reason captured from the exception that lost the queue. */
     };

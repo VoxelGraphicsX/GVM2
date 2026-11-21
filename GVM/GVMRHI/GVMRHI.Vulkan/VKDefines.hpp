@@ -1,7 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 namespace GVM::RHI::Vulkan
 {
+    /// Bounds backend timeline storage for the main, compute, and transfer queue selections.
+    constexpr uint32_t MaxDeviceQueues = 3;
+
     class VKInstance;
     class VKDevice;
     class VKQueue;

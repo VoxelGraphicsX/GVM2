@@ -156,7 +156,6 @@ namespace GVM::RHI::Metal
             this->mNativeComputeEncoder->setBuffer(eastl::static_pointer_cast<MBindGroup>(group)->getNativeBuffer(), 0, groupIndex);
         }
         const auto *bindGroup = static_cast<MBindGroup *>(group.get());
-        mWeakCommandEncoder->markOpaque();
         mValidator.setBindGroup(group, groupIndex, bindGroup->getDescriptor().layout, bindGroup->getComputeTextureUses());
     }
 
@@ -221,7 +220,6 @@ namespace GVM::RHI::Metal
         {
             throw std::invalid_argument("Indirect dispatch requires a native buffer from the same device.");
         }
-        mWeakCommandEncoder->recordAccess({&buffer, offset, sizeof(uint32_t) * 3, false});
         mNativeComputeEncoder->dispatchThreadgroups(&buffer, offset, mLastThreadGroupSize);
     }
 

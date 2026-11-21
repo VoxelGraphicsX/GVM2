@@ -14,6 +14,8 @@ namespace GVM::RHI::Vulkan
         VKTextureView() = default;
         /// Returns the parent allocation identity without exposing a native Vulkan image.
         const TextureImpl *getSourceTexture() const override;
+        /// Returns the resolved subresource descriptor of this Vulkan texture view.
+        TextureViewDescriptor getViewDescriptor() const override { return mDescriptor; }
 
         void init(VKDevice &device, VKTexture &texture, const TextureViewDescriptor &descriptor);
         void destroy() override;

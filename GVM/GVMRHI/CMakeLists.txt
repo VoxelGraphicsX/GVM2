@@ -75,6 +75,31 @@ endif()
 
 if(GVM_RHI_ENABLE_VULKAN)
     add_subdirectory(GVMRHI.Vulkan)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        find_path(GVM_KOSMICKRISP_SDK NAMES lib/libvulkan_kosmickrisp.dylib
+            PATHS "${GVM_DEPENDENCY_CACHE_ROOT}/kosmickrisp/1.4.363.1/macOS" "$ENV{HOME}/VulkanSDK/1.4.363.1/macOS"
+            NO_DEFAULT_PATH DOC "macOS directory of the LunarG Vulkan 1.4 SDK containing KosmicKrisp")
+        if(GVM_KOSMICKRISP_SDK)
+            set(kosmic_libraries "${GVM_KOSMICKRISP_SDK}/lib/libvulkan.1.dylib" "${GVM_KOSMICKRISP_SDK}/lib/libvulkan_kosmickrisp.dylib")
+            foreach(library IN LISTS kosmic_libraries)
+                if(NOT EXISTS "${library}")
+                    message(FATAL_ERROR "GVM_KOSMICKRISP_SDK is missing ${library}")
+                endif()
+            endforeach()
+            add_custom_target(gvm_kosmickrisp_runtime
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GVMRHI>/KosmicKrisp"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${kosmic_libraries} "$<TARGET_FILE_DIR:GVMRHI>/KosmicKrisp"
+                VERBATIM)
+            add_dependencies(GVMRHI gvm_kosmickrisp_runtime)
+            if(GVM_INSTALL)
+                install(FILES "$<TARGET_FILE_DIR:GVMRHI>/KosmicKrisp/libvulkan.1.dylib"
+                              "$<TARGET_FILE_DIR:GVMRHI>/KosmicKrisp/libvulkan_kosmickrisp.dylib"
+                        DESTINATION "${CMAKE_INSTALL_LIBDIR}/KosmicKrisp")
+            endif()
+        else()
+            message(STATUS "macOS Vulkan needs KosmicKrisp beside GVMRHI; set GVM_KOSMICKRISP_SDK to package it. Metal is available independently.")
+        endif()
+    endif()
     target_link_libraries(
         GVMRHI
         PRIVATE

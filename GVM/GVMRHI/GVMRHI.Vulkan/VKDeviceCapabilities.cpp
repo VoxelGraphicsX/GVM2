@@ -8,11 +8,20 @@
 
 #include <cstring>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace GVM::RHI::Vulkan
 {
     namespace
     {
         constexpr eastl::string_view DeviceLogCategory = "gvmrhi.vulkan.device";
+
+#if defined(__APPLE__) && TARGET_OS_OSX
+        // VK_DRIVER_ID_MESA_KOSMICKRISP was assigned after the pinned Vulkan 1.3.280 headers.
+        constexpr vk::DriverId KosmicKrispDriverId = static_cast<vk::DriverId>(28);
+#endif
 
         uint32_t scorePhysicalDeviceType(vk::PhysicalDeviceType type)
         {
@@ -93,10 +102,12 @@ namespace GVM::RHI::Vulkan
             supportedFeatures2.pNext = &supportedVulkan12Features;
             physicalDevice.getFeatures2(&supportedFeatures2);
             survey.storage16BitFeatures.pNext = nullptr;
+            survey.supportsSeparateDepthStencilLayouts = supportedVulkan12Features.separateDepthStencilLayouts != VK_FALSE;
             survey.supportsRequiredVulkan13Features =
                 supportedVulkan12Features.bufferDeviceAddress &&
                 supportedVulkan13Features.synchronization2 &&
                 supportedVulkan12Features.timelineSemaphore &&
+                supportedVulkan12Features.separateDepthStencilLayouts &&
                 supportedVulkan12Features.descriptorBindingSampledImageUpdateAfterBind &&
                 supportedVulkan12Features.descriptorBindingStorageBufferUpdateAfterBind &&
                 supportedVulkan12Features.descriptorBindingPartiallyBound;
@@ -203,6 +214,7 @@ namespace GVM::RHI::Vulkan
 
         uint32_t bestScore = 0;
         bool foundDevice = false;
+        vk::PhysicalDeviceDriverProperties selectedDriverProperties = {};
         for (const vk::PhysicalDevice &physicalDevice : physicalDevices)
         {
             const vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
@@ -216,6 +228,20 @@ namespace GVM::RHI::Vulkan
                     VulkanApiVersion);
                 continue;
             }
+            vk::PhysicalDeviceDriverProperties driverProperties = {};
+            vk::PhysicalDeviceProperties2 properties2 = {};
+            properties2.pNext = &driverProperties;
+            physicalDevice.getProperties2(&properties2);
+#if defined(__APPLE__) && TARGET_OS_OSX
+            if (driverProperties.driverID != KosmicKrispDriverId || properties.apiVersion < VK_MAKE_API_VERSION(0, 1, 4, 0))
+            {
+                GVMLogInfo(
+                    logSubject, DeviceLogCategory,
+                    "event=device_candidate_rejected name=\"{}\" driver=\"{}\" api_version={} reason=macos_requires_kosmickrisp_vulkan_1_4",
+                    properties.deviceName.data(), driverProperties.driverName.data(), properties.apiVersion);
+                continue;
+            }
+#endif
             eastl::vector<vk::ExtensionProperties> availableDeviceExtensions = toEastlVector(physicalDevice.enumerateDeviceExtensionProperties());
             const VulkanCapabilitySurvey capabilitySurvey =
                 queryVulkanCapabilitySurvey(physicalDevice, availableDeviceExtensions);
@@ -258,6 +284,7 @@ namespace GVM::RHI::Vulkan
                     foundDevice = true;
                     mPhysicalDevice = physicalDevice;
                     mPhysicalDeviceProperties = properties;
+                    selectedDriverProperties = driverProperties;
                     mQueueFamilyProperties = eastl::move(queueFamilies);
                     mSurvey = capabilitySurvey;
                     mSelectedDeviceExtensions = eastl::move(availableDeviceExtensions);
@@ -270,7 +297,12 @@ namespace GVM::RHI::Vulkan
         if (!foundDevice)
         {
             throw std::runtime_error(
-                "VKDevice::init could not find a Vulkan 1.3 graphics-capable device exposing the required core sampled-image descriptor indexing feature set "
+#if defined(__APPLE__) && TARGET_OS_OSX
+                "VKDevice::init requires a Vulkan 1.4 KosmicKrisp device on macOS "
+#else
+                "VKDevice::init could not find a Vulkan 1.3 graphics-capable device "
+#endif
+                "exposing the required core sampled-image descriptor indexing feature set "
                 "(descriptor indexing, sampled-image/storage-buffer update-after-bind, partially bound arrays, timeline semaphores, buffer device address, synchronization2, and compatible robust buffer access).");
         }
 
@@ -289,8 +321,11 @@ namespace GVM::RHI::Vulkan
         mTimestampQuerySupport.passTimestampWritesSupported = mTimestampQuerySupport.supported;
         GVMLogInfo(
             logSubject, DeviceLogCategory,
-            "event=device_selected name=\"{}\" type={} queue_family_index={} unified_memory={} timestamp_valid_bits={} timestamp_period_ns={} max_compute_workgroup_count={}x{}x{} max_compute_workgroup_invocations={}",
+            "event=device_selected name=\"{}\" driver=\"{}\" driver_info=\"{}\" driver_id={} type={} queue_family_index={} unified_memory={} timestamp_valid_bits={} timestamp_period_ns={} max_compute_workgroup_count={}x{}x{} max_compute_workgroup_invocations={}",
             mPhysicalDeviceProperties.deviceName.data(),
+            selectedDriverProperties.driverName.data(),
+            selectedDriverProperties.driverInfo.data(),
+            static_cast<uint32_t>(selectedDriverProperties.driverID),
             physicalDeviceTypeName(mPhysicalDeviceProperties.deviceType),
             mGraphicsQueueFamilyIndex,
             mMemoryProperties.unifiedMemory != False,

@@ -19,6 +19,8 @@ namespace GVM::RHI::Vulkan
         void copyBufferToBuffer(BufferRange source, BufferRange destination) override;
         void copyBufferToTexture(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize) override;
         void copyTextureToBuffer(const ImageCopyTexture &source, const ImageCopyBuffer &destination, const Extent3D &copySize) override;
+        /// Records a subresource copy between two compatible Vulkan textures.
+        void copyTextureToTexture(const ImageCopyTexture &source, const ImageCopyTexture &destination, const Extent3D &copySize) override;
         void fillBuffer(BufferRange source, uint8_t value) override;
         void end() override;
         /// Emits retained copies in their final queue order.
@@ -70,6 +72,13 @@ namespace GVM::RHI::Vulkan
             Extent3D extent;
             bool upload;
         };
+        /// Describes one texture-to-texture subresource copy retained until command encoding.
+        struct TextureToTextureCopyCommand
+        {
+            ImageCopyTexture source;
+            ImageCopyTexture destination;
+            Extent3D extent;
+        };
         /// Copies an uploaded mip chain without retaining caller-owned offset storage.
         struct MipCopyCommand
         {
@@ -81,8 +90,10 @@ namespace GVM::RHI::Vulkan
         };
         /// Records a typed buffer clear.
         struct FillCommand { BufferRange destination; uint8_t value; };
-        eastl::vector<eastl::variant<BufferCopyCommand, TextureCopyCommand, MipCopyCommand, FillCommand>> mCommands;
+        eastl::vector<eastl::variant<BufferCopyCommand, TextureCopyCommand, TextureToTextureCopyCommand, MipCopyCommand, FillCommand>> mCommands;
         void ensureOpen(const char *apiName) const;
+        /// Rejects image regions that the selected queue family's transfer granularity cannot execute.
+        void validateTextureTransfer(const ImageCopyTexture &texture, const Extent3D &extent) const;
 
         VKDevice *mDevice = nullptr;
         CommandEncoder mRecordingOwner = nullptr;

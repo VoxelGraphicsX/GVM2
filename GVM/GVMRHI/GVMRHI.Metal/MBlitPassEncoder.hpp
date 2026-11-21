@@ -14,6 +14,8 @@ namespace GVM::RHI::Metal
         virtual void copyBufferToBuffer(BufferRange source, BufferRange destination) override;
         virtual void copyBufferToTexture(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize) override;
         virtual void copyTextureToBuffer(const ImageCopyTexture &source, const ImageCopyBuffer &destination, const Extent3D &copySize) override;
+        /// Records a subresource copy between two compatible Metal textures.
+        virtual void copyTextureToTexture(const ImageCopyTexture &source, const ImageCopyTexture &destination, const Extent3D &copySize) override;
         virtual void fillBuffer(BufferRange source, uint8_t value) override;
         virtual void end() override;
         MTL::BlitCommandEncoder *getNativeCommandEncoder() const;

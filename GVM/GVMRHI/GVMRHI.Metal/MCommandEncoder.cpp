@@ -1,6 +1,4 @@
 #include "MCommandEncoder.hpp"
-#include "MTextureView.hpp"
-#include "MTexture.hpp"
 #include "MBindGroup.hpp"
 #include "MBlitPassEncoder.hpp"
 #include "MBuffer.hpp"
@@ -10,7 +8,6 @@
 #include "MQuerySet.hpp"
 #include "MRenderPassEncoder.hpp"
 #include "MRenderPipeline.hpp"
-#include "MTextureView.hpp"
 #include <EASTL/make_intrusive.h>
 #include <stdexcept>
 #include <string>
@@ -76,17 +73,6 @@ namespace GVM::RHI::Metal
         try
         {
             renderPassEncoder->init(this->mDevice, this, pass);
-            for (const auto &attachment : pass.colorAttachments)
-            {
-                if (!attachment.view.isNull())
-                {
-                    recordAccess({static_cast<MTextureView *>(attachment.view.get())->getParentTexture()->getNativeTexture(), 0, UINT64_MAX, true});
-                }
-            }
-            if (!pass.depthStencilAttachment.view.isNull())
-            {
-                recordAccess({static_cast<MTextureView *>(pass.depthStencilAttachment.view.get())->getParentTexture()->getNativeTexture(), 0, UINT64_MAX, true});
-            }
         }
         catch (...)
         {
@@ -257,25 +243,8 @@ namespace GVM::RHI::Metal
     {
         if (querySet != nullptr)
         {
-            markOpaque();
             mRetainedQuerySets.push_back(querySet);
         }
-    }
-
-    void MCommandEncoder::recordAccess(MQueueAccess use)
-    {
-        mAccesses.push_back(use);
-    }
-
-    void MCommandEncoder::markOpaque()
-    {
-        mOpaque = true;
-    }
-
-    void MCommandEncoder::collectAccesses(eastl::vector<MQueueAccess> &uses, bool &opaque) const
-    {
-        opaque = opaque || mOpaque;
-        uses.insert(uses.end(), mAccesses.begin(), mAccesses.end());
     }
 
     void MCommandEncoder::retainBuffer(Buffer buffer)
@@ -288,11 +257,14 @@ namespace GVM::RHI::Metal
 
     MArgumentAllocation MCommandEncoder::allocateArguments(Arguments arguments)
     {
-        if (mEnded || mCommitted) throw std::logic_error("Cannot record Args after the Metal command encoder has ended.");
+        if (mEnded || mCommitted)
+        {
+            throw std::logic_error("Cannot record Args after the Metal command encoder has ended.");
+        }
         if (mArgumentStorage == nullptr)
+        {
             mArgumentStorage = eastl::make_intrusive<MArgumentStorage>(mDevice->getArgumentPagePool());
-        const auto &uses = static_cast<MArguments *>(arguments.get())->queueAccesses();
-        mAccesses.insert(mAccesses.end(), uses.begin(), uses.end());
+        }
         return mArgumentStorage->allocate(*mDevice, eastl::move(arguments));
     }
 

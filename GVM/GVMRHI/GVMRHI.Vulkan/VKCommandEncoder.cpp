@@ -127,6 +127,10 @@ namespace GVM::RHI::Vulkan
 
     ComputePassEncoder VKCommandEncoder::beginComputePass(const ComputePassDescriptor &pass)
     {
+        if (!(mDevice->getCapabilities().getQueueFamilyProperties()[mQueue->getQueueFamilyIndex()].queueFlags & vk::QueueFlagBits::eCompute))
+        {
+            throw std::invalid_argument("Compute passes require a compute-capable queue family.");
+        }
         beginPass("VKCommandEncoder::beginComputePass");
         ComputePassEncoder encoder = new VKComputePassEncoder();
         static_cast<VKComputePassEncoder *>(encoder.get())->init(mDevice, CommandEncoder(this), pass);
@@ -493,7 +497,8 @@ namespace GVM::RHI::Vulkan
                 throw std::invalid_argument("Pass timestamp begin and end indices must be distinct.");
             }
             const TimestampQuerySupport support = mDevice->getTimestampQuerySupport();
-            if (support.supported == False || support.passTimestampWritesSupported == False)
+            if (support.supported == False || support.passTimestampWritesSupported == False ||
+                mDevice->getCapabilities().getQueueFamilyProperties()[mQueue->getQueueFamilyIndex()].timestampValidBits == 0)
             {
                 throw std::runtime_error("Pass timestamps are unsupported on the selected queue family.");
             }

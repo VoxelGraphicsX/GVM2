@@ -13,6 +13,13 @@
 #include <EASTL/string.h>
 #include <EASTL/vector.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if TARGET_OS_OSX
+#include <dlfcn.h>
+#endif
+#endif
+
 namespace GVM::RHI::Vulkan
 {
         namespace
@@ -34,6 +41,32 @@ namespace
         constexpr const char *ValidationFeaturesExtensionName = VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME;
         constexpr const char *ValidationLayerName = "VK_LAYER_KHRONOS_validation";
         bool gSynchronizationValidationEnabled = false;
+
+#if defined(__APPLE__) && TARGET_OS_OSX
+        /// Loads a single entry point from the packaged macOS Vulkan runtime and keeps it valid for Volk's lifetime.
+        PFN_vkGetInstanceProcAddr loadMacVulkanEntryPoint(const char *libraryPath, const char *entryPoint)
+        {
+            void *library = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL | RTLD_FIRST);
+            if (library == nullptr)
+            {
+                throw std::runtime_error((eastl::string("GVM macOS Vulkan requires the packaged KosmicKrisp runtime: ") + dlerror()).c_str());
+            }
+            auto address = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(library, entryPoint));
+            if (address == nullptr)
+            {
+                dlclose(library);
+                throw std::runtime_error((eastl::string(libraryPath) + " does not export " + entryPoint).c_str());
+            }
+            return address;
+        }
+
+        /// Returns the packaged driver's ICD entry point for extension discovery and exclusive instance creation.
+        PFN_vkGetInstanceProcAddr getKosmicKrispProcAddr()
+        {
+            static const auto address = loadMacVulkanEntryPoint("@loader_path/KosmicKrisp/libvulkan_kosmickrisp.dylib", "vk_icdGetInstanceProcAddr");
+            return address;
+        }
+#endif
 
         bool hasInstanceExtension(const eastl::vector<vk::ExtensionProperties> &extensions, const char *extensionName)
         {
@@ -219,10 +252,15 @@ namespace
 
         GVMLogInfo(this, VulkanBackendLogCategory, "event=instance_init_begin");
 
+#if defined(__APPLE__) && TARGET_OS_OSX
+        static const auto loader = loadMacVulkanEntryPoint("@loader_path/KosmicKrisp/libvulkan.1.dylib", "vkGetInstanceProcAddr");
+        volkInitializeCustom(loader);
+#else
         if (volkInitialize() != VK_SUCCESS)
         {
             throw std::runtime_error("VKInstance::init failed to initialize volk.");
         }
+#endif
 
         uint32_t supportedInstanceVersion = VK_API_VERSION_1_0;
         if (vkEnumerateInstanceVersion != nullptr)
@@ -249,7 +287,14 @@ namespace
 
     void VKInstance::selectInstanceLayersAndExtensions(InstanceSelection &selection) const
     {
-        const eastl::vector<vk::ExtensionProperties> availableExtensions = toEastlVector(vk::enumerateInstanceExtensionProperties());
+#if defined(__APPLE__) && TARGET_OS_OSX
+        // A global enumeration would probe system ICDs and omit a directly supplied driver that is not installed globally.
+        const vk::DispatchLoaderDynamic driver(getKosmicKrispProcAddr());
+        const auto availableExtensions = toEastlVector(vk::enumerateInstanceExtensionProperties(nullptr, driver));
+        selection.enabledExtensions.push_back(VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME);
+#else
+        const auto availableExtensions = toEastlVector(vk::enumerateInstanceExtensionProperties());
+#endif
         const eastl::vector<vk::LayerProperties> availableLayers = toEastlVector(vk::enumerateInstanceLayerProperties());
         const bool validationEnabled = gSynchronizationValidationEnabled;
         selection.validationEnabled = validationEnabled;
@@ -331,7 +376,7 @@ namespace
                     joinLayerNames(availableLayers) +
                     "]").c_str());
             }
-            if (!hasInstanceExtension(availableExtensions, DebugUtilsExtensionName))
+            if (!debugUtilsAvailable)
             {
                 throw std::runtime_error((
                     eastl::string("VKInstance::init requested Vulkan validation, but the required instance extension is unavailable: ") +
@@ -394,6 +439,16 @@ namespace
             selection.enabledLayers.size(),
             joinExtensionNames(selection.enabledLayers).c_str());
 
+#if defined(__APPLE__) && TARGET_OS_OSX
+        VkDirectDriverLoadingInfoLUNARG driverInfo = {VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_INFO_LUNARG};
+        driverInfo.pfnGetInstanceProcAddr = getKosmicKrispProcAddr();
+        VkDirectDriverLoadingListLUNARG drivers = {VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_LIST_LUNARG};
+        drivers.pNext = instanceCreateInfo.pNext;
+        drivers.mode = VK_DIRECT_DRIVER_LOADING_MODE_EXCLUSIVE_LUNARG;
+        drivers.driverCount = 1;
+        drivers.pDrivers = &driverInfo;
+        instanceCreateInfo.pNext = &drivers;
+#endif
         mInstance = vk::createInstanceUnique(instanceCreateInfo);
         mDebugUtilsEnabled = selection.debugUtilsEnabled;
         volkLoadInstance(static_cast<VkInstance>(mInstance.get()));

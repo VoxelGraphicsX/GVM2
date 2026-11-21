@@ -12,6 +12,14 @@
 
 namespace GVM::RHI::Vulkan
 {
+    bool operator==(const VKResourceQueueState &left, const VKResourceQueueState &right)
+    {
+        return left.lastExclusiveQueueId == right.lastExclusiveQueueId &&
+            left.lastExclusiveValue == right.lastExclusiveValue &&
+            left.lastReadValues == right.lastReadValues &&
+            left.ownerFamily == right.ownerFamily && left.releaseQueueId == right.releaseQueueId;
+    }
+
     VKResourceTextureState VKResourceStateDB::makeTextureState(const VKTexture &texture)
     {
         VKResourceTextureState state;
@@ -100,7 +108,10 @@ namespace GVM::RHI::Vulkan
             {
                 if (bufferRangesOverlap(range.offset, range.size, offset, size))
                 {
-                    writer = eastl::max(writer, range.frontier.writer[lane]);
+                    if (range.queueState.lastExclusiveQueueId == lane)
+                    {
+                        writer = eastl::max(writer, range.queueState.lastExclusiveValue);
+                    }
                 }
             }
         }
@@ -242,32 +253,72 @@ namespace GVM::RHI::Vulkan
         ScopedLock lock(mMutex);
         mBuffers.clear();
         mTextures.clear();
-        mAcceptedRelease = 0;
-        mRelease.images.clear();
-        mRelease.buffers.clear();
+        mAcceptedReleases.fill(0);
+        mForeignWaits.fill(0);
+        for (auto &release : mReleases)
+        {
+            release = {};
+        }
+        mQueries.clear();
+        mQueueIndex = UINT32_MAX;
+        mQueueFamily = VK_QUEUE_FAMILY_IGNORED;
         mHistory = nullptr;
     }
 
-    void VKResourceStateDB::beginSubmission(VKResourceStateDB &history, VKQueue &queue, uint64_t value)
+    void VKResourceStateDB::beginSubmission(VKResourceStateDB &history, uint32_t queueIndex, uint32_t queueFamily, uint64_t value)
     {
         if (&history == this || mHistory != nullptr || !mBuffers.empty() || !mTextures.empty())
         {
             throw std::logic_error("A submission resource overlay must start empty and borrow a distinct history.");
         }
+        if (queueIndex >= MaxDeviceQueues || queueFamily == VK_QUEUE_FAMILY_IGNORED || value == 0)
+        {
+            throw std::invalid_argument("A submission resource overlay requires a valid queue index, family and nonzero timeline value.");
+        }
         mHistory = &history;
-        mQueue = &queue;
-        mOther = queue.getDevice()->otherQueue(queue);
-        mLane = &queue == queue.getDevice()->getMainQueueImpl() ? 0 : 1;
+        mQueueIndex = queueIndex;
+        mQueueFamily = queueFamily;
         mValue = value;
+        mForeignWaits.fill(0);
     }
 
-    bool VKResourceStateDB::advanceFrontier(VKQueueFrontier &frontier, bool exclusive)
+    bool VKResourceStateDB::prepareQueueAccess(VKResourceQueueState &state, bool exclusive, bool concurrent)
     {
-        if (mOther == nullptr)
+        if (mHistory == nullptr)
         {
-            return false;
+            throw std::logic_error("Queue access requires an active submission resource overlay.");
         }
-        return frontier.advance(mLane, mQueue->getQueueFamilyIndex(), mValue, exclusive, mForeignWait);
+        const bool transfer = !concurrent && state.ownerFamily != VK_QUEUE_FAMILY_IGNORED && state.ownerFamily != mQueueFamily;
+        if (state.lastExclusiveValue != 0 && state.lastExclusiveQueueId != mQueueIndex)
+        {
+            auto &wait = mForeignWaits[state.lastExclusiveQueueId];
+            wait = eastl::max(wait, state.lastExclusiveValue);
+        }
+        if (exclusive || transfer)
+        {
+            for (uint32_t index = 0; index < MaxDeviceQueues; ++index)
+            {
+                if (index != mQueueIndex)
+                {
+                    mForeignWaits[index] = eastl::max(mForeignWaits[index], state.lastReadValues[index]);
+                }
+            }
+            state.lastExclusiveQueueId = mQueueIndex;
+            state.lastExclusiveValue = mValue;
+            state.lastReadValues.fill(0);
+        }
+        else
+        {
+            state.lastReadValues[mQueueIndex] = mValue;
+        }
+        state.ownerFamily = mQueueFamily;
+        state.releaseQueueId = mQueueIndex;
+        return transfer;
+    }
+
+    const eastl::array<uint64_t, MaxDeviceQueues> &VKResourceStateDB::queueWaitValues() const
+    {
+        return mForeignWaits;
     }
 
     namespace
@@ -291,59 +342,91 @@ namespace GVM::RHI::Vulkan
         }
     }
 
-    void VKResourceStateDB::transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer)
+    VKOwnershipRelease &VKResourceStateDB::prepareOwnershipRelease(const VKResourceQueueState &previous)
     {
-        if (mRelease.bufferOwners.empty() || mRelease.bufferOwners.back() != buffer.getHandle())
+        auto &release = mReleases.at(previous.releaseQueueId);
+        if (previous.lastExclusiveValue != 0)
         {
-            mRelease.bufferOwners.push_back(buffer.getHandle());
+            auto &wait = release.waits[previous.lastExclusiveQueueId];
+            wait = eastl::max(wait, previous.lastExclusiveValue);
         }
-        mRelease.buffers.push_back(makeRelease(acquire, mOther->getQueueFamilyIndex(), mQueue->getQueueFamilyIndex()));
+        for (uint32_t index = 0; index < MaxDeviceQueues; ++index)
+        {
+            release.waits[index] = eastl::max(release.waits[index], previous.lastReadValues[index]);
+        }
+        return release;
     }
 
-    void VKResourceStateDB::transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture)
+    void VKResourceStateDB::transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer, const VKResourceQueueState &previous)
     {
-        if (mRelease.imageOwners.empty() || mRelease.imageOwners.back() != texture.getHandle())
+        auto &release = prepareOwnershipRelease(previous);
+        if (release.bufferOwners.empty() || release.bufferOwners.back() != buffer.getHandle())
         {
-            mRelease.imageOwners.push_back(texture.getHandle());
+            release.bufferOwners.push_back(buffer.getHandle());
         }
-        mRelease.images.push_back(makeRelease(acquire, mOther->getQueueFamilyIndex(), mQueue->getQueueFamilyIndex()));
+        release.buffers.push_back(makeRelease(acquire, previous.ownerFamily, mQueueFamily));
     }
 
-    void VKResourceStateDB::prepareQueueWaits(const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits)
+    void VKResourceStateDB::transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture, const VKResourceQueueState &previous)
     {
-        if (mOther == nullptr)
+        auto &release = prepareOwnershipRelease(previous);
+        if (release.imageOwners.empty() || release.imageOwners.back() != texture.getHandle())
         {
-            return;
+            release.imageOwners.push_back(texture.getHandle());
         }
+        release.images.push_back(makeRelease(acquire, previous.ownerFamily, mQueueFamily));
+    }
+
+    void VKResourceStateDB::prepareQueueWaits(VKDevice &device, const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits)
+    {
         for (const auto &encoder : users)
         {
             for (const auto &query : static_cast<VKCommandEncoder *>(encoder.get())->getRetainedQuerySets())
             {
                 auto *native = static_cast<VKQuerySet *>(query.get());
-                mForeignWait = eastl::max(mForeignWait, native->lastUse(1 - mLane));
+                for (uint32_t index = 0; index < device.queueCount(); ++index)
+                {
+                    if (index != mQueueIndex)
+                    {
+                        mForeignWaits[index] = eastl::max(mForeignWaits[index], native->lastUse(index));
+                    }
+                }
                 mQueries.push_back(native);
             }
         }
-        if (!mRelease.buffers.empty() || !mRelease.images.empty())
+        for (uint32_t index = 0; index < device.queueCount(); ++index)
         {
-            // A subsequent acquire failure is terminal. Preserve the accepted release receipt and exact ranges for diagnostics.
-            mForeignWait = mOther->submitOwnershipRelease(mRelease);
-            ScopedLock lock(mHistory->mMutex);
-            mHistory->mAcceptedRelease = mForeignWait;
-            mHistory->mRelease.buffers.swap(mRelease.buffers);
-            mHistory->mRelease.images.swap(mRelease.images);
+            auto &release = mReleases[index];
+            if (!release.buffers.empty() || !release.images.empty())
+            {
+                const uint64_t value = device.queue(index).submitOwnershipRelease(release);
+                mForeignWaits[index] = eastl::max(mForeignWaits[index], value);
+                // Preserve every accepted source release if a later release or the consumer fails.
+                ScopedLock lock(mHistory->mMutex);
+                mHistory->mAcceptedReleases[index] = value;
+                eastl::swap(mHistory->mReleases[index], release);
+            }
         }
-        if (mForeignWait == 0)
+        for (uint32_t index = 0; index < device.queueCount(); ++index)
         {
-            return;
+            if (index != mQueueIndex && mForeignWaits[index] != 0)
+            {
+                mergeTimelineWait(waits, device.queue(index).timelineWait(mForeignWaits[index]));
+            }
         }
-        mergeTimelineWait(waits, mOther->timelineWait(mForeignWait));
     }
 
     bool VKResourceStateDB::hasUnacquiredRelease() const
     {
         ScopedLock lock(mMutex);
-        return mAcceptedRelease != 0;
+        for (uint64_t value : mAcceptedReleases)
+        {
+            if (value != 0)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void VKResourceStateDB::commitSubmission() noexcept
@@ -352,11 +435,13 @@ namespace GVM::RHI::Vulkan
         ScopedLock historyLock(mHistory->mMutex);
         for (auto *query : mQueries)
         {
-            query->acceptUse(mLane, mValue);
+            query->acceptUse(mQueueIndex, mValue);
         }
-        mHistory->mAcceptedRelease = 0;
-        mHistory->mRelease.buffers.clear();
-        mHistory->mRelease.images.clear();
+        mHistory->mAcceptedReleases.fill(0);
+        for (auto &release : mHistory->mReleases)
+        {
+            release = {};
+        }
         for (auto &entry : mBuffers)
         {
             mHistory->mBuffers.at(entry.first).swap(entry.second);

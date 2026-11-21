@@ -32,6 +32,9 @@ namespace GVM::RHI::Metal
 		virtual uint32_t getArrayLayerCount() const override;
 		[[nodiscard]]
 		virtual TextureFormat getFormat() const override;
+		/// Returns the declared dimensionality of this Metal texture.
+		[[nodiscard]]
+		virtual TextureDimension getDimension() const override;
 		[[nodiscard]]
 		TextureUsageFlags getUsage() const;
 

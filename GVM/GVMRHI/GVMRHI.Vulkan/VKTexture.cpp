@@ -143,10 +143,22 @@ namespace GVM::RHI::Vulkan
         {
             if (descriptor.dimension == TextureDimension::e1D)
             {
-                throw std::invalid_argument((
-                    "VKTexture::init texture '" + describeTextureLabel(descriptor) +
-                    "' resolved to TextureDimension::e1D. The current UGLC/GVM Vulkan texture contract only accepts portable 2D/2DArray/3D shapes, and GVM does not author 1D textures. This indicates an upstream descriptor/codegen bug. Actual descriptor: " +
-                    describeTextureShape(descriptor) + ".").c_str());
+                if (descriptor.size.height != 1u || descriptor.size.depth != 1u)
+                {
+                    throw std::invalid_argument((
+                        "VKTexture::init texture '" + describeTextureLabel(descriptor) +
+                        "' uses invalid height/depth (" + eastl::to_string(descriptor.size.height) +
+                        "x" + eastl::to_string(descriptor.size.depth) +
+                        ") for a 1D texture. Actual descriptor: " + describeTextureShape(descriptor) + ".").c_str());
+                }
+                if (descriptor.arrayLayerCount != 1u)
+                {
+                    throw std::invalid_argument((
+                        "VKTexture::init texture '" + describeTextureLabel(descriptor) +
+                        "' is 1D but requests arrayLayerCount=" + eastl::to_string(descriptor.arrayLayerCount) +
+                        ". The current Vulkan backend does not legalize 1D texture arrays. Actual descriptor: " +
+                        describeTextureShape(descriptor) + ".").c_str());
+                }
             }
 
             if (descriptor.dimension != TextureDimension::e3D && descriptor.size.depth != 1u)
@@ -340,7 +352,18 @@ namespace GVM::RHI::Vulkan
         {
             imageCreateInfo.usage |= vk::ImageUsageFlagBits::eTransientAttachment;
         }
-        imageCreateInfo.sharingMode = vk::SharingMode::eExclusive;
+        const auto families = device->queueFamilyIndices();
+        mConcurrentSharing = families.size() > 1 && descriptor.storageMode != TextureStorageMode::TransientAttachment;
+        if (mConcurrentSharing)
+        {
+            imageCreateInfo.sharingMode = vk::SharingMode::eConcurrent;
+            imageCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(families.size());
+            imageCreateInfo.pQueueFamilyIndices = families.data();
+        }
+        else
+        {
+            imageCreateInfo.sharingMode = vk::SharingMode::eExclusive;
+        }
         imageCreateInfo.initialLayout = vk::ImageLayout::eUndefined;
 
         const VkImageCreateInfo nativeImageCreateInfo = static_cast<VkImageCreateInfo>(imageCreateInfo);
@@ -403,6 +426,7 @@ namespace GVM::RHI::Vulkan
         mCachedArrayLayerCount = resolveImageArrayLayers(descriptor);
         mDevice->getPresentManager().unregisterDirectPresentTexture(this);
         mOwnsAllocation = false;
+        mConcurrentSharing = false;
         mDestroyed = false;
     }
 

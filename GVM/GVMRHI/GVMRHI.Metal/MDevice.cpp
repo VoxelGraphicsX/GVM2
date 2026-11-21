@@ -247,35 +247,65 @@ namespace GVM::RHI::Metal
 
     Queue MDevice::getQueue(const QueueDescriptor &descriptor)
     {
-        if (descriptor.prefer != QueuePreference::Compute || descriptor.index != 0 || getMainQueue() != mMainQueue)
+        if (descriptor.index != 0)
         {
             return DeviceImpl::getQueue(descriptor);
         }
-        std::lock_guard lock(mQueueHistory.mutex());
+        if (descriptor.prefer == QueuePreference::Transfer)
+        {
+            {
+                std::lock_guard lock(mQueueMutex);
+                if (mTransferQueue == nullptr && !mTransferUnavailable)
+                {
+                    uint32_t maxCmdBuffers = MQueue::DefaultMaxCommandBufferCount;
+                    auto native = NS::TransferPtr(mNativeDevice->newCommandQueue(maxCmdBuffers));
+                    if (!native)
+                    {
+                        maxCmdBuffers = 64u;
+                        native = NS::TransferPtr(mNativeDevice->newCommandQueue());
+                    }
+                    if (native)
+                    {
+                        auto candidate = eastl::make_unique<MQueue>();
+                        candidate->init(this, "TransferQueue", native.get(), maxCmdBuffers);
+                        mTransferQueue = candidate.release();
+                    }
+                    else
+                    {
+                        mTransferUnavailable = true;
+                    }
+                }
+                if (mTransferQueue != nullptr)
+                {
+                    return mTransferQueue;
+                }
+            }
+            return getQueue({.prefer = QueuePreference::Compute});
+        }
+        if (descriptor.prefer != QueuePreference::Compute)
+        {
+            return DeviceImpl::getQueue(descriptor);
+        }
+        std::lock_guard lock(mQueueMutex);
         if (mComputeQueue == nullptr && !mComputeUnavailable)
         {
-            auto native = NS::TransferPtr(mNativeDevice->newCommandQueue());
+            uint32_t maxCmdBuffers = MQueue::DefaultMaxCommandBufferCount;
+            auto native = NS::TransferPtr(mNativeDevice->newCommandQueue(maxCmdBuffers));
+            if (!native)
+            {
+                maxCmdBuffers = 64u;
+                native = NS::TransferPtr(mNativeDevice->newCommandQueue());
+            }
             if (!native)
             {
                 mComputeUnavailable = true;
                 return getMainQueue();
             }
             auto candidate = eastl::make_unique<MQueue>();
-            candidate->init(this, "ComputeQueue", native.get());
-            mMainQueue->publishAcceptedTail();
+            candidate->init(this, "ComputeQueue", native.get(), maxCmdBuffers);
             mComputeQueue = candidate.release();
         }
         return mComputeQueue != nullptr ? mComputeQueue : getMainQueue();
-    }
-
-    MQueueHistory &MDevice::queueHistory()
-    {
-        return mQueueHistory;
-    }
-
-    bool MDevice::tracksQueue(const MQueue &queue) const
-    {
-        return mComputeQueue != nullptr && (&queue == mComputeQueue || &queue == mMainQueue);
     }
 
     Queue MDevice::getMainQueue() const
@@ -321,15 +351,16 @@ namespace GVM::RHI::Metal
         return mDiagnosticsOverlayConfig;
     }
 
-    /** Returns a snapshot of live Metal resources for runtime diagnostics. */
     eastl::vector<uint8_t> MDevice::getPipelineCacheData() const
     {
         return {};
     }
 
+    /** Copies live buffer and texture metadata without waiting for GPU work. */
     DiagnosticsResourceSnapshot MDevice::getDiagnosticsResourceSnapshot() const
     {
         DiagnosticsResourceSnapshot snapshot = {};
+        std::lock_guard lock(mResourceSnapshotMutex);
         snapshot.entries.reserve(mLiveBuffers.size() + mLiveTextures.size());
         for (Buffer buffer : mLiveBuffers)
         {
@@ -502,8 +533,8 @@ namespace GVM::RHI::Metal
         // GVMRHI exposes immediate logical destruction to user code. On Metal, resources that
         // are still referenced by in-flight command buffers remain retained by the runtime, so
         // this path is safe to use as the backend's retirement entry point.
-        buffer.get()->destroy();
         untrackBuffer(buffer);
+        buffer.get()->destroy();
         mBufferPool.freeByHandle(buffer);
     }
 
@@ -515,8 +546,8 @@ namespace GVM::RHI::Metal
         }
         // Same lifetime contract as freeBuffer(): user code can retire the handle immediately,
         // while Metal keeps native objects alive until command-buffer references are gone.
-        texture.get()->destroy();
         untrackTexture(texture);
+        texture.get()->destroy();
         mTexturePool.freeByHandle(texture);
     }
 
@@ -549,6 +580,12 @@ namespace GVM::RHI::Metal
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            if (mTransferQueue != nullptr)
+            {
+                mTransferQueue->destroy();
+                delete mTransferQueue;
+                mTransferQueue = nullptr;
+            }
             if (mComputeQueue != nullptr)
             {
                 mComputeQueue->destroy();
@@ -556,7 +593,6 @@ namespace GVM::RHI::Metal
                 mComputeQueue = nullptr;
             }
             this->mMainQueue->destroy();
-            mQueueHistory.clear();
             delete this->mMainQueue;
             this->mMainQueue = nullptr;
         }
@@ -565,21 +601,27 @@ namespace GVM::RHI::Metal
         mFullscreenTextureExecutor = Private::FullscreenTextureExecutor{};
 
         eastl::vector<Sampler> liveSamplers;
-        liveSamplers.swap(mLiveSamplers);
+        {
+            std::lock_guard lock(mResourceSnapshotMutex);
+            liveSamplers.swap(mLiveSamplers);
+        }
         for (auto &sampler : liveSamplers)
         {
             freeSampler(sampler);
         }
 
         eastl::vector<Texture> liveTextures;
-        liveTextures.swap(mLiveTextures);
+        eastl::vector<Buffer> liveBuffers;
+        {
+            std::lock_guard lock(mResourceSnapshotMutex);
+            liveTextures.swap(mLiveTextures);
+            liveBuffers.swap(mLiveBuffers);
+        }
         for (auto &texture : liveTextures)
         {
             freeTexture(texture);
         }
 
-        eastl::vector<Buffer> liveBuffers;
-        liveBuffers.swap(mLiveBuffers);
         for (auto &buffer : liveBuffers)
         {
             freeBuffer(buffer);
@@ -665,6 +707,7 @@ namespace GVM::RHI::Metal
     {
         if (!buffer.isNull())
         {
+            std::lock_guard lock(mResourceSnapshotMutex);
             mLiveBuffers.push_back(buffer);
         }
     }
@@ -673,6 +716,7 @@ namespace GVM::RHI::Metal
     {
         if (!texture.isNull())
         {
+            std::lock_guard lock(mResourceSnapshotMutex);
             mLiveTextures.push_back(texture);
         }
     }
@@ -681,22 +725,26 @@ namespace GVM::RHI::Metal
     {
         if (!sampler.isNull())
         {
+            std::lock_guard lock(mResourceSnapshotMutex);
             mLiveSamplers.push_back(sampler);
         }
     }
 
     void MDevice::untrackBuffer(Buffer buffer)
     {
+        std::lock_guard lock(mResourceSnapshotMutex);
         eraseTrackedHandle(mLiveBuffers, buffer);
     }
 
     void MDevice::untrackTexture(Texture texture)
     {
+        std::lock_guard lock(mResourceSnapshotMutex);
         eraseTrackedHandle(mLiveTextures, texture);
     }
 
     void MDevice::untrackSampler(Sampler sampler)
     {
+        std::lock_guard lock(mResourceSnapshotMutex);
         eraseTrackedHandle(mLiveSamplers, sampler);
     }
 

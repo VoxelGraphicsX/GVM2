@@ -26,17 +26,20 @@ namespace GVM::RHI::Private
                     describeTextureViewShape(viewDescriptor) + ".").c_str());
             }
 
-            if (viewDescriptor.dimension == TextureViewDimension::e1D || textureDescriptor.dimension == TextureDimension::e1D)
-            {
-                throw std::invalid_argument((
-                    "createView texture '" + describeTextureLabel(textureDescriptor) +
-                    "' resolved to an unexpected 1D texture/view. GVM does not author 1D textures, so this indicates an upstream descriptor/codegen bug. Texture descriptor: " +
-                    describeTextureShape(textureDescriptor) + ". View descriptor: " +
-                    describeTextureViewShape(viewDescriptor) + ".").c_str());
-            }
-
             switch (viewDescriptor.dimension)
             {
+            case TextureViewDimension::e1D:
+                if (textureDescriptor.dimension != TextureDimension::e1D ||
+                    viewDescriptor.baseArrayLayer != 0u ||
+                    viewDescriptor.arrayLayerCount != 1u)
+                {
+                    throw std::invalid_argument((
+                        "createView texture '" + describeTextureLabel(textureDescriptor) +
+                        "' cannot create a 1D view from the resolved descriptors. Texture descriptor: " +
+                        describeTextureShape(textureDescriptor) + ". View descriptor: " +
+                        describeTextureViewShape(viewDescriptor) + ".").c_str());
+                }
+                break;
             case TextureViewDimension::e2D:
                 if (textureDescriptor.dimension != TextureDimension::e2D || viewDescriptor.arrayLayerCount != 1u)
                 {

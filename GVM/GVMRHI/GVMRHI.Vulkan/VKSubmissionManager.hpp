@@ -74,6 +74,8 @@ namespace GVM::RHI::Vulkan
         uint64_t nextValue() const;
         /// Builds a device-side wait for one accepted value on this manager's retained timeline.
         vk::SemaphoreSubmitInfo timelineWait(uint64_t value) const;
+        /// Returns the retained queue timeline so host waits can release the device submission lock before blocking.
+        [[nodiscard]] const eastl::shared_ptr<VKSubmissionTimeline> &timeline() const;
 
         [[nodiscard]]
         uint64_t getUserSubmitCount() const;

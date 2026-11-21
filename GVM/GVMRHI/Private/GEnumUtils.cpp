@@ -32,6 +32,16 @@ namespace GVM::RHI::Private
         return index < TextureFormatCount ? TextureFormatTable[index].blockHeight : 1u;
     }
 
+    uint64_t tryGetTextureBytesPerBlock(TextureFormat format) noexcept
+    {
+        const uint32_t index = static_cast<uint32_t>(format);
+        if (index >= TextureFormatCount)
+        {
+            return 0u;
+        }
+        return TextureFormatTable[index].bytesPerBlock;
+    }
+
     uint64_t getTextureBytesPerBlock(TextureFormat format)
     {
         const uint32_t index = static_cast<uint32_t>(format);

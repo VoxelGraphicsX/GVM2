@@ -171,32 +171,29 @@ namespace GVM::RHI::Vulkan
         const VulkanCapabilitySurvey &capabilitySurvey = mCapabilities.getSurvey();
         const uint32_t mainFamily = mCapabilities.getGraphicsQueueFamilyIndex();
         const auto &families = mCapabilities.getQueueFamilyProperties();
-        const float priorities[] = {1.0f, 1.0f};
-        vk::DeviceQueueCreateInfo queues[2]{};
-        queues[0].queueFamilyIndex = mainFamily;
-        queues[0].queueCount = 1;
-        queues[0].pQueuePriorities = priorities;
-        uint32_t familyCount = 1;
-        if (families[mainFamily].queueCount >= 2)
+        mQueueSelections = selectDeviceQueues({families.data(), families.size()}, mainFamily);
+        const float priorities[MaxDeviceQueues] = {1.0f, 1.0f, 1.0f};
+        eastl::vector<vk::DeviceQueueCreateInfo> queues;
+        for (const auto &selection : mQueueSelections)
         {
-            mComputeFamily = mainFamily;
-            queues[0].queueCount = 2;
-        }
-        else
-        {
-            for (uint32_t index = 0; index < families.size(); ++index)
+            if (selection.family == VK_QUEUE_FAMILY_IGNORED)
             {
-                if (index != mainFamily && families[index].queueCount != 0 &&
-                    (families[index].queueFlags & vk::QueueFlagBits::eCompute))
+                continue;
+            }
+            auto request = queues.begin();
+            for (; request != queues.end(); ++request)
+            {
+                if (request->queueFamilyIndex == selection.family)
                 {
-                    mComputeFamily = index;
-                    queues[1].queueFamilyIndex = index;
-                    queues[1].queueCount = 1;
-                    queues[1].pQueuePriorities = priorities;
-                    familyCount = 2;
                     break;
                 }
             }
+            if (request == queues.end())
+            {
+                queues.push_back(vk::DeviceQueueCreateInfo{}.setQueueFamilyIndex(selection.family).setPQueuePriorities(priorities));
+                request = queues.end() - 1;
+            }
+            request->queueCount = eastl::max(request->queueCount, selection.index + 1);
         }
 
         eastl::vector<const char *> enabledDeviceExtensions;
@@ -239,6 +236,7 @@ namespace GVM::RHI::Vulkan
         enabledVulkan12Features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
         enabledVulkan12Features.runtimeDescriptorArray = VK_TRUE;
         enabledVulkan12Features.timelineSemaphore = VK_TRUE;
+        enabledVulkan12Features.separateDepthStencilLayouts = capabilitySurvey.supportsSeparateDepthStencilLayouts ? VK_TRUE : VK_FALSE;
         enabledVulkan12Features.bufferDeviceAddress = VK_TRUE;
         enabledVulkan12Features.drawIndirectCount = capabilitySurvey.supportsDrawIndirectCount;
         enabledVulkan12Features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
@@ -279,8 +277,8 @@ namespace GVM::RHI::Vulkan
 
         vk::DeviceCreateInfo deviceCreateInfo = {};
         deviceCreateInfo.pNext = &enabledFeatures2;
-        deviceCreateInfo.queueCreateInfoCount = familyCount;
-        deviceCreateInfo.pQueueCreateInfos = queues;
+        deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queues.size());
+        deviceCreateInfo.pQueueCreateInfos = queues.data();
         deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(enabledDeviceExtensions.size());
         deviceCreateInfo.ppEnabledExtensionNames = enabledDeviceExtensions.data();
 
@@ -347,12 +345,23 @@ namespace GVM::RHI::Vulkan
         mMainQueue = new VKQueue();
         try
         {
-            mMainQueue->init(this, mCapabilities.getGraphicsQueueFamilyIndex(), mDevice->getQueue(mCapabilities.getGraphicsQueueFamilyIndex(), 0), "MainQueue");
-            if (mComputeFamily != VK_QUEUE_FAMILY_IGNORED)
+            mMainQueue->init(this, mQueueSelections[0].family, mDevice->getQueue(mQueueSelections[0].family, 0), "MainQueue", 0);
+            mQueues.push_back(mMainQueue);
+            if (mQueueSelections[1].family != VK_QUEUE_FAMILY_IGNORED)
             {
                 mComputeQueue = new VKQueue();
-                mComputeQueue->init(this, mComputeFamily, mDevice->getQueue(mComputeFamily,
-                    mComputeFamily == mCapabilities.getGraphicsQueueFamilyIndex() ? 1 : 0), "ComputeQueue");
+                const auto &selection = mQueueSelections[1];
+                mComputeQueue->init(this, selection.family, mDevice->getQueue(selection.family, selection.index),
+                    "ComputeQueue", static_cast<uint32_t>(mQueues.size()));
+                mQueues.push_back(mComputeQueue);
+            }
+            if (mQueueSelections[2].family != VK_QUEUE_FAMILY_IGNORED)
+            {
+                mTransferQueue = new VKQueue();
+                const auto &selection = mQueueSelections[2];
+                mTransferQueue->init(this, selection.family, mDevice->getQueue(selection.family, selection.index),
+                    "TransferQueue", static_cast<uint32_t>(mQueues.size()));
+                mQueues.push_back(mTransferQueue);
             }
             if (mDiagnosticsOverlayConfig.enabled != False)
             {
@@ -373,10 +382,13 @@ namespace GVM::RHI::Vulkan
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            delete mTransferQueue;
+            mTransferQueue = nullptr;
             delete mComputeQueue;
             mComputeQueue = nullptr;
             delete mMainQueue;
             mMainQueue = nullptr;
+            mQueues.clear();
             throw;
         }
     }
@@ -566,17 +578,27 @@ namespace GVM::RHI::Vulkan
 
     Queue VKDevice::getQueue(const QueueDescriptor &descriptor)
     {
-        if (descriptor.prefer == QueuePreference::Compute && descriptor.index == 0 && mComputeQueue != nullptr &&
-            !mSingleQueueForTesting && getMainQueue() == mMainQueue)
+        if (descriptor.prefer == QueuePreference::Transfer && descriptor.index == 0 && mTransferQueue != nullptr &&
+            !mSingleQueueForTesting)
+        {
+            return mTransferQueue;
+        }
+        if ((descriptor.prefer == QueuePreference::Compute || descriptor.prefer == QueuePreference::Transfer) &&
+            descriptor.index == 0 && mComputeQueue != nullptr && !mSingleQueueForTesting)
         {
             return mComputeQueue;
         }
         return DeviceImpl::getQueue(descriptor);
     }
 
-    VKQueue *VKDevice::otherQueue(const VKQueue &queue) const
+    uint32_t VKDevice::queueCount() const
     {
-        return &queue == mMainQueue ? mComputeQueue : mMainQueue;
+        return static_cast<uint32_t>(mQueues.size());
+    }
+
+    VKQueue &VKDevice::queue(uint32_t index) const
+    {
+        return *mQueues.at(index);
     }
 
     std::recursive_mutex &VKDevice::submissionMutex()
@@ -584,9 +606,18 @@ namespace GVM::RHI::Vulkan
         return mResourceRegistry->submissionMutex();
     }
 
-    uint32_t VKDevice::computeFamily() const
+    eastl::vector<uint32_t> VKDevice::queueFamilyIndices() const
     {
-        return mComputeFamily;
+        eastl::vector<uint32_t> families;
+        for (const auto &selection : mQueueSelections)
+        {
+            if (selection.family != VK_QUEUE_FAMILY_IGNORED &&
+                eastl::find(families.begin(), families.end(), selection.family) == families.end())
+            {
+                families.push_back(selection.family);
+            }
+        }
+        return families;
     }
 
     void VKDevice::useSingleQueueForTesting()
@@ -616,6 +647,28 @@ namespace GVM::RHI::Vulkan
         return mCapabilities.getPassCounterQuerySupport();
     }
 
+    HostTimeline VKDevice::createHostTimeline()
+    {
+        ensureUsable("VKDevice::createHostTimeline");
+        auto state = eastl::make_shared<VKHostTimelineState>(mDevice.get(), mLostState);
+        {
+            std::lock_guard lock(mHostTimelinesMutex);
+            for (auto it = mHostTimelines.begin(); it != mHostTimelines.end();)
+            {
+                if (it->expired())
+                {
+                    it = mHostTimelines.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+            mHostTimelines.push_back(state);
+        }
+        return makeHostTimeline(eastl::move(state));
+    }
+
     void VKDevice::destroy()
     {
         GVMLogInfo(this, DeviceLogCategory, "event=device_destroy_begin");
@@ -639,6 +692,25 @@ namespace GVM::RHI::Vulkan
             GVMLogWarn(this, DeviceLogCategory, "event=device_wait_idle_end");
         }
 
+        {
+            eastl::vector<eastl::shared_ptr<VKHostTimelineState>> liveHostTimelines;
+            {
+                std::lock_guard lock(mHostTimelinesMutex);
+                for (const auto &weakState : mHostTimelines)
+                {
+                    if (auto sp = weakState.lock())
+                    {
+                        liveHostTimelines.push_back(eastl::move(sp));
+                    }
+                }
+                mHostTimelines.clear();
+            }
+            for (const auto &state : liveHostTimelines)
+            {
+                state->close();
+            }
+        }
+
         if (mMainQueue != nullptr)
         {
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
@@ -649,6 +721,12 @@ namespace GVM::RHI::Vulkan
                 mDiagnosticsOverlayQueue = nullptr;
             }
 #endif
+            if (mTransferQueue != nullptr)
+            {
+                mTransferQueue->destroy();
+                delete mTransferQueue;
+                mTransferQueue = nullptr;
+            }
             if (mComputeQueue != nullptr)
             {
                 mComputeQueue->destroy();
@@ -659,6 +737,7 @@ namespace GVM::RHI::Vulkan
             delete mMainQueue;
             mMainQueue = nullptr;
         }
+        mQueues.clear();
 
         mResourceRegistry->collectReleasedResources();
         mResourceRegistry->releaseAll();

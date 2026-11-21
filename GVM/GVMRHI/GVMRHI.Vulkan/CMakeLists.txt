@@ -32,6 +32,7 @@ target_sources(
         VKPresentManager.cpp
         VKQueueDiagnostics.cpp
         VKQueue.cpp
+        VKQueueSelection.cpp
         VKQueueCommandContextPool.cpp
         VKQuerySet.cpp
         VKRenderPassEncoder.cpp
@@ -41,7 +42,6 @@ target_sources(
         VKRenderPipeline.cpp
         VKResourceLifetime.cpp
         VKResourceRegistry.cpp
-        VKQueueFrontier.cpp
         VKResourceStateDB.cpp
         VKRetireManager.cpp
         VKSampler.cpp

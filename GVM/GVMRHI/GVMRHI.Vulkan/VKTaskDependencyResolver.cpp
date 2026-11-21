@@ -83,9 +83,9 @@ namespace GVM::RHI::Vulkan
         template <class State>
         bool equalBufferAccess(const State &a, const State &b)
         {
-            if constexpr (requires { a.frontier; })
+            if constexpr (requires { a.queueState; })
             {
-                return a.access == b.access && a.frontier == b.frontier;
+                return a.access == b.access && a.queueState == b.queueState;
             }
             return a.access == b.access;
         }
@@ -134,6 +134,55 @@ namespace GVM::RHI::Vulkan
                     barriers[count] = barrier;
                 }
                 ++count;
+            }
+            barriers.resize(count);
+        }
+
+        /// Merges single-plane barriers on the same image subresource range and layout transition into a combined aspect mask.
+        void coalesceImageAspects(eastl::vector<vk::ImageMemoryBarrier2> &barriers)
+        {
+            size_t count = 0;
+            for (size_t index = 0; index < barriers.size(); ++index)
+            {
+                const auto &barrier = barriers[index];
+                bool merged = false;
+                if (barrier.srcQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                    barrier.dstQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED)
+                {
+                    for (size_t prev = 0; prev < count; ++prev)
+                    {
+                        auto &existing = barriers[prev];
+                        const auto &a = existing.subresourceRange;
+                        const auto &b = barrier.subresourceRange;
+                        if (existing.srcQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                            existing.dstQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED &&
+                            existing.image == barrier.image &&
+                            existing.oldLayout == barrier.oldLayout &&
+                            existing.newLayout == barrier.newLayout &&
+                            a.baseMipLevel == b.baseMipLevel &&
+                            a.levelCount == b.levelCount &&
+                            a.baseArrayLayer == b.baseArrayLayer &&
+                            a.layerCount == b.layerCount &&
+                            (a.aspectMask & b.aspectMask) == vk::ImageAspectFlags{})
+                        {
+                            existing.subresourceRange.aspectMask |= b.aspectMask;
+                            existing.srcStageMask |= barrier.srcStageMask;
+                            existing.srcAccessMask |= barrier.srcAccessMask;
+                            existing.dstStageMask |= barrier.dstStageMask;
+                            existing.dstAccessMask |= barrier.dstAccessMask;
+                            merged = true;
+                            break;
+                        }
+                    }
+                }
+                if (!merged)
+                {
+                    if (count != index)
+                    {
+                        barriers[count] = barrier;
+                    }
+                    ++count;
+                }
             }
             barriers.resize(count);
         }
@@ -409,6 +458,7 @@ namespace GVM::RHI::Vulkan
             first = end;
         }
         coalesceImageMips(barriers);
+        coalesceImageAspects(barriers);
         mDiagnostics.recordTextureBarriers(barriers.size());
         emitBarriers(cb, {}, barriers);
     }
@@ -457,6 +507,7 @@ namespace GVM::RHI::Vulkan
             }
         }
         coalesceImageMips(barriers);
+        coalesceImageAspects(barriers);
         mDiagnostics.recordTextureBarriers(barriers.size());
         emitBarriers(cb, {}, barriers);
     }
@@ -487,6 +538,59 @@ namespace GVM::RHI::Vulkan
     void VKTaskDependencyResolver::prepareSubmission(VKResourceStateDB &state,
         eastl::vector<vk::BufferMemoryBarrier2> &buffers, eastl::vector<vk::ImageMemoryBarrier2> &images) const
     {
+        const uint32_t queueIndex = mQueue->getDeviceQueueIndex();
+        vk::QueueFlags queueFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
+        if (const auto *device = mQueue->getDevice(); device != nullptr)
+        {
+            const auto &families = device->getCapabilities().getQueueFamilyProperties();
+            if (mQueue->getQueueFamilyIndex() < families.size())
+            {
+                queueFlags = families[mQueue->getQueueFamilyIndex()].queueFlags;
+            }
+        }
+        const vk::PipelineStageFlags2 supportedStages = supportedStageMaskForQueueFlags(queueFlags);
+        const vk::AccessFlags2 supportedAccesses = supportedAccessMaskForQueueFlags(queueFlags);
+
+        auto sanitizeIncoming = [&](const VKResourceAccessState &sharedAccess, const VKResourceQueueState &previous)
+        {
+            VKResourceAccessState incoming = sharedAccess;
+            incoming.visibleReads = {};
+            const bool foreignProducer =
+                previous.lastExclusiveValue != 0 && previous.lastExclusiveQueueId != queueIndex;
+            const bool hasLocalReads =
+                queueIndex < MaxDeviceQueues && previous.lastReadValues[queueIndex] != 0;
+            bool hasForeignReads = false;
+            for (uint32_t q = 0; q < MaxDeviceQueues; ++q)
+            {
+                if (q != queueIndex && previous.lastReadValues[q] != 0)
+                {
+                    hasForeignReads = true;
+                    break;
+                }
+            }
+            if (foreignProducer)
+            {
+                incoming.producer = {};
+                incoming.hasProducer = false;
+                if (!hasLocalReads)
+                {
+                    incoming.current = {};
+                }
+            }
+            else if (hasForeignReads && !hasLocalReads && isReadOnlyAccess(incoming.current.accesses))
+            {
+                incoming.current = {};
+            }
+            incoming.producer.stages &= supportedStages;
+            incoming.producer.accesses &= supportedAccesses;
+            incoming.current.stages &= supportedStages;
+            incoming.current.accesses &= supportedAccesses;
+            incoming.initialized = incoming.hasProducer ||
+                incoming.current.stages != vk::PipelineStageFlags2{} ||
+                incoming.current.accesses != vk::AccessFlags2{};
+            return incoming;
+        };
+
         for (const auto &entry : mBuffers)
         {
             auto &buffer = *entry.first;
@@ -510,12 +614,15 @@ namespace GVM::RHI::Vulkan
                     continue;
                 }
                 vk::MemoryBarrier2 dependency{};
-                const bool transfer = state.advanceFrontier(range.frontier, summary.exit.hasProducer);
+                const auto previous = range.queueState;
+                const bool transfer = state.prepareQueueAccess(range.queueState, summary.exit.hasProducer, buffer.isConcurrentSharing());
                 if (transfer)
                 {
                     range.access = {};
                 }
-                if (resolveAccess(range.access, summary.entry, false, dependency) || transfer)
+                VKResourceAccessState incoming = transfer ? VKResourceAccessState{} : sanitizeIncoming(range.access, previous);
+                const bool needsBarrier = resolveAccess(incoming, summary.entry, false, dependency) || transfer;
+                if (needsBarrier)
                 {
                     vk::BufferMemoryBarrier2 barrier{};
                     barrier.srcStageMask = dependency.srcStageMask;
@@ -528,15 +635,27 @@ namespace GVM::RHI::Vulkan
                     barrier.size = range.size;
                     if (transfer)
                     {
-                        state.transferOwnership(barrier, buffer);
+                        state.transferOwnership(barrier, buffer, previous);
                     }
                     buffers.push_back(barrier);
                 }
-                // Read-only bodies must keep the incoming producer and its established visibility.
+                // Read-only bodies must keep the incoming producer for every later reader.
                 if (summary.exit.hasProducer)
                 {
                     range.access = summary.exit;
                 }
+                else
+                {
+                    if (!isReadOnlyAccess(range.access.current.accesses))
+                    {
+                        range.access.current = {};
+                    }
+                    range.access.current.stages |= summary.exit.current.stages;
+                    range.access.current.accesses |= summary.exit.current.accesses;
+                    range.access.initialized = true;
+                }
+                // Do not publish encoder-local visibility into shared submission history.
+                range.access.visibleReads = {};
             }
             mergeAdjacentBufferRangeStates(ranges, equalBufferAccess<VKResourceBufferState>);
         }
@@ -576,12 +695,15 @@ namespace GVM::RHI::Vulkan
                         vk::MemoryBarrier2 dependency{};
                         const bool exclusive = summary.exclusiveEntry && isReadOnlyAccess(summary.entry.accesses);
                         const bool layoutChange = cell.layout != summary.entryLayout;
-                        const bool transfer = state.advanceFrontier(cell.frontier, layoutChange || summary.exit.hasProducer);
+                        const auto previous = cell.queueState;
+                        const bool transfer = state.prepareQueueAccess(cell.queueState, layoutChange || summary.exit.hasProducer, texture.isConcurrentSharing());
                         if (transfer)
                         {
                             cell.access = {};
                         }
-                        if (resolveAccess(cell.access, summary.entry, layoutChange || exclusive, dependency) || transfer)
+                        VKResourceAccessState incoming = transfer ? VKResourceAccessState{} : sanitizeIncoming(cell.access, previous);
+                        const bool needsBarrier = resolveAccess(incoming, summary.entry, layoutChange || exclusive, dependency) || transfer;
+                        if (needsBarrier)
                         {
                             vk::ImageMemoryBarrier2 barrier{};
                             barrier.srcStageMask = dependency.srcStageMask;
@@ -595,7 +717,7 @@ namespace GVM::RHI::Vulkan
                             barrier.subresourceRange = {local.planeAspects[plane], mip, 1, layer, 1};
                             if (transfer)
                             {
-                                state.transferOwnership(barrier, texture);
+                                state.transferOwnership(barrier, texture, previous);
                             }
                             appendImageBarrier(images, barrier);
                         }
@@ -603,12 +725,30 @@ namespace GVM::RHI::Vulkan
                         {
                             cell.access = summary.exit;
                         }
+                        else if (layoutChange || exclusive)
+                        {
+                            cell.access = incoming;
+                            cell.access.current.stages |= summary.exit.current.stages;
+                            cell.access.current.accesses |= summary.exit.current.accesses;
+                        }
+                        else
+                        {
+                            if (!isReadOnlyAccess(cell.access.current.accesses))
+                            {
+                                cell.access.current = {};
+                            }
+                            cell.access.current.stages |= summary.exit.current.stages;
+                            cell.access.current.accesses |= summary.exit.current.accesses;
+                            cell.access.initialized = true;
+                        }
+                        cell.access.visibleReads = {};
                         cell.layout = summary.layout;
                     }
                 }
             }
         }
         coalesceImageMips(images);
+        coalesceImageAspects(images);
     }
 
     void VKTaskDependencyResolver::preparePresent(VKResourceStateDB &state, const VKTexture &texture,
@@ -652,6 +792,7 @@ namespace GVM::RHI::Vulkan
             }
         }
         coalesceImageMips(images);
+        coalesceImageAspects(images);
     }
 
     void VKTaskDependencyResolver::finalize(vk::CommandBuffer cb)

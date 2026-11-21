@@ -89,6 +89,7 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]] bool isDestroyRequested() const;
         /** Reports whether the user handle was released and no holder references remain. */
         [[nodiscard]] bool isDestroyable() const;
+        [[nodiscard]] bool isConcurrentSharing() const { return mConcurrentSharing; }
         /** Returns the live reference count, including the user handle's while it is held. */
         [[nodiscard]] uint32_t getReferenceCount() const;
 
@@ -106,5 +107,6 @@ namespace GVM::RHI::Vulkan
         Buffer mHandle = {};
         bool mIsMapped = false;
         bool mDestroyed = false;
+        bool mConcurrentSharing = false;
     };
 } // namespace GVM::RHI::Vulkan

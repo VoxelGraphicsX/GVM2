@@ -37,6 +37,12 @@ namespace GVM::RHI::Vulkan
         void init(VKDevice *device);
 
         [[nodiscard]]
+        eastl::optional<VKUploadSlice> tryAllocateAndWrite(
+            const void *data,
+            uint64_t size,
+            uint64_t alignment = DefaultAlignment);
+
+        [[nodiscard]]
         VKUploadSlice allocateAndWrite(const void *data, uint64_t size, uint64_t alignment = DefaultAlignment);
 
         void onSubmission(VKSubmissionSerial serial);

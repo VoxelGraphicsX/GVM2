@@ -187,6 +187,11 @@ namespace GVM::RHI::Vulkan
             .setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
     }
 
+    const eastl::shared_ptr<VKSubmissionTimeline> &VKSubmissionManager::timeline() const
+    {
+        return mTimeline;
+    }
+
     size_t VKSubmissionManager::getInFlightCount() const
     {
         return mInFlightSubmissions.size();

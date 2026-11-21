@@ -1,7 +1,7 @@
 #pragma once
 #include "VKCommon.hpp"
 #include "VKDefines.hpp"
-#include "VKQueueFrontier.hpp"
+#include <EASTL/array.h>
 #include <EASTL/unordered_map.h>
 #include <EASTL/vector.h>
 
@@ -15,16 +15,31 @@ namespace GVM::RHI::Vulkan
         bool operator==(const VKAccessScope &) const = default;
     };
 
-    /// Tracks readers, the latest write/transition, and established read visibility.
+    /// Tracks readers and the latest write/transition, with read visibility reusable only inside one encoder.
     struct VKResourceAccessState
     {
         VKAccessScope current;
         VKAccessScope producer;
+        /// Caches encoder-local read barriers; shared submission history must leave this scope empty.
         VKAccessScope visibleReads;
         bool initialized = false;
         bool hasProducer = false;
         bool operator==(const VKResourceAccessState &) const = default;
     };
+
+    /// Stores one resource range's accepted write/transition, independent reader timelines, and queue-family ownership.
+    /// ResourceDB updates this data only while preparing a submission; recording workers do not mutate it.
+    struct VKResourceQueueState
+    {
+        uint32_t lastExclusiveQueueId = UINT32_MAX;
+        uint64_t lastExclusiveValue = 0;
+        eastl::array<uint64_t, MaxDeviceQueues> lastReadValues{};
+        uint32_t ownerFamily = VK_QUEUE_FAMILY_IGNORED;
+        uint32_t releaseQueueId = UINT32_MAX;
+    };
+
+    /// Compares all queue progress and ownership before adjacent resource ranges may share one state entry.
+    bool operator==(const VKResourceQueueState &left, const VKResourceQueueState &right);
 
     /// Tracks one non-overlapping byte interval in the queue's buffer state.
     struct VKResourceBufferState
@@ -32,7 +47,7 @@ namespace GVM::RHI::Vulkan
         VKBuffer *buffer = nullptr;
         uint64_t offset = 0, size = 0;
         VKResourceAccessState access;
-        VKQueueFrontier frontier;
+        VKResourceQueueState queueState;
     };
 
     /// Tracks the actual layout and access history of one image subresource.
@@ -40,7 +55,7 @@ namespace GVM::RHI::Vulkan
     {
         vk::ImageLayout layout = vk::ImageLayout::eUndefined;
         VKResourceAccessState access;
-        VKQueueFrontier frontier;
+        VKResourceQueueState queueState;
     };
 
     /// Stores independent aspect/mip/layer cells; updates never replace unrelated layers.
@@ -54,6 +69,7 @@ namespace GVM::RHI::Vulkan
     /// Describes one source-family release and the exact allocations its native barriers must keep alive.
     struct VKOwnershipRelease
     {
+        eastl::array<uint64_t, MaxDeviceQueues> waits{};
         eastl::vector<vk::BufferMemoryBarrier2> buffers;
         eastl::vector<vk::ImageMemoryBarrier2> images;
         eastl::vector<Buffer> bufferOwners;
@@ -89,16 +105,20 @@ namespace GVM::RHI::Vulkan
         void discardTextureState(const VKTexture &texture);
         /// Clears resource history when the owning device is initialized or destroyed.
         void reset();
-        /// Starts an empty submission overlay; the caller holds the device submission lock until commit or destruction.
-        void beginSubmission(VKResourceStateDB &history, VKQueue &queue, uint64_t value);
-        /// Advances a tentative queue frontier and reports whether exclusive ownership changes family.
-        bool advanceFrontier(VKQueueFrontier &frontier, bool exclusive);
+        /// Starts an empty submission overlay with a valid device queue index, family and nonzero timeline value.
+        /// The caller holds the device submission lock until commit or destruction.
+        void beginSubmission(VKResourceStateDB &history, uint32_t queueIndex, uint32_t queueFamily, uint64_t value);
+        /// Collects required foreign waits and updates one range's pending use; returns whether ownership changes family.
+        /// Requires an active submission; writes, image layout changes, and EXCLUSIVE family changes are exclusive uses.
+        bool prepareQueueAccess(VKResourceQueueState &state, bool exclusive, bool concurrent = false);
+        /// Returns required timeline values indexed by device queue; values from different queues are independent.
+        const eastl::array<uint64_t, MaxDeviceQueues> &queueWaitValues() const;
         /// Pairs a consuming buffer acquire with the matching source-family release.
-        void transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer);
+        void transferOwnership(vk::BufferMemoryBarrier2 &acquire, const VKBuffer &buffer, const VKResourceQueueState &previous);
         /// Pairs a consuming image acquire with the identical release range and layout transition.
-        void transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture);
+        void transferOwnership(vk::ImageMemoryBarrier2 &acquire, const VKTexture &texture, const VKResourceQueueState &previous);
         /// Submits any release commands and merges required foreign timeline values before consumer acceptance.
-        void prepareQueueWaits(const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits);
+        void prepareQueueWaits(VKDevice &device, const eastl::vector<CommandEncoder> &users, eastl::vector<vk::SemaphoreSubmitInfo> &waits);
         /// Reports an accepted release whose acquire was not accepted, for device-loss diagnostics.
         bool hasUnacquiredRelease() const;
         /// Publishes preallocated touched entries after native submission is accepted; never allocates or throws.
@@ -107,17 +127,18 @@ namespace GVM::RHI::Vulkan
     private:
         /// Creates the initial undefined cells for a newly encountered image.
         static VKResourceTextureState makeTextureState(const VKTexture &texture);
+        /// Accumulates all old-family accesses before the selected source queue releases ownership.
+        VKOwnershipRelease &prepareOwnershipRelease(const VKResourceQueueState &previous);
         mutable Mutex mMutex;
         eastl::unordered_map<const VKBuffer *, eastl::vector<VKResourceBufferState>> mBuffers;
         eastl::unordered_map<const VKTexture *, VKResourceTextureState> mTextures;
-        VKQueue *mQueue = nullptr;
-        VKQueue *mOther = nullptr;
-        uint32_t mLane = 0;
+        uint32_t mQueueIndex = UINT32_MAX;
+        uint32_t mQueueFamily = VK_QUEUE_FAMILY_IGNORED;
         uint64_t mValue = 0;
-        uint64_t mForeignWait = 0;
-        uint64_t mAcceptedRelease = 0;
+        eastl::array<uint64_t, MaxDeviceQueues> mForeignWaits{};
+        eastl::array<uint64_t, MaxDeviceQueues> mAcceptedReleases{};
         eastl::vector<VKQuerySet *> mQueries;
-        VKOwnershipRelease mRelease;
+        eastl::array<VKOwnershipRelease, MaxDeviceQueues> mReleases;
         VKResourceStateDB *mHistory = nullptr;
     };
 } // namespace GVM::RHI::Vulkan

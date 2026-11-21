@@ -45,6 +45,51 @@ namespace GVM::RHI::Vulkan
         return mQueueFamilyIndex;
     }
 
+    Extent3D VKQueue::getImageTransferGranularity() const
+    {
+        if (mDevice == nullptr)
+        {
+            return {1u, 1u, 1u};
+        }
+        const auto &families = mDevice->getCapabilities().getQueueFamilyProperties();
+        if (mQueueFamilyIndex >= families.size())
+        {
+            return {1u, 1u, 1u};
+        }
+        const auto &granularity = families[mQueueFamilyIndex].minImageTransferGranularity;
+        return {granularity.width, granularity.height, granularity.depth};
+    }
+
+    TimestampQuerySupport VKQueue::getTimestampQuerySupport() const
+    {
+        if (mDevice == nullptr)
+        {
+            return {};
+        }
+        TimestampQuerySupport support = mDevice->getTimestampQuerySupport();
+        if (support.supported == False)
+        {
+            return support;
+        }
+        const auto &families = mDevice->getCapabilities().getQueueFamilyProperties();
+        if (mQueueFamilyIndex >= families.size())
+        {
+            return {};
+        }
+        const auto &family = families[mQueueFamilyIndex];
+        const bool supportsInLineReset =
+            (family.queueFlags & (vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute)) != vk::QueueFlags{};
+        if (family.timestampValidBits == 0u || !supportsInLineReset)
+        {
+            support.supported = False;
+            support.passTimestampWritesSupported = False;
+            support.validBits = 0u;
+            return support;
+        }
+        support.validBits = family.timestampValidBits;
+        return support;
+    }
+
     uint64_t VKQueue::getUserSubmitCount() const
     {
         ScopedLock lock(mDevice->submissionMutex());
@@ -101,6 +146,8 @@ namespace GVM::RHI::Vulkan
         // CPU/GPU inflight-frame count. Queue-internal commands can legitimately
         // expand one frame into multiple same-queue submissions.
         constexpr size_t kMaxTrackedSubmissions = 64u;
+        constexpr uint64_t kHostGpuWaitTimeoutMilliseconds = 2000u;
+        constexpr uint64_t kHostGpuWaitTimeoutNanoseconds = 2'000'000'000ull;
 
         uint64_t resolveBufferTransferSize(const BufferRange &range, uint64_t requestedSize, const char *apiName)
         {
@@ -243,7 +290,7 @@ namespace GVM::RHI::Vulkan
 
     } // namespace
 
-    void VKQueue::init(VKDevice *device, uint32_t queueFamilyIndex, vk::Queue queue, const eastl::string &queueName)
+    void VKQueue::init(VKDevice *device, uint32_t queueFamilyIndex, vk::Queue queue, const eastl::string &queueName, uint32_t deviceQueueIndex)
     {
         if (device == nullptr || queue == vk::Queue{})
         {
@@ -254,8 +301,10 @@ namespace GVM::RHI::Vulkan
         mLogger = device->getLogger();
         mLogContext = device->getLogContext();
         mQueueFamilyIndex = queueFamilyIndex;
+        mDeviceQueueIndex = deviceQueueIndex;
         mQueue = queue;
         mQueueName = queueName;
+        mDestroyed.store(false, eastl::memory_order_release);
 
         mCommandContextPool.init(mDevice->getNativeDevice(), queueFamilyIndex);
         mSubmissionManager.init(*mDevice, queueName);
@@ -435,22 +484,29 @@ namespace GVM::RHI::Vulkan
 
     void VKQueue::recycleCommandBufferContext(eastl::shared_ptr<VKCommandBufferContext> context)
     {
-        if (!context)
+        if (!context || mDestroyed.load(eastl::memory_order_acquire))
         {
             return;
         }
-
-        ScopedLock lock(mDevice->submissionMutex());
-        recycleCommandBufferContextLocked(eastl::move(context));
+        mCommandContextPool.recycle(eastl::move(context));
     }
 
     CommandEncoder VKQueue::createCommandEncoder()
     {
         ensureAlive("VKQueue::createCommandEncoder");
         ensureNotLost();
-        ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
-        return createCommandEncoderLocked();
+        eastl::shared_ptr<VKCommandBufferContext> commandContext = mCommandContextPool.tryAcquire();
+        if (!commandContext)
+        {
+            if (std::unique_lock<std::recursive_mutex> lock(mDevice->submissionMutex(), std::try_to_lock); lock.owns_lock())
+            {
+                pollCompletedSubmissions();
+            }
+            commandContext = mCommandContextPool.acquire();
+        }
+        CommandEncoder encoder = new VKCommandEncoder();
+        static_cast<VKCommandEncoder *>(encoder.get())->init(*this, eastl::move(commandContext));
+        return encoder;
     }
 
 
@@ -480,9 +536,8 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
-        const VKUploadSlice slice = mUploadAllocator.allocateAndWrite(data, bytesToWrite);
+        const VKUploadSlice slice = allocateUploadSliceLocked(data, bytesToWrite);
         BufferRange destination = buffer;
         destination.size = bytesToWrite;
         getOrCreateInternalBlitCopyPassLocked().copyNativeBufferToBuffer(slice.buffer, slice.offset, destination);
@@ -508,7 +563,6 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
         auto *sourceBuffer = static_cast<VKBuffer *>(buffer.buffer.get());
         if (sourceBuffer->isHostVisible() && sourceBuffer->supportsCpuRead() && sourceBuffer->getPersistentMappedData() != nullptr)
@@ -534,7 +588,6 @@ namespace GVM::RHI::Vulkan
             throw std::invalid_argument("VKQueue::readBufferAsync requires a valid source buffer.");
         }
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         auto *sourceBuffer = static_cast<VKBuffer *>(source.buffer.get());
         const uint64_t bytesToRead = resolveBufferRangeSize("VKQueue::readBufferAsync", sourceBuffer, source.offset, source.size);
         auto readback = VKReadback(new VKReadbackImpl(*this));
@@ -564,7 +617,6 @@ namespace GVM::RHI::Vulkan
         const uint64_t requiredBytes = Private::computeTextureCopyFootprint(
             "VKQueue::readTextureAsync", source.texture->getFormat(), dataLayout, readSize, 1u).minimumDataBytes;
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         const uint64_t readbackId = mReadbackSequence++;
         auto readback = VKReadback(new VKReadbackImpl(*this));
         Buffer stagingBuffer = createQueueReadbackBuffer(*mDevice, mQueueName, "_ReadbackTextureBuffer_", readbackId, requiredBytes);
@@ -594,9 +646,8 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
-        const VKUploadSlice slice = mUploadAllocator.allocateAndWrite(data, requiredBytes);
+        const VKUploadSlice slice = allocateUploadSliceLocked(data, requiredBytes);
         getOrCreateInternalBlitCopyPassLocked().copyBufferToTexture({}, slice.buffer, slice.offset, requiredBytes, dataLayout, destination, writeSize);
     }
 
@@ -620,7 +671,6 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
         const uint64_t readbackId = mReadbackSequence++;
         Buffer stagingBuffer = createQueueReadbackBuffer(*mDevice, mQueueName, "_ReadbackTextureBuffer_", readbackId, dataSize);
@@ -646,9 +696,8 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
-        const VKUploadSlice slice = mUploadAllocator.allocateAndWrite(data, dataStorageBytes);
+        const VKUploadSlice slice = allocateUploadSliceLocked(data, dataStorageBytes);
         getOrCreateInternalBlitCopyPassLocked().copyBufferToTextureMipChain({}, slice.buffer, slice.offset, dataStorageBytes, destination, mipmapOffsetBytes);
     }
 
@@ -666,7 +715,6 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         getOrCreateInternalBlitCopyPassLocked().copyBufferToTextureMipChain(bufferRange, destination, mipmapOffsetBytes);
     }
 
@@ -676,7 +724,6 @@ namespace GVM::RHI::Vulkan
         ensureNotLost();
         {
             ScopedLock lock(mDevice->submissionMutex());
-            pollCompletedSubmissions();
             getOrCreateInternalBlitCopyPassLocked().copyBufferToBuffer(source, destination);
         }
     }
@@ -686,7 +733,6 @@ namespace GVM::RHI::Vulkan
         ensureAlive("VKQueue::copyBufferToTexture");
         ensureNotLost();
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         auto *sourceBuffer = source.buffer.isNull() ? nullptr : static_cast<VKBuffer *>(source.buffer.get());
         const vk::Buffer nativeSourceBuffer = sourceBuffer != nullptr ? sourceBuffer->getNativeBuffer() : vk::Buffer{};
         uint64_t sourceSize = 0u;
@@ -703,7 +749,6 @@ namespace GVM::RHI::Vulkan
         ensureAlive("VKQueue::copyTextureToBuffer");
         ensureNotLost();
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         auto *destinationBuffer = destination.buffer.isNull() ? nullptr : static_cast<VKBuffer *>(destination.buffer.get());
         const vk::Buffer nativeDestinationBuffer = destinationBuffer != nullptr ? destinationBuffer->getNativeBuffer() : vk::Buffer{};
         uint64_t destinationSize = 0u;
@@ -725,7 +770,6 @@ namespace GVM::RHI::Vulkan
         }
 
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
 
         Private::BufferCopyMultipleRegionInputs inputs = {};
         inputs.source = source;
@@ -755,7 +799,6 @@ namespace GVM::RHI::Vulkan
         ensureAlive("VKQueue::fillBuffer");
         ensureNotLost();
         ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
         getOrCreateInternalBlitCopyPassLocked().fillBuffer(source, value);
     }
 
@@ -800,9 +843,11 @@ namespace GVM::RHI::Vulkan
         }
 
         {
-            ScopedLock lock(mDevice->submissionMutex());
+            std::unique_lock<std::recursive_mutex> lock(mDevice->submissionMutex());
             // A source release or consumer may have failed while this caller waited for acceptance.
             ensureNotLost();
+            pollCompletedSubmissions();
+            enforceTrackedSubmissionLimit(lock);
             eastl::unordered_set<const VKCommandEncoder *> uniqueEncoders;
             for (const CommandEncoder &encoder : encoders)
             {
@@ -817,15 +862,18 @@ namespace GVM::RHI::Vulkan
                     throw std::logic_error("Vulkan command encoder was already submitted.");
                 }
             }
-            pollCompletedSubmissions();
-            if (auto *other = mDevice->otherQueue(*this))
+            for (uint32_t index = 0; index < mDevice->queueCount(); ++index)
             {
-                other->pollCompletedSubmissions();
-                const uint32_t lane = other == mDevice->getMainQueueImpl() ? 0u : 1u;
-                const uint64_t value = mPendingReadbackTracker.lastDirectWriter(getResourceStateDB(), lane);
-                if (value > other->mSubmissionManager.getLastRetiredSubmissionId())
+                auto &other = mDevice->queue(index);
+                if (&other == this)
                 {
-                    mergeTimelineWait(dependencies, other->timelineWait(value));
+                    continue;
+                }
+                other.pollCompletedSubmissions();
+                const uint64_t value = mPendingReadbackTracker.lastDirectWriter(getResourceStateDB(), index);
+                if (value > other.mSubmissionManager.getLastRetiredSubmissionId())
+                {
+                    mergeTimelineWait(dependencies, other.timelineWait(value));
                 }
             }
             eastl::vector<vk::CommandBuffer> commandBuffers;
@@ -907,9 +955,10 @@ namespace GVM::RHI::Vulkan
         GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::submitTracked", "queue={} command_buffers={} internal_present={} submit_kind={}", mQueueName.c_str(), submitInfo.commandBufferInfoCount, internalPresentSubmit, submitKind);
         GVMCpuProbeValueU64(this, QueueLogCategory, "queue.submit_tracked.command_buffer_count", submitInfo.commandBufferInfoCount);
 
-        ScopedLock lock(mDevice->submissionMutex());
+        std::unique_lock<std::recursive_mutex> lock(mDevice->submissionMutex());
         ensureNotLost();
         pollCompletedSubmissions();
+        enforceTrackedSubmissionLimit(lock);
         if (hasPendingInternalCommands() || mPendingReadbackTracker.hasUnsubmitted())
         {
             throw std::logic_error("VKQueue::submitTracked cannot bypass explicit user submit while queue-internal commands or pending readbacks still exist.");
@@ -934,11 +983,19 @@ namespace GVM::RHI::Vulkan
     uint64_t VKQueue::submitOwnershipRelease(const VKOwnershipRelease &release)
     {
         ScopedLock lock(mDevice->submissionMutex());
-        enforceTrackedSubmissionLimitLocked();
+        pollCompletedSubmissions();
         const auto encoder = createCommandEncoderLocked();
         auto &native = *static_cast<VKCommandEncoder *>(encoder.get());
         native.recordOwnershipRelease(release);
-        const auto serial = mSubmissionManager.executeTrackedSubmit(mQueue, {native.getNativeCommandBuffer()}, {}, {},
+        eastl::vector<vk::SemaphoreSubmitInfo> waits;
+        for (uint32_t index = 0; index < mDevice->queueCount(); ++index)
+        {
+            if (index != mDeviceQueueIndex && release.waits[index] != 0)
+            {
+                mergeTimelineWait(waits, mDevice->queue(index).timelineWait(release.waits[index]));
+            }
+        }
+        const auto serial = mSubmissionManager.executeTrackedSubmit(mQueue, {native.getNativeCommandBuffer()}, waits, {},
             {encoder}, false, false, {}, "ownership_release");
         native.onSubmitted();
         return serial;
@@ -949,9 +1006,14 @@ namespace GVM::RHI::Vulkan
         return mSubmissionManager.timelineWait(value);
     }
 
+    uint32_t VKQueue::getDeviceQueueIndex() const
+    {
+        return mDeviceQueueIndex;
+    }
+
     void VKQueue::destroy()
     {
-        if (mDestroyed)
+        if (mDestroyed.load(eastl::memory_order_acquire))
         {
             return;
         }
@@ -1006,7 +1068,7 @@ namespace GVM::RHI::Vulkan
         }
         mBufferCopyMultipleRegionExecutor = Private::BufferCopyMultipleRegionExecutor{};
         mQueue = nullptr;
-        mDestroyed = true;
+        mDestroyed.store(true, eastl::memory_order_release);
         GVMLogWarn(this, QueueLogCategory, "event=queue_destroy_end queue={}", mQueueName.c_str());
         if (mLogger != nullptr)
         {
@@ -1019,7 +1081,6 @@ namespace GVM::RHI::Vulkan
     void VKQueue::waitForSubmission(VKSubmissionSerial serial, const char *waitSource)
     {
         ensureAlive("VKQueue::waitForSubmission");
-        GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::waitForSubmission", "queue={} target_submission_id={} pending_readbacks={} wait_source={}", mQueueName.c_str(), serial, mPendingReadbackTracker.pendingCount(), waitSource != nullptr ? waitSource : "unspecified");
         if (mSubmissionManager.isRetired(serial))
         {
             ScopedLock lock(mDevice->submissionMutex());
@@ -1027,14 +1088,25 @@ namespace GVM::RHI::Vulkan
             return;
         }
 
-        ScopedLock lock(mDevice->submissionMutex());
-        pollCompletedSubmissions();
-        if (mSubmissionManager.isRetired(serial))
+        eastl::shared_ptr<VKSubmissionTimeline> timeline;
         {
-            return;
+            ScopedLock lock(mDevice->submissionMutex());
+            GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::waitForSubmission", "queue={} target_submission_id={} pending_readbacks={} wait_source={}", mQueueName.c_str(), serial, mPendingReadbackTracker.pendingCount(), waitSource != nullptr ? waitSource : "unspecified");
+            pollCompletedSubmissions();
+            if (mSubmissionManager.isRetired(serial) || mSubmissionManager.getInFlightCount() == 0u)
+            {
+                return;
+            }
+            timeline = mSubmissionManager.timeline();
         }
 
-        waitTrackedSubmissionLocked(serial);
+        if (timeline)
+        {
+            waitForTimelineSerialUnlocked(*timeline, serial, waitSource);
+        }
+
+        ScopedLock lock(mDevice->submissionMutex());
+        pollCompletedSubmissions();
     }
 
     bool VKQueue::trySampleSubmissionStatus(VKSubmissionSerial serial, SubmissionStatusSnapshot &outStatus) const
@@ -1050,24 +1122,36 @@ namespace GVM::RHI::Vulkan
 
     bool VKQueue::waitForOldestPendingSubmission()
     {
+        VKSubmissionSerial oldestSerial = 0u;
+        eastl::shared_ptr<VKSubmissionTimeline> timeline;
+        {
+            ScopedLock lock(mDevice->submissionMutex());
+            pollCompletedSubmissions();
+            if (mSubmissionManager.getInFlightCount() == 0u)
+            {
+                return false;
+            }
+            oldestSerial = mSubmissionManager.getOldestSubmissionSerial();
+            if (oldestSerial == 0u)
+            {
+                return false;
+            }
+            timeline = mSubmissionManager.timeline();
+        }
+
+        if (timeline)
+        {
+            waitForTimelineSerialUnlocked(*timeline, oldestSerial, "oldest_pending_submission");
+        }
+
         ScopedLock lock(mDevice->submissionMutex());
         pollCompletedSubmissions();
-        if (mSubmissionManager.getInFlightCount() == 0)
-        {
-            return false;
-        }
-        const VKSubmissionSerial oldestSerial = mSubmissionManager.getOldestSubmissionSerial();
-        if (oldestSerial == 0u)
-        {
-            return false;
-        }
-        waitTrackedSubmissionLocked(oldestSerial);
         return true;
     }
 
     void VKQueue::ensureAlive(const char *apiName) const
     {
-        if (mDestroyed || mDevice == nullptr)
+        if (mDestroyed.load(eastl::memory_order_acquire) || mDevice == nullptr)
         {
             throw std::runtime_error((eastl::string(apiName) + " was called on a destroyed Vulkan queue.").c_str());
         }
@@ -1098,27 +1182,60 @@ namespace GVM::RHI::Vulkan
         }
     }
 
-    void VKQueue::enforceTrackedSubmissionLimitLocked()
+    void VKQueue::enforceTrackedSubmissionLimit(std::unique_lock<std::recursive_mutex> &lock)
     {
         while (mSubmissionManager.getInFlightCount() >= kMaxTrackedSubmissions)
         {
             const VKSubmissionSerial oldestSerial = mSubmissionManager.getOldestSubmissionSerial();
-            if (oldestSerial == 0u)
+            const eastl::shared_ptr<VKSubmissionTimeline> timeline = mSubmissionManager.timeline();
+            if (oldestSerial == 0u || !timeline)
             {
                 break;
             }
 
-            GVMLogWarn(this, QueueLogCategory, "event=queue_submission_limit_wait_begin queue={} in_flight={} limit={} oldest_submission_id={}", mQueueName.c_str(), mSubmissionManager.getInFlightCount(), kMaxTrackedSubmissions, oldestSerial);
-            GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::enforceTrackedSubmissionLimitLocked.waitForSubmission", "queue={} target_submission_id={} in_flight_before={} limit={} wait_source={}", mQueueName.c_str(), oldestSerial, mSubmissionManager.getInFlightCount(), kMaxTrackedSubmissions, "tracked_submission_limit");
-            waitTrackedSubmissionLocked(oldestSerial);
+            const size_t inFlightBefore = mSubmissionManager.getInFlightCount();
+            GVMLogWarn(this, QueueLogCategory, "event=queue_submission_limit_wait_begin queue={} in_flight={} limit={} oldest_submission_id={}", mQueueName.c_str(), inFlightBefore, kMaxTrackedSubmissions, oldestSerial);
+            GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::enforceTrackedSubmissionLimit.waitForSubmission", "queue={} target_submission_id={} in_flight_before={} limit={} wait_source={}", mQueueName.c_str(), oldestSerial, inFlightBefore, kMaxTrackedSubmissions, "tracked_submission_limit");
+            lock.unlock();
+            try
+            {
+                waitForTimelineSerialUnlocked(*timeline, oldestSerial, "tracked_submission_limit");
+            }
+            catch (...)
+            {
+                lock.lock();
+                throw;
+            }
+            lock.lock();
+            ensureAlive("VKQueue::enforceTrackedSubmissionLimit");
+            ensureNotLost();
+            pollCompletedSubmissions();
             GVMLogWarn(this, QueueLogCategory, "event=queue_submission_limit_wait_end queue={} in_flight_after={} limit={} oldest_submission_id={}", mQueueName.c_str(), mSubmissionManager.getInFlightCount(), kMaxTrackedSubmissions, oldestSerial);
         }
     }
 
-    void VKQueue::waitTrackedSubmissionLocked(VKSubmissionSerial serial)
+    void VKQueue::waitForTimelineSerialUnlocked(const VKSubmissionTimeline &timeline, VKSubmissionSerial serial, const char *waitSource)
     {
-        mSubmissionManager.waitForSubmission(serial, std::bind(&VKQueue::handleRetiredSubmissionLocked, this, std::placeholders::_1));
-        processCompletedSubmissionCleanupLocked();
+        if (timeline.wait(serial, kHostGpuWaitTimeoutNanoseconds))
+        {
+            return;
+        }
+        GVMLogError(
+            this,
+            QueueLogCategory,
+            "event=submission_wait_timeout queue={} target_submission_id={} timeout_ms={} wait_source={}",
+            mQueueName.c_str(),
+            serial,
+            kHostGpuWaitTimeoutMilliseconds,
+            waitSource != nullptr ? waitSource : "unspecified");
+        flushLogger(mDevice != nullptr ? mDevice->getLogger() : Logger{});
+        throw std::runtime_error((
+            eastl::string{"VKSubmissionManager::waitForSubmission timed out while waiting for queue='"} +
+            mQueueName +
+            "' targetSubmissionId=" +
+            eastl::to_string(serial) +
+            " timeoutMs=" +
+            eastl::to_string(kHostGpuWaitTimeoutMilliseconds)).c_str());
     }
 
     void VKQueue::handleRetiredSubmissionLocked(InFlightSubmission &submission)
@@ -1136,16 +1253,37 @@ namespace GVM::RHI::Vulkan
 
     eastl::shared_ptr<VKCommandBufferContext> VKQueue::acquireCommandBufferContextLocked()
     {
+        if (auto reused = mCommandContextPool.tryAcquire())
+        {
+            return reused;
+        }
+        if (mSubmissionManager.getInFlightCount() > 0u)
+        {
+            pollCompletedSubmissions();
+        }
         return mCommandContextPool.acquire();
     }
 
     void VKQueue::recycleCommandBufferContextLocked(eastl::shared_ptr<VKCommandBufferContext> context)
     {
-        if (mDestroyed)
+        if (mDestroyed.load(eastl::memory_order_acquire))
         {
             return;
         }
         mCommandContextPool.recycle(eastl::move(context));
+    }
+
+    VKUploadSlice VKQueue::allocateUploadSliceLocked(const void *data, uint64_t size)
+    {
+        if (auto slice = mUploadAllocator.tryAllocateAndWrite(data, size))
+        {
+            return *slice;
+        }
+        if (mSubmissionManager.getInFlightCount() > 0u)
+        {
+            pollCompletedSubmissions();
+        }
+        return mUploadAllocator.allocateAndWrite(data, size);
     }
 
     bool VKQueue::assignPendingReadbackCompletionLocked(VKSubmissionSerial submissionSerial, VKSubmissionSerial &outAssignedSerial)
@@ -1178,10 +1316,6 @@ namespace GVM::RHI::Vulkan
         GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::submitRecordedCommandBuffersLocked", "queue={} command_buffers={} encoders={} internal_present={} submit_kind={}", mQueueName.c_str(), commandBuffers.size(), encoders.size(), internalPresentSubmit, effectiveSubmitKind);
         GVMCpuProbeValueU64(this, QueueLogCategory, "queue.submit_recorded.command_buffer_count", commandBuffers.size());
 
-        {
-            GVMCpuProbeScopeDetail(this, QueueLogCategory, "VKQueue::submitRecordedCommandBuffersLocked.enforceTrackedSubmissionLimitLocked", "queue={} in_flight_before={} command_buffers={} internal_present={} submit_kind={}", mQueueName.c_str(), mSubmissionManager.getInFlightCount(), commandBuffers.size(), internalPresentSubmit, effectiveSubmitKind);
-            enforceTrackedSubmissionLimitLocked();
-        }
         QueueDiagnostics::SubmissionStatistics submitStatistics = {};
         VKPresentManager::DirectPresentSubmitSync directPresentSync = {};
         eastl::vector<vk::SemaphoreSubmitInfo> submitWaitSemaphores;
@@ -1200,7 +1334,7 @@ namespace GVM::RHI::Vulkan
         try
         {
             VKResourceStateDB pending;
-            pending.beginSubmission(getResourceStateDB(), *this, mSubmissionManager.nextValue());
+            pending.beginSubmission(getResourceStateDB(), mDeviceQueueIndex, mQueueFamilyIndex, mSubmissionManager.nextValue());
             eastl::vector<vk::CommandBuffer> orderedCommands;
             orderedCommands.reserve(encoders.size() * 2 + 1);
             for (const auto &encoder : encoders)
@@ -1219,7 +1353,7 @@ namespace GVM::RHI::Vulkan
                 }
             }
             prepareSubmitInfoSynchronization(submitTemplate, directPresentSync, submitWaitSemaphores, submitSignalSemaphores);
-            pending.prepareQueueWaits(encoders, submitWaitSemaphores);
+            pending.prepareQueueWaits(*mDevice, encoders, submitWaitSemaphores);
             submissionSerial = mSubmissionManager.executeTrackedSubmit(mQueue, encoders.empty() ? commandBuffers : orderedCommands,
                 submitWaitSemaphores, submitSignalSemaphores,
                 encoders, internalPresentSubmit, noteUserSubmit, submitStatistics, effectiveSubmitKind, completion);

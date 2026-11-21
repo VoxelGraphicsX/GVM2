@@ -2,6 +2,7 @@
 
 #include "VKCommon.hpp"
 #include "VKDefines.hpp"
+#include "VKDefines.hpp"
 
 namespace GVM::RHI::Vulkan
 {
@@ -25,7 +26,7 @@ namespace GVM::RHI::Vulkan
         /// Publishes an accepted query operation; other queues must wait before using this pool.
         void acceptUse(uint32_t lane, uint64_t value);
     private:
-        uint64_t mLastUse[2]{};
+        uint64_t mLastUse[MaxDeviceQueues]{};
         QueryType mType = QueryType::Timestamp;
         uint32_t mCount = 0u;
         uint32_t mResultStrideBytes = sizeof(uint64_t);

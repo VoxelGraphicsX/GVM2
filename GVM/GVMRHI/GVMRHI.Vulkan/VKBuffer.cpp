@@ -60,11 +60,22 @@ namespace GVM::RHI::Vulkan
         }
         mNativeUsageFlags = usageFlags;
 
+        const auto families = device.queueFamilyIndices();
+        mConcurrentSharing = families.size() > 1;
         VkBufferCreateInfo bufferCreateInfo = {};
         bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferCreateInfo.size = descriptor.size;
         bufferCreateInfo.usage = static_cast<VkBufferUsageFlags>(usageFlags);
-        bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        if (mConcurrentSharing)
+        {
+            bufferCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            bufferCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(families.size());
+            bufferCreateInfo.pQueueFamilyIndices = families.data();
+        }
+        else
+        {
+            bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
 
         VmaAllocationCreateInfo allocationCreateInfo = buildBufferAllocationInfo(descriptor.usage);
 

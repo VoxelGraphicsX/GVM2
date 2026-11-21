@@ -22,6 +22,7 @@ namespace GVM::RHI::Vulkan
     {
         bool supportsRequiredSampledImageDescriptorIndexing = false;
         bool supportsRequiredVulkan13Features = false;
+        bool supportsSeparateDepthStencilLayouts = false;
         bool supportsRobustBufferAccess = false;
         bool supportsRobustBufferAccess2 = false;
         bool supportsSamplerAnisotropy = false;

@@ -249,7 +249,6 @@ namespace GVM::RHI::Metal
     void MRenderPassEncoder::setBindGroup(BindGroup group, uint32_t groupIndex)
     {
         ensureOpen("MRenderPassEncoder::setBindGroup");
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->markOpaque();
         if (group == nullptr)
         {
             throw std::invalid_argument("MRenderPassEncoder::setBindGroup requires a valid bind group.");
@@ -262,8 +261,6 @@ namespace GVM::RHI::Metal
     {
         ensureOpen("MRenderPassEncoder::setVertexBuffer");
         mRecorder.setVertexBuffer(buffer, slot);
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->recordAccess(
-            {static_cast<MBuffer *>(buffer.buffer.get())->getNativeBuffer(), buffer.offset, buffer.size, false});
     }
 
     void MRenderPassEncoder::setIndexBuffer(BufferRange buffer, IndexFormat format)
@@ -273,8 +270,6 @@ namespace GVM::RHI::Metal
         auto &source = resolveBufferRange(*mDevice, buffer, BufferUsage::Index, alignment);
         const uint32_t payload = static_cast<uint32_t>(mIndexBuffers.size());
         mRecorder.setIndexBuffer(buffer, format, payload);
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->recordAccess(
-            {source.getNativeBuffer(), buffer.offset, buffer.size, false});
         mIndexBuffers.push_back(NS::RetainPtr(source.getNativeBuffer()));
     }
 
@@ -293,7 +288,6 @@ namespace GVM::RHI::Metal
     void MRenderPassEncoder::drawIndirect(BufferRange indirectBuffer, uint32_t indirectCommandCount, uint32_t stride)
     {
         ensureOpen("MRenderPassEncoder::drawIndirect");
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->markOpaque();
         if (indirectCommandCount == 0u)
         {
             return;
@@ -313,7 +307,6 @@ namespace GVM::RHI::Metal
     void MRenderPassEncoder::drawIndexedIndirect(BufferRange indirectBuffer, uint32_t indirectCommandCount, uint32_t stride)
     {
         ensureOpen("MRenderPassEncoder::drawIndexedIndirect");
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->markOpaque();
         if (indirectCommandCount == 0u)
         {
             return;
@@ -331,7 +324,6 @@ namespace GVM::RHI::Metal
     void MRenderPassEncoder::drawIndirectCount(BufferRange indirectBuffer, BufferRange countBuffer, uint32_t maxDrawCount, uint32_t stride)
     {
         ensureOpen("MRenderPassEncoder::drawIndirectCount");
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->markOpaque();
         auto &source = resolveBufferRange(*mDevice, indirectBuffer, BufferUsage::Indirect, 4u);
         auto &counter = resolveBufferRange(*mDevice, countBuffer, BufferUsage::Indirect, 4u);
         const uint32_t payload = static_cast<uint32_t>(mIndirectDraws.size());
@@ -350,7 +342,6 @@ namespace GVM::RHI::Metal
     void MRenderPassEncoder::drawIndexedIndirectCount(BufferRange indirectBuffer, BufferRange countBuffer, uint32_t maxDrawCount, uint32_t stride)
     {
         ensureOpen("MRenderPassEncoder::drawIndexedIndirectCount");
-        static_cast<MCommandEncoder *>(mWeakCommandEncoder)->markOpaque();
         auto &source = resolveBufferRange(*mDevice, indirectBuffer, BufferUsage::Indirect, 4u);
         auto &counter = resolveBufferRange(*mDevice, countBuffer, BufferUsage::Indirect, 4u);
         const uint32_t payload = static_cast<uint32_t>(mIndirectDraws.size());

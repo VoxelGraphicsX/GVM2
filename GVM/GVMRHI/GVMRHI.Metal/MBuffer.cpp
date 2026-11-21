@@ -3,6 +3,7 @@
 
 #include <GVMRHI/Private/RHIBufferContracts.hpp>
 
+#include <cassert>
 #include <cstring>
 #include <stdexcept>
 namespace GVM::RHI::Metal
@@ -100,7 +101,9 @@ namespace GVM::RHI::Metal
         if (device != nullptr)
         {
             const auto resourceOptions = translateBufferUsageToResourceOptionMTL(descriptor.usage);
-            // Resources keep Metal's default tracked hazard mode: GVM relies on Metal's automatic hazard tracking between encoders instead of explicit MTLFence/MTLEvent synchronization.
+            // Resources keep Metal's default tracked hazard mode: GVM relies on Metal's automatic hazard tracking within and across queues (paired with MTLSharedEvent) rather than manual MTLFence/memoryBarrier tracking.
+            assert((resourceOptions & MTL::ResourceHazardTrackingModeUntracked) == 0 &&
+                "Metal buffers must remain hazard-tracked unless explicit untracked barrier synthesis is implemented.");
             this->mNativeBuffer = device->getNativeDevice()->newBuffer(descriptor.size, resourceOptions);
         }
 

@@ -118,17 +118,26 @@ namespace GVM::RHI::Vulkan
                         return use.view == view && use.layout == imageLayout;
                     });
                     const auto stages = translateShaderStagesToPipelineStages(field.entry.visibility);
+                    vk::AccessFlags2 accesses = vk::AccessFlagBits2::eShaderRead;
+                    if (access == StorageTextureAccess::WriteOnly)
+                    {
+                        accesses = vk::AccessFlagBits2::eShaderWrite;
+                    }
+                    else if (access == StorageTextureAccess::ReadWrite)
+                    {
+                        accesses |= vk::AccessFlagBits2::eShaderWrite;
+                    }
                     if (existing != mTextureUses.end())
                     {
                         existing->stages |= stages;
+                        existing->accesses |= accesses;
                         const auto index = static_cast<size_t>(existing - mTextureUses.begin());
                         mTextureUseAccesses[index] = static_cast<StorageTextureAccess>(
                             static_cast<uint32_t>(mTextureUseAccesses[index]) | static_cast<uint32_t>(access));
                     }
                     else
                     {
-                        mTextureUses.push_back({view, imageLayout, stages, storage ?
-                            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite : vk::AccessFlagBits2::eShaderRead});
+                        mTextureUses.push_back({view, imageLayout, stages, accesses});
                         mTextureUseAccesses.push_back(access);
                         view->retainReference();
                     }
@@ -206,13 +215,13 @@ namespace GVM::RHI::Vulkan
         VkBufferCreateInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bufferInfo.size = page.size;
         bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        const uint32_t families[] = {mDevice.getCapabilities().getGraphicsQueueFamilyIndex(), mDevice.computeFamily()};
-        if (families[1] != VK_QUEUE_FAMILY_IGNORED && families[1] != families[0])
+        const auto families = mDevice.queueFamilyIndices();
+        if (families.size() > 1)
         {
             // Private argument pages may be recycled on another family after their submission retires.
             bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-            bufferInfo.queueFamilyIndexCount = 2;
-            bufferInfo.pQueueFamilyIndices = families;
+            bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(families.size());
+            bufferInfo.pQueueFamilyIndices = families.data();
         }
         VmaAllocationCreateInfo allocationInfo{};
         allocationInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -241,13 +250,14 @@ namespace GVM::RHI::Vulkan
 
     bool VKArgumentPagePool::waitForSubmittedWork()
     {
-        VKQueue *queue = mDevice.getMainQueueImpl();
-        if (queue == nullptr)
+        for (uint32_t index = 0; index < mDevice.queueCount(); ++index)
         {
-            return false;
+            if (mDevice.queue(index).waitForOldestPendingSubmission())
+            {
+                return true;
+            }
         }
-        auto *other = mDevice.otherQueue(*queue);
-        return queue->waitForOldestPendingSubmission() || (other != nullptr && other->waitForOldestPendingSubmission());
+        return false;
     }
 
     VKArgumentStorage::VKArgumentStorage(VKDevice &device) : mDevice(device), mPool(device.getArgumentResources().getPagePool()) {}

@@ -1,4 +1,5 @@
 #include "MSubmissionState.hpp"
+#include <EASTL/unordered_map.h>
 #include <EASTL/unordered_set.h>
 #include "MQueue.hpp"
 #include "MCommandEncoder.hpp"
@@ -28,7 +29,7 @@ namespace GVM::RHI::Metal
     MQueue::MQueue()
     {
     }
-    void MQueue::init(MDevice *device, const eastl::string &queueName, MTL::CommandQueue *native)
+    void MQueue::init(MDevice *device, const eastl::string &queueName, MTL::CommandQueue *native, uint32_t maxCommandBufferCount)
     {
         GVMCpuProbeScopeDetail(
             device,
@@ -42,12 +43,35 @@ namespace GVM::RHI::Metal
         this->mDevice = device;
         if (mDevice != nullptr)
         {
-            mNativeQueue = native != nullptr ? native->retain() : mDevice->getNativeDevice()->newCommandQueue();
+            if (native != nullptr)
+            {
+                mNativeQueue = native->retain();
+                mMaxCommandBufferCount = maxCommandBufferCount != 0u ? maxCommandBufferCount : 64u;
+            }
+            else
+            {
+                mNativeQueue = mDevice->getNativeDevice()->newCommandQueue(DefaultMaxCommandBufferCount);
+                if (mNativeQueue != nullptr)
+                {
+                    mMaxCommandBufferCount = DefaultMaxCommandBufferCount;
+                }
+                else
+                {
+                    mNativeQueue = mDevice->getNativeDevice()->newCommandQueue();
+                    mMaxCommandBufferCount = 64u;
+                }
+            }
             if (mNativeQueue == nullptr)
             {
                 throw std::runtime_error("Metal could not allocate its main command queue.");
             }
             mNativeQueue->setLabel(NS::String::string(queueName.c_str(), NS::UTF8StringEncoding));
+            mQueueEvent = NS::TransferPtr(mDevice->getNativeDevice()->newEvent());
+            if (!mQueueEvent)
+            {
+                throw std::runtime_error("Metal could not allocate a queue synchronization event.");
+            }
+            mNextEventValue = 1;
         }
         mQueueName = queueName;
         mUploadAllocator.init(mDevice, mQueueName);
@@ -57,6 +81,16 @@ namespace GVM::RHI::Metal
             .code = getCopyBufferToBufferMultipleRegion(),
         });
         mBufferCopyMultipleRegionExecutor.init(*mDevice, {.module = copyShader, .entryPoint = "executeCopyBufferCommands"});
+    }
+
+    TimestampQuerySupport MQueue::getTimestampQuerySupport() const
+    {
+        return mDevice != nullptr ? mDevice->getTimestampQuerySupport() : TimestampQuerySupport{};
+    }
+
+    uint32_t MQueue::getMaxUnsubmittedCommandEncoderCount() const
+    {
+        return eastl::max(8u, mMaxCommandBufferCount / 2u);
     }
 
     CommandEncoder MQueue::createCommandEncoder()
@@ -81,6 +115,7 @@ namespace GVM::RHI::Metal
     }
     void MQueue::writeBuffer(BufferRange buffer, void const *data, uint64_t size)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::writeBuffer");
         if (buffer.buffer.isNull() || buffer.buffer.get() == nullptr)
         {
@@ -109,6 +144,7 @@ namespace GVM::RHI::Metal
 
     void MQueue::readBuffer(BufferRange buffer, void *data, uint64_t size)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::readBuffer");
         GVMCpuProbeScopeDetail(
             mDevice,
@@ -177,6 +213,12 @@ namespace GVM::RHI::Metal
 
     void MQueue::writeTexture(const ImageCopyTexture &destination, void const *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &writeSize)
     {
+        std::lock_guard lock(mSubmitMutex);
+        writeTextureLocked(destination, data, dataSize, dataLayout, writeSize);
+    }
+
+    void MQueue::writeTextureLocked(const ImageCopyTexture &destination, void const *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &writeSize)
+    {
         mDevice->getLostState().throwIfLost("MQueue::writeTexture");
         if (destination.texture.isNull() || destination.texture.get() == nullptr)
         {
@@ -200,6 +242,7 @@ namespace GVM::RHI::Metal
 
     void MQueue::readTexture(const ImageCopyTexture &source, void *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &readSize)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::readTexture");
         if (source.texture.isNull() || source.texture.get() == nullptr)
         {
@@ -259,6 +302,7 @@ namespace GVM::RHI::Metal
 
     void MQueue::uploadTexture(Texture destination, void const *data, uint64_t dataStorageBytes, const eastl::vector<uint64_t> &mipmapOffsetBytes)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::uploadTexture");
         if (destination.isNull() || data == nullptr)
             throw std::invalid_argument("MQueue::uploadTexture requires a valid destination texture and source data.");
@@ -270,12 +314,13 @@ namespace GVM::RHI::Metal
             const Extent3D size = {eastl::max(1u, destination->getWidth() >> level), eastl::max(1u, destination->getHeight() >> level), 1u};
             const ImageCopyTexture target = {.texture = destination, .mipLevel = level};
             const TextureDataLayout layout = {.offset = mipmapOffsetBytes[level]};
-            writeTexture(target, data, dataStorageBytes, layout, size);
+            writeTextureLocked(target, data, dataStorageBytes, layout, size);
         }
     }
 
     void MQueue::uploadTexture(Texture destination, GVM::RHI::BufferRange bufferRange, const eastl::vector<uint64_t> &mipmapOffsetBytes)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::uploadTexture");
         if (destination.isNull() || bufferRange.buffer.isNull())
             throw std::invalid_argument("MQueue::uploadTexture requires a valid destination texture and source buffer.");
@@ -303,17 +348,24 @@ namespace GVM::RHI::Metal
             layout.bytesPerRow = static_cast<uint32_t>(footprint.bytesPerRow);
             layout.rowsPerImage = static_cast<uint32_t>(footprint.rowsPerImage);
             const ImageCopyTexture target = {.texture = destination, .mipLevel = level};
-            copyBufferToTexture({.layout = layout, .buffer = bufferRange.buffer}, target, size);
+            copyBufferToTextureLocked({.layout = layout, .buffer = bufferRange.buffer}, target, size);
         }
     }
 
     void MQueue::copyBufferToBuffer(BufferRange source, BufferRange destination)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::copyBufferToBuffer");
         getOrCreateTopBlitPassEncoder()->copyBufferToBuffer(source, destination);
     }
 
     void MQueue::copyBufferToTexture(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize)
+    {
+        std::lock_guard lock(mSubmitMutex);
+        copyBufferToTextureLocked(source, destination, copySize);
+    }
+
+    void MQueue::copyBufferToTextureLocked(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize)
     {
         mDevice->getLostState().throwIfLost("MQueue::copyBufferToTexture");
         getOrCreateTopBlitPassEncoder()->copyBufferToTexture(source, destination, copySize);
@@ -321,12 +373,14 @@ namespace GVM::RHI::Metal
 
     void MQueue::copyTextureToBuffer(const ImageCopyTexture &source, const ImageCopyBuffer &destination, const Extent3D &copySize)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::copyTextureToBuffer");
         getOrCreateReadbackBlitPassEncoder()->copyTextureToBuffer(source, destination, copySize);
     }
 
     void MQueue::copyBufferToBufferMultipleRegion(Buffer source, Buffer destination, Buffer regions, uint32_t regionCount)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::copyBufferToBufferMultipleRegion");
         if (regionCount == 0)
         {
@@ -355,12 +409,14 @@ namespace GVM::RHI::Metal
 
     void MQueue::fillBuffer(BufferRange source, uint8_t value)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::fillBuffer");
         getOrCreateTopBlitPassEncoder()->fillBuffer(source, value);
     }
 
     Readback MQueue::readBufferAsync(BufferRange source)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::readBufferAsync");
         if (source.buffer.isNull() || source.buffer.get() == nullptr)
         {
@@ -409,6 +465,7 @@ namespace GVM::RHI::Metal
 
     Readback MQueue::readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize)
     {
+        std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::readTextureAsync");
         if (source.texture.isNull() || source.texture.get() == nullptr)
         {
@@ -464,36 +521,8 @@ namespace GVM::RHI::Metal
         return submitBatch(encoders, &waits);
     }
 
-    void MQueue::publishAcceptedTail()
-    {
-        std::lock_guard lock(mSubmitMutex);
-        if (mLastCommittedSubmitSerial == 0)
-        {
-            return;
-        }
-        auto event = NS::TransferPtr(mDevice->getNativeDevice()->newEvent());
-        if (!event)
-        {
-            throw std::runtime_error("Metal could not allocate an event for the accepted main-queue tail.");
-        }
-        auto marker = createCommandEncoder();
-        auto *native = static_cast<MCommandEncoder *>(marker.get())->getNativeCommandEncoder();
-        native->encodeSignalEvent(event.get(), 1);
-        marker->end();
-        eastl::vector<NS::SharedPtr<MTL::CommandBuffer>> buffers{NS::RetainPtr(native)};
-        auto completion = eastl::make_shared<MSubmissionState>(eastl::move(buffers), eastl::move(event), mDevice->getLostStateHandle());
-        completion->arm();
-        eastl::vector<Submission> waits;
-        mDevice->queueHistory().prepare(this, {}, true, waits);
-        commitCommandEncoder(marker, "accepted_tail", false);
-        ++mNextSubmitSerial;
-        mDevice->queueHistory().accept(this, {}, true, makeSubmission(eastl::move(completion)));
-    }
-
     Submission MQueue::submitBatch(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> *waits)
     {
-        auto &history = mDevice->queueHistory();
-        std::lock_guard deviceLock(history.mutex());
         std::lock_guard lock(mSubmitMutex);
         mDevice->getLostState().throwIfLost("MQueue::submit");
         const auto autoreleasePool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
@@ -510,14 +539,6 @@ namespace GVM::RHI::Metal
         CommandEncoder dependencyEncoder;
         CommandEncoder completionEncoder;
         eastl::shared_ptr<MSubmissionState> completion;
-        const bool managed = mDevice->tracksQueue(*this);
-        bool opaque = mWriteBufferCommandEncoder != nullptr || mReadbackCommandEncoder != nullptr;
-        eastl::vector<MQueueAccess> uses;
-        eastl::vector<Submission> dependencies;
-        if (waits != nullptr)
-        {
-            dependencies = *waits;
-        }
         eastl::unordered_set<const MCommandEncoder *> uniqueEncoders;
         for (const auto &encoder : encoders)
         {
@@ -527,46 +548,70 @@ namespace GVM::RHI::Metal
                 throw std::invalid_argument("Submission requires unique Metal command encoders.");
             }
             native->validateSubmission(*mNativeQueue, waits != nullptr);
-            if (managed)
-            {
-                native->collectAccesses(uses, opaque);
-            }
         }
-        if (managed)
+        if (waits != nullptr)
         {
-            history.prepare(this, uses, opaque, dependencies);
-        }
-        const bool publish = managed && (opaque || !uses.empty());
-        if (waits != nullptr || publish || !dependencies.empty())
-        {
-            eastl::unordered_set<MTL::Event *> events;
-            for (const auto &dependency : dependencies)
+            eastl::unordered_map<MTL::Event *, uint64_t> waitMap;
+            for (const auto &dependency : *waits)
             {
                 const auto state = eastl::dynamic_pointer_cast<MSubmissionState>(getSubmissionState(dependency));
                 if (!state)
                 {
                     throw std::invalid_argument("Submission dependency belongs to a different backend.");
                 }
-                events.insert(state->dependency(mDevice->getLostStateHandle()));
+                const auto dep = state->dependency(mDevice->getLostStateHandle());
+                if (dep.event != nullptr && dep.event != mQueueEvent.get())
+                {
+                    auto &maxValue = waitMap[dep.event];
+                    maxValue = eastl::max(maxValue, dep.value);
+                }
             }
-            if (!events.empty())
+            if (!waitMap.empty())
             {
                 dependencyEncoder = createCommandEncoder();
                 auto *native = static_cast<MCommandEncoder *>(dependencyEncoder.get())->getNativeCommandEncoder();
-                for (auto *event : events)
+                for (const auto &[event, value] : waitMap)
                 {
-                    native->encodeWait(event, 1);
+                    native->encodeWait(event, value);
                 }
                 dependencyEncoder->end();
             }
-            auto event = NS::TransferPtr(mDevice->getNativeDevice()->newEvent());
-            if (!event)
+            const uint64_t signalValue = mNextEventValue++;
+            if (mReadbackCommandEncoder != nullptr)
             {
-                throw std::runtime_error("Metal could not allocate a submission event.");
+                if (mReadbackBlitPassEncoder != nullptr)
+                {
+                    mReadbackBlitPassEncoder->end();
+                    mReadbackBlitPassEncoder = nullptr;
+                }
+                mReadbackCommandEncoder->end();
+                static_cast<MCommandEncoder *>(mReadbackCommandEncoder.get())->getNativeCommandEncoder()->encodeSignalEvent(mQueueEvent.get(), signalValue);
             }
-            completionEncoder = createCommandEncoder();
-            static_cast<MCommandEncoder *>(completionEncoder.get())->getNativeCommandEncoder()->encodeSignalEvent(event.get(), 1);
-            completionEncoder->end();
+            else if (!encoders.empty())
+            {
+                static_cast<MCommandEncoder *>(encoders.back().get())->getNativeCommandEncoder()->encodeSignalEvent(mQueueEvent.get(), signalValue);
+            }
+            else if (mWriteBufferCommandEncoder != nullptr)
+            {
+                if (mWriteBufferBlitPassEncoder != nullptr)
+                {
+                    mWriteBufferBlitPassEncoder->end();
+                    mWriteBufferBlitPassEncoder = nullptr;
+                }
+                if (mComputeCopyPassEncoder != nullptr)
+                {
+                    mComputeCopyPassEncoder->end();
+                    mComputeCopyPassEncoder = nullptr;
+                }
+                mWriteBufferCommandEncoder->end();
+                static_cast<MCommandEncoder *>(mWriteBufferCommandEncoder.get())->getNativeCommandEncoder()->encodeSignalEvent(mQueueEvent.get(), signalValue);
+            }
+            else
+            {
+                completionEncoder = createCommandEncoder();
+                static_cast<MCommandEncoder *>(completionEncoder.get())->getNativeCommandEncoder()->encodeSignalEvent(mQueueEvent.get(), signalValue);
+                completionEncoder->end();
+            }
             eastl::vector<NS::SharedPtr<MTL::CommandBuffer>> buffers;
             buffers.reserve(encoders.size() + 4);
             for (const auto &encoder : {dependencyEncoder, mWriteBufferCommandEncoder})
@@ -587,7 +632,7 @@ namespace GVM::RHI::Metal
                     buffers.push_back(NS::RetainPtr(static_cast<MCommandEncoder *>(encoder.get())->getNativeCommandEncoder()));
                 }
             }
-            completion = eastl::make_shared<MSubmissionState>(eastl::move(buffers), eastl::move(event), mDevice->getLostStateHandle());
+            completion = eastl::make_shared<MSubmissionState>(eastl::move(buffers), NS::RetainPtr(mQueueEvent.get()), signalValue, mDevice->getLostStateHandle());
             completion->arm();
         }
         try
@@ -596,15 +641,11 @@ namespace GVM::RHI::Metal
         }
         catch (...)
         {
-            if (waits != nullptr || managed)
+            if (waits != nullptr || mLastCommittedEncoder != nullptr)
             {
                 mDevice->getLostState().markLost(DeviceLostReason::SubmissionFailed, "Metal batch submission failed after commit began.");
             }
             throw;
-        }
-        if (publish)
-        {
-            history.accept(this, eastl::move(uses), opaque, makeSubmission(completion));
         }
         mUploadAllocator.markSubmitted(mNextSubmitSerial);
         finalizePendingReadbacks();
@@ -682,6 +723,7 @@ namespace GVM::RHI::Metal
         mReadbackCommandEncoder = nullptr;
         mLastCommittedEncoder = nullptr;
         mCommittedCommandBuffers.clear();
+        mQueueEvent.reset();
         if (this->mNativeQueue != nullptr)
         {
             this->mNativeQueue->release();

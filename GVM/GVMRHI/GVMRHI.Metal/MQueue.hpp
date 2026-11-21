@@ -22,10 +22,13 @@ namespace GVM::RHI::Metal
     class MQueue final : public QueueImpl
     {
     public:
+        static constexpr uint32_t DefaultMaxCommandBufferCount = 512u;
+
         MQueue();
-        void init(MDevice *device, const eastl::string &queueName, MTL::CommandQueue *native = nullptr);
-        /// Signals previously committed work before the first auxiliary queue is exposed; queued application transfers stay pending.
-        void publishAcceptedTail();
+        void init(MDevice *device, const eastl::string &queueName, MTL::CommandQueue *native = nullptr, uint32_t maxCommandBufferCount = 0u);
+        virtual TimestampQuerySupport getTimestampQuerySupport() const override;
+        /// Returns half of the native Metal command queue's command-buffer slot capacity as safe unsubmitted headroom.
+        uint32_t getMaxUnsubmittedCommandEncoderCount() const override;
         virtual CommandEncoder createCommandEncoder() override;
 
         virtual void writeBuffer(BufferRange buffer, void const *data, uint64_t size) override;
@@ -73,6 +76,8 @@ namespace GVM::RHI::Metal
         /** Returns the owning Metal device. */
         [[nodiscard]] MDevice *getDevice() const { return mDevice; }
     private:
+        void writeTextureLocked(const ImageCopyTexture &destination, void const *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &writeSize);
+        void copyBufferToTextureLocked(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize);
         CommandEncoder getOrCreateWriteBufferCommandEncoder();
         BlitPassEncoder getOrCreateTopBlitPassEncoder();
 
@@ -110,6 +115,9 @@ namespace GVM::RHI::Metal
         uint64_t mNextSubmitSerial = 1;
         uint64_t mLastCommittedSubmitSerial = 0;
         uint64_t mRetiredSubmitSerial = 0;
+        NS::SharedPtr<MTL::Event> mQueueEvent;
+        uint64_t mNextEventValue = 1;
+        uint32_t mMaxCommandBufferCount = 64u;
         MCommandEncoder *mLastCommittedEncoder = nullptr;
         eastl::vector<eastl::unique_ptr<MCommittedCommandBuffer>> mCommittedCommandBuffers;
 

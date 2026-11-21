@@ -35,7 +35,7 @@ namespace GVM::RHI::Vulkan
         VKDevice &getDevice() const { return *mDevice; }
         [[nodiscard]] vk::Image getNativeImage() const;
         [[nodiscard]] TextureUsageFlags getUsage() const;
-        [[nodiscard]] TextureDimension getDimension() const;
+        [[nodiscard]] TextureDimension getDimension() const override;
         [[nodiscard]] vk::ImageLayout getSteadyStateLayout() const;
         [[nodiscard]] bool hasSteadyStateLayout() const;
 
@@ -69,6 +69,7 @@ namespace GVM::RHI::Vulkan
         [[nodiscard]] bool isDestroyRequested() const;
         /** Reports whether the user handle was released and no holder references remain. */
         [[nodiscard]] bool isDestroyable() const;
+        [[nodiscard]] bool isConcurrentSharing() const { return mConcurrentSharing; }
         /** Returns the live reference count, including the user handle's while it is held. */
         [[nodiscard]] uint32_t getReferenceCount() const;
 
@@ -94,5 +95,6 @@ namespace GVM::RHI::Vulkan
         Texture mHandle = {};
         bool mOwnsAllocation = true;
         bool mDestroyed = false;
+        bool mConcurrentSharing = false;
     };
 } // namespace GVM::RHI::Vulkan

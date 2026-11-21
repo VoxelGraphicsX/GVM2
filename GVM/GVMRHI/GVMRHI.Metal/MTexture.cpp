@@ -3,6 +3,7 @@
 #include "MEnumUtils.hpp"
 #include "MTextureView.hpp"
 
+#include <cassert>
 #include <stdexcept>
 
 namespace GVM::RHI::Metal
@@ -97,10 +98,12 @@ namespace GVM::RHI::Metal
         textureDescriptor->setDepth(descriptor.size.depth);
         textureDescriptor->setArrayLength(descriptor.arrayLayerCount);
         textureDescriptor->setMipmapLevelCount(descriptor.mipLevelCount);
-        // Resources keep Metal's default tracked hazard mode: GVM relies on Metal's automatic hazard tracking between encoders instead of explicit MTLFence/MTLEvent synchronization.
+        // Resources keep Metal's default tracked hazard mode: GVM relies on Metal's automatic hazard tracking within and across queues (paired with MTLSharedEvent) rather than manual MTLFence/memoryBarrier tracking.
         //  textureDescriptor->setSampleCount(descriptor.sampleCount);
         textureDescriptor->setStorageMode(translateTextureStorageModeToMTL(descriptor.storageMode));
         textureDescriptor->setUsage(translateTextureUsageToMTL(descriptor.usage));
+        assert(textureDescriptor->hazardTrackingMode() != MTL::HazardTrackingModeUntracked &&
+            "Metal textures must remain hazard-tracked unless explicit untracked barrier synthesis is implemented.");
         this->mNativeTexture = device->getNativeDevice()->newTexture(textureDescriptor);
         if (this->mNativeTexture == nullptr)
         {
@@ -263,6 +266,11 @@ namespace GVM::RHI::Metal
     TextureFormat MTexture::getFormat() const
     {
         return this->mDescriptor.format;
+    }
+
+    TextureDimension MTexture::getDimension() const
+    {
+        return this->mDescriptor.dimension;
     }
 
     TextureUsageFlags MTexture::getUsage() const

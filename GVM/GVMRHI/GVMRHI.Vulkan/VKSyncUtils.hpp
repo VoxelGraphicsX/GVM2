@@ -22,4 +22,10 @@ namespace GVM::RHI::Vulkan
 
     [[nodiscard]]
     vk::AccessFlags2 resolveAccessMaskForLayout(vk::ImageLayout layout);
+
+    [[nodiscard]]
+    vk::PipelineStageFlags2 supportedStageMaskForQueueFlags(vk::QueueFlags queueFlags);
+
+    [[nodiscard]]
+    vk::AccessFlags2 supportedAccessMaskForQueueFlags(vk::QueueFlags queueFlags);
 } // namespace GVM::RHI::Vulkan

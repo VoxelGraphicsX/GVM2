@@ -1631,9 +1631,15 @@ namespace GVM::RHI
         virtual void freeTexture(Texture texture) = 0;
         virtual void freeSampler(Sampler sampler) = 0;
 
+        /// Creates a host-driven 64-bit monotonic timeline usable with RHI::waitAny on submissions from this device.
+        virtual HostTimeline createHostTimeline();
+
         virtual void destroy() = 0;
         /// Releases the interface after the backend has completed its explicit destroy operation.
         virtual ~DeviceImpl();
+
+    protected:
+        static HostTimeline makeHostTimeline(eastl::shared_ptr<Private::HostTimelineState> state);
     };
 
     /// Owns the bytes of one queued readback; becomes ready once the submission that executes the copy completes.
@@ -1653,6 +1659,21 @@ namespace GVM::RHI
     class QueueImpl
     {
     public:
+        /// Reports timestamp query support and valid counter bits for this specific queue.
+        virtual TimestampQuerySupport getTimestampQuerySupport() const
+        {
+            return {};
+        }
+        /// Returns the minimum image transfer granularity required by this queue; (0, 0, 0) requires whole-mip copies.
+        virtual Extent3D getImageTransferGranularity() const
+        {
+            return {1u, 1u, 1u};
+        }
+        /// Returns the maximum number of unsubmitted command encoders that may coexist safely on this queue.
+        virtual uint32_t getMaxUnsubmittedCommandEncoderCount() const
+        {
+            return 1024u;
+        }
         virtual CommandEncoder createCommandEncoder() = 0;
         /** Queues an upload that runs before the command encoders of the next submit(), in call order relative to other queued writes. */
         virtual void writeBuffer(BufferRange buffer, void const *data, uint64_t size) = 0;
@@ -1680,9 +1701,10 @@ namespace GVM::RHI
         virtual void copyBufferToBufferMultipleRegion(Buffer source, Buffer destination, Buffer regions, uint32_t regionCount) = 0;
         /** Queues a fill that sets every byte in [offset, offset+size) to value before the command encoders of the next submit(), in call order relative to other queued writes; offset and size must be multiples of 4. */
         virtual void fillBuffer(BufferRange source, uint8_t value) = 0;
-        /** Submits the recorded command encoders so that all queued writes run before them and all queued reads and texture-to-buffer copies run after them, each in call order. */
+        /** Submits this queue's pending writes, encoders and pending reads in that order. Use the overload with dependencies when sharing writable resources across queues. */
         virtual void submit(const eastl::vector<CommandEncoder> &encoders) = 0;
         /// Submits closed encoders after GPU dependencies, preserving pending-write/user/pending-read order.
+        /// Callers must supply the producer or reader completions needed to order conflicting accesses on different queues.
         /// Dependencies must originate from this device; accepted work returns an owning completion handle.
         /// Empty batches still return completion; legacy pointer readbacks retain their host-wait behavior.
         virtual Submission submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits);
@@ -1714,6 +1736,8 @@ namespace GVM::RHI
 
         virtual void copyBufferToTexture(const ImageCopyBuffer &source, const ImageCopyTexture &destination, const Extent3D &copySize) = 0;
         virtual void copyTextureToBuffer(const ImageCopyTexture &source, const ImageCopyBuffer &destination, const Extent3D &copySize) = 0;
+        /// Records a subresource copy between two compatible GPU textures.
+        virtual void copyTextureToTexture(const ImageCopyTexture &source, const ImageCopyTexture &destination, const Extent3D &copySize) = 0;
         /** Records a fill that sets every byte in [offset, offset+size) to value; offset and size must be multiples of 4. */
         virtual void fillBuffer(BufferRange source, uint8_t value) = 0;
         virtual void end() = 0;
@@ -2343,6 +2367,12 @@ namespace GVM::RHI
         virtual uint32_t getArrayLayerCount() const = 0;
         [[nodiscard]]
         virtual TextureFormat getFormat() const = 0;
+        /// Returns the declared dimensionality of this texture allocation.
+        [[nodiscard]]
+        virtual TextureDimension getDimension() const
+        {
+            return getDepth() > 1u ? TextureDimension::e3D : TextureDimension::e2D;
+        }
         // Backend teardown hook. As with BufferImpl::destroy, this is part of the backend's
         // retirement path after Device::freeTexture has determined the native texture can be
         // released safely.
@@ -2355,6 +2385,9 @@ namespace GVM::RHI
     public:
         /// Returns the parent allocation for graph hazard analysis, or null when identity is unavailable.
         virtual const TextureImpl *getSourceTexture() const;
+        /// Returns the subresource view descriptor when available, or an all-subresource fallback for conservative ordering.
+        [[nodiscard]]
+        virtual TextureViewDescriptor getViewDescriptor() const;
         /// Returns the concrete pixel format used by this view for pipeline attachment compatibility.
         [[nodiscard]]
         virtual TextureFormat getFormat() const = 0;

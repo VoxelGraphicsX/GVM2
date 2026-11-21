@@ -12,7 +12,7 @@
 #include <Metal/Metal.hpp>
 #include <Utils/ResourcePool.hpp>
 #include <dispatch/dispatch.h>
-#include "MQueueHistory.hpp"
+#include <mutex>
 
 #include "MUtilShaders/MIndirectBufferConvertShaderExecutor.hpp"
 namespace GVM::RHI::Metal
@@ -24,12 +24,8 @@ namespace GVM::RHI::Metal
         MDevice();
         void init(MInstance *instance);
         virtual Queue getMainQueue() const override;
-        /// Lazily acquires the preferred compute queue, keeping graphics, overlay and unavailable requests canonical.
+        /// Lazily acquires the preferred auxiliary queue for compute and transfer work, keeping graphics, overlay and unavailable requests canonical.
         Queue getQueue(const QueueDescriptor &descriptor) override;
-        /// Returns the device submission history shared by managed Metal queues.
-        MQueueHistory &queueHistory();
-        /// Reports whether this queue participates in the managed two-queue hazard domain under the submission lock.
-        bool tracksQueue(const MQueue &queue) const;
         virtual TimestampQuerySupport getTimestampQuerySupport() const override;
         virtual PassCounterQuerySupport getPassCounterQuerySupport() const override;
         /// Returns Metal device memory topology as reported by the selected native device.
@@ -134,8 +130,10 @@ namespace GVM::RHI::Metal
         RuntimeDiagnosticsOverlayConfig mDiagnosticsOverlayConfig = {};
         MQueue *mMainQueue = nullptr;
         MQueue *mComputeQueue = nullptr;
-        MQueueHistory mQueueHistory;
+        MQueue *mTransferQueue = nullptr;
+        std::mutex mQueueMutex;
         bool mComputeUnavailable = false;
+        bool mTransferUnavailable = false;
 #if GVM_DIAGNOSTICS_OVERLAY_ENABLED
         Queue mDiagnosticsOverlayQueue = nullptr;
 #endif
@@ -146,6 +144,8 @@ namespace GVM::RHI::Metal
         MIndirectBufferConvertShaderExecutor mIndirectIndexedRenderCommandConvertShaderExecutor = nullptr;
         Private::FullscreenTextureExecutor mFullscreenTextureExecutor;
         Private::DeviceObjectCache mObjectCache;
+        // Keep tracked buffers and textures alive while a diagnostics snapshot copies their metadata.
+        mutable std::mutex mResourceSnapshotMutex;
         eastl::vector<Buffer> mLiveBuffers;
         eastl::vector<Texture> mLiveTextures;
         eastl::vector<Sampler> mLiveSamplers;

@@ -14,6 +14,8 @@ namespace GVM::RHI::Private
     // https://stackoverflow.com/questions/56285630/how-to-set-bytesperrow-parameter-in-replaceregion-when-texture-format-is-compres
     uint64_t getTextureBlockWidth(TextureFormat format);
     uint64_t getTextureBlockHeight(TextureFormat format);
+    /** Returns bytes per texel block when format has a portable host block size, or zero otherwise. */
+    uint64_t tryGetTextureBytesPerBlock(TextureFormat format) noexcept;
     uint64_t getTextureBytesPerBlock(TextureFormat format);
     BlockInfo getTextureBlockInfo(TextureFormat format);
     uint64_t getIndexBufferElementStorageSizeFromFormat(IndexFormat format);
