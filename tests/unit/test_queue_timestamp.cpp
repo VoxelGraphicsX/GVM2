@@ -82,6 +82,7 @@ namespace
         void copyBufferToBuffer(GVM::RHI::BufferRange, GVM::RHI::BufferRange) override {}
         void copyBufferToTexture(const GVM::RHI::ImageCopyBuffer &, const GVM::RHI::ImageCopyTexture &, const GVM::RHI::Extent3D &) override {}
         void copyTextureToBuffer(const GVM::RHI::ImageCopyTexture &, const GVM::RHI::ImageCopyBuffer &, const GVM::RHI::Extent3D &) override {}
+        void copyTextureToTexture(const GVM::RHI::ImageCopyTexture &, const GVM::RHI::ImageCopyTexture &, const GVM::RHI::Extent3D &) override {}
         void fillBuffer(GVM::RHI::BufferRange, uint8_t) override {}
         void end() override {}
     };

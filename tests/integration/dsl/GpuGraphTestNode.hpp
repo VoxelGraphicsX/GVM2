@@ -16,10 +16,11 @@ struct GpuGraphRecordingProbe
     bool fail = false;
     bool observeBuild = false;
     bool allocateProbeBuffer = false;
+    bool transferPasses = false;
     GVM::RHI::Buffer buffer;
 };
 
-/// Builds native test subgraphs with instrumented compute and optional ordinary render passes.
+/// Builds instrumented compute/render subgraphs or transfer fills for independent-queue progress checks.
 class GpuGraphTestNode final : public GVM::Core::IRenderNode<uint32_t, uint32_t>
 {
 public:

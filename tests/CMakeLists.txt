@@ -65,11 +65,15 @@ if(GVM_BUILD_TESTS_UNIT)
             unit/test_eastl_allocator.cpp
             unit/test_pass_schedule.cpp
             unit/test_task_runtime.cpp
+            unit/test_marl_executor.cpp
             unit/TaskTestExecutor.cpp
         LABELS unit whitebox core
         INCLUDE_DIRS
             ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
             ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Public
+    )
+    set_source_files_properties(unit/test_marl_executor.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/unit/marl_stub"
     )
 
     if(GVM_RHI_ENABLE_VULKAN)
@@ -662,7 +666,11 @@ endif()
 if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
     gvm_add_dsl_runtime_gtest(gvm_dsl_gpu_task_graph_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/GpuTaskGraph.hpp
-        SOURCES integration/dsl/test_gpu_task_graph.cpp integration/dsl/GpuGraphTestNode.cpp integration/dsl/GpuGraphTestExecutor.cpp
+        SOURCES
+            integration/dsl/test_gpu_task_graph.cpp
+            integration/dsl/test_gpu_task_graph_marl.cpp
+            integration/dsl/GpuGraphTestNode.cpp
+            integration/dsl/GpuGraphTestExecutor.cpp
         LABELS integration dsl core task-graph gpu
         UGL_INCLUDE_DIRS ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders ${GVM_REPOSITORY_ROOT}/GVM/third_party
         LINK_LIBS glm::glm
@@ -670,7 +678,25 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
         RUN_SERIAL
         TIMEOUT 120
     )
+    set_source_files_properties(integration/dsl/test_gpu_task_graph_marl.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/unit/marl_stub"
+    )
     target_compile_definitions(gvm_dsl_gpu_task_graph_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
+
+    if(TARGET GVM::MarlExecutor)
+        gvm_add_dsl_runtime_gtest(gvm_marl_upstream_smoke_tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/GpuTaskGraph.hpp
+            SOURCES
+                integration/dsl/test_marl_upstream_smoke.cpp
+            LABELS integration dsl core task-graph gpu marl
+            UGL_INCLUDE_DIRS ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders ${GVM_REPOSITORY_ROOT}/GVM/third_party
+            LINK_LIBS GVM::MarlExecutor glm::glm
+            UGLC_ARGS --shader-pipeline=uglir
+            RUN_SERIAL
+            TIMEOUT 120
+        )
+        target_compile_definitions(gvm_marl_upstream_smoke_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
+    endif()
     gvm_add_dsl_runtime_gtest(gvm_dsl_task_graph_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/dsl_cases/CpuTaskGraph.hpp
         SOURCES integration/dsl/test_cpu_task_graph.cpp

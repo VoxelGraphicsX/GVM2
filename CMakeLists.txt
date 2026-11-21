@@ -52,6 +52,8 @@ if(GVM_SANITIZERS)
 endif()
 option(GVM_RHI_ENABLE_DIAGNOSTICS_OVERLAY "Build the runtime RHI diagnostics overlay" ON)
 option(GVM_RHI_USE_SPDLOG_LOGGER "Build and auto-register the built-in spdlog logger provider" OFF)
+option(GVM_ENABLE_UPSTREAM_MARL "Fetch or use upstream google/marl for optional GVM::MarlExecutor smoke tests and samples" ${GVM_IS_TOP_LEVEL})
+set(GVM_MARL_SOURCE_DIR "" CACHE PATH "Optional local checkout of google/marl used when GVM_ENABLE_UPSTREAM_MARL=ON.")
 option(GVM_USE_REPOSITORY_DEPENDENCY_CACHE "Use the repository-local .cache directory for downloaded dependency sources and toolchains." ON)
 if(NOT DEFINED GVM_DEPENDENCY_CACHE_ROOT)
     set(GVM_DEPENDENCY_CACHE_ROOT "${GVM_REPOSITORY_ROOT}/.cache" CACHE PATH "Repository-local cache root for downloaded dependency sources and toolchains.")
@@ -268,11 +270,11 @@ if(GVM_BUILD_SAMPLES)
 	  endif()
 
 
-  set(GVMRUNTIMES_PORTABLE_WINDOWED_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture)
+  set(GVMRUNTIMES_PORTABLE_WINDOWED_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture Test_07_TaskGraphSwapchain Test_08_PCGForestTaskGraph Test_09_SparseVoxelWorld Test_10_ProceduralCityWorld)
   if(WIN32)
     set(GVMRUNTIMES_SAMPLES ${GVMRUNTIMES_PORTABLE_WINDOWED_SAMPLES})
   else()
-  set(GVMRUNTIMES_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture Test_04_Cube Test_05_3DGS_PLY_Compute Test_06_3DGS_PLY_ComputeSort_Graphics ReplayAttachmentHazard)
+  set(GVMRUNTIMES_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture Test_04_Cube Test_05_3DGS_PLY_Compute Test_06_3DGS_PLY_ComputeSort_Graphics Test_07_TaskGraphSwapchain Test_08_PCGForestTaskGraph ReplayAttachmentHazard Test_09_SparseVoxelWorld Test_10_ProceduralCityWorld)
   endif()
   set(GVM_3DGS_RUNTIME_SAMPLES Test_05_3DGS_PLY_Compute Test_06_3DGS_PLY_ComputeSort_Graphics)
   #set(GVMRUNTIMES_SAMPLES  Test_TriangleWithTexture)
@@ -350,6 +352,126 @@ if(GVM_BUILD_SAMPLES)
       ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
       ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_03_TriangleWithTexture)
   set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_03_TriangleWithTexture GVMRuntimeSampleTest03TriangleWithTextureApp)
+
+  add_library(GVMRuntimeSampleTest07TaskGraphSwapchainApp STATIC
+    GVMRuntime_Samples/Test_07_TaskGraphSwapchain/Test07TaskGraphSwapchainApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest07TaskGraphSwapchainApp PUBLIC GVMSampleWindowManager glm::glm)
+  target_include_directories(GVMRuntimeSampleTest07TaskGraphSwapchainApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_07_TaskGraphSwapchain
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest07TaskGraphSwapchainApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_07_TaskGraphSwapchain/Test_07_TaskGraphSwapchain.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_07_TaskGraphSwapchain/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_07_TaskGraphSwapchain
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_07_TaskGraphSwapchain
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_07_TaskGraphSwapchain GVMRuntimeSampleTest07TaskGraphSwapchainApp)
+
+  add_library(GVMRuntimeSampleTest08PCGForestTaskGraphApp STATIC
+    GVMRuntime_Samples/Test_08_PCGForestTaskGraph/Test08PCGForestTaskGraphApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest08PCGForestTaskGraphApp PUBLIC GVMSampleWindowManager glm::glm)
+  if(TARGET GVM::MarlExecutor)
+    target_link_libraries(GVMRuntimeSampleTest08PCGForestTaskGraphApp PUBLIC GVM::MarlExecutor)
+    target_compile_definitions(GVMRuntimeSampleTest08PCGForestTaskGraphApp PUBLIC GVM_SAMPLE_HAS_UPSTREAM_MARL=1)
+  endif()
+  target_include_directories(GVMRuntimeSampleTest08PCGForestTaskGraphApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_08_PCGForestTaskGraph
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest08PCGForestTaskGraphApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_08_PCGForestTaskGraph/Test_08_PCGForestTaskGraph.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_08_PCGForestTaskGraph/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_08_PCGForestTaskGraph
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_08_PCGForestTaskGraph
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_08_PCGForestTaskGraph GVMRuntimeSampleTest08PCGForestTaskGraphApp)
+
+  add_library(GVMRuntimeSampleTest09SparseVoxelWorldApp STATIC
+    GVMRuntime_Samples/Test_09_SparseVoxelWorld/Test09SparseVoxelWorldApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest09SparseVoxelWorldApp PUBLIC GVMSampleWindowManager glm::glm)
+  if(TARGET GVM::MarlExecutor)
+    target_link_libraries(GVMRuntimeSampleTest09SparseVoxelWorldApp PUBLIC GVM::MarlExecutor)
+    target_compile_definitions(GVMRuntimeSampleTest09SparseVoxelWorldApp PUBLIC GVM_SAMPLE_HAS_UPSTREAM_MARL=1)
+  endif()
+  target_include_directories(GVMRuntimeSampleTest09SparseVoxelWorldApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_09_SparseVoxelWorld
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest09SparseVoxelWorldApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_09_SparseVoxelWorld/Test_09_SparseVoxelWorld.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_09_SparseVoxelWorld/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_09_SparseVoxelWorld
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_09_SparseVoxelWorld
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_09_SparseVoxelWorld GVMRuntimeSampleTest09SparseVoxelWorldApp)
+
+  add_library(GVMRuntimeSampleTest10ProceduralCityWorldApp STATIC
+    GVMRuntime_Samples/Test_10_ProceduralCityWorld/Test10ProceduralCityWorldApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest10ProceduralCityWorldApp PUBLIC GVMSampleWindowManager glm::glm)
+  if(TARGET GVM::MarlExecutor)
+    target_link_libraries(GVMRuntimeSampleTest10ProceduralCityWorldApp PUBLIC GVM::MarlExecutor)
+    target_compile_definitions(GVMRuntimeSampleTest10ProceduralCityWorldApp PUBLIC GVM_SAMPLE_HAS_UPSTREAM_MARL=1)
+  endif()
+  target_include_directories(GVMRuntimeSampleTest10ProceduralCityWorldApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_10_ProceduralCityWorld
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest10ProceduralCityWorldApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_10_ProceduralCityWorld/Test_10_ProceduralCityWorld.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_10_ProceduralCityWorld/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_10_ProceduralCityWorld
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_10_ProceduralCityWorld
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_10_ProceduralCityWorld GVMRuntimeSampleTest10ProceduralCityWorldApp)
 
   if(GVM_BUILD_SAMPLE_DESKTOP_BINARIES)
     foreach(SAMPLE IN LISTS GVMRUNTIMES_SAMPLES)

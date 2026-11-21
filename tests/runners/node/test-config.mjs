@@ -33,7 +33,8 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
         GVM_BUILD_TESTS_RHI: 'ON',
         GVM_BUILD_TESTS_DSL: 'ON',
         GVM_BUILD_TESTS_RENDER: 'ON',
-        GVM_BUILD_UGLC: 'ON'
+        GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON'
       }
     },
     'macos-asan': {
@@ -55,6 +56,7 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
         GVM_BUILD_TESTS_DSL: 'ON',
         GVM_BUILD_TESTS_RENDER: 'ON',
         GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
         GVM_SANITIZERS: 'address,undefined'
       },
       environment: {
@@ -77,6 +79,7 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
         GVM_BUILD_TESTS_DSL: 'ON',
         GVM_BUILD_TESTS_RENDER: 'ON',
         GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
         GVM_RHI_ENABLE_DIAGNOSTICS_OVERLAY: 'OFF'
       }
     },
@@ -95,6 +98,7 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
         GVM_BUILD_TESTS_DSL: 'ON',
         GVM_BUILD_TESTS_RENDER: 'ON',
         GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
         GVM_RHI_ENABLE_LOGGING: 'ON',
         GVM_RHI_ENABLE_CPU_PROBES: 'ON'
       }
@@ -118,6 +122,7 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
         GVM_BUILD_TESTS_DSL: 'ON',
         GVM_BUILD_TESTS_RENDER: 'ON',
         GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
         GVM_SANITIZERS: 'thread'
       },
       environment: {

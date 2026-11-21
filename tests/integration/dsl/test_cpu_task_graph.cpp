@@ -38,5 +38,23 @@ TEST(CpuTaskGraphDslTests, DeferredFieldsRemainTypedAndOwned)
     ASSERT_TRUE(nested.wait(5'000'000'000ull));
     ASSERT_EQ(nested.status(), GVM::Core::ExecutionStatus::Succeeded) << nested.error().c_str();
     EXPECT_FLOAT_EQ(nested.get(), 127.5f);
+}
 
+/// Verifies UGL-generated nested [[Export]] subgraphs, explicit TaskGraph& functors, and Task vector fan-in run without deadlock on 1 worker.
+TEST(CpuTaskGraphDslTests, NestedDslSubgraphAndTaskVectorCompleteOnSingleWorker)
+{
+    GVM::Core::ThreadExecutor singleWorker(1);
+    GVM::Core::TaskRuntime runtime(singleWorker, {.maximumActiveExecutions = 4, .maximumTasksPerExecution = 512});
+    CpuGraphFixture::Input input;
+    input.count = 256u;
+    input.scale = 2.0f;
+    auto execution = runtime.submit(CpuGraphFixture::Entries::buildNestedCpuSubgraph, input);
+    ASSERT_TRUE(execution.wait(5'000'000'000ull));
+    ASSERT_EQ(execution.status(), GVM::Core::ExecutionStatus::Succeeded) << execution.error().c_str();
+    EXPECT_FLOAT_EQ(execution.get(), 510.0f);
+
+    auto rangeForExec = runtime.submit(CpuGraphFixture::Entries::buildRangeForCpuGraph, CpuGraphFixture::Input{});
+    ASSERT_TRUE(rangeForExec.wait(5'000'000'000ull));
+    ASSERT_EQ(rangeForExec.status(), GVM::Core::ExecutionStatus::Succeeded) << rangeForExec.error().c_str();
+    EXPECT_FLOAT_EQ(rangeForExec.get(), 127.5f);
 }

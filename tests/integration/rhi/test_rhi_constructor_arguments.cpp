@@ -6,8 +6,11 @@
 #include "GVMShaderReadbackTest.hpp"
 #include <GVMRHI/GVMRHI.Vulkan/VKDevice.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKArguments.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKArgumentTable.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKBuffer.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKQueue.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKQueueSelection.hpp>
+#include <GVMRHI/GVMRHI.Vulkan/VKTaskDependencyResolver.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKTexture.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKNativeRecordingProbe.hpp>
 #include <chrono>
@@ -19,6 +22,19 @@
 
 namespace
 {
+    /// Applies a queue access through ResourceDB without native GPU objects and returns the resulting per-queue waits.
+    bool prepareTestQueueAccess(GVM::RHI::Vulkan::VKResourceQueueState &state,
+        uint32_t queueIndex, uint32_t queueFamily, uint64_t value, bool exclusive,
+        eastl::array<uint64_t, GVM::RHI::Vulkan::MaxDeviceQueues> &waits)
+    {
+        GVM::RHI::Vulkan::VKResourceStateDB history;
+        GVM::RHI::Vulkan::VKResourceStateDB submission;
+        submission.beginSubmission(history, queueIndex, queueFamily, value);
+        const bool transfer = submission.prepareQueueAccess(state, exclusive);
+        waits = submission.queueWaitValues();
+        return transfer;
+    }
+
     PFN_vkQueueSubmit2 nativeQueueSubmit = nullptr;
     VkQueue rejectedQueue = VK_NULL_HANDLE;
 
@@ -2145,8 +2161,8 @@ TEST_F(ConstructorArgumentsTest, SamplesStorageTextureWritesInFinalSubmissionOrd
     EXPECT_EQ(result[0], 111u);
 }
 
-/// Checks write, sample, overwrite and sample across real native queues on a single mip with no caller-supplied waits.
-TEST_F(ConstructorArgumentsTest, CrossQueueImageOwnershipPreservesSampledValues)
+/// Orders writes and sampling of the same mip across queues using GPU dependencies in both directions.
+TEST_F(ConstructorArgumentsTest, CrossQueueImageWaitsPreserveSampledValues)
 {
     using namespace GVM::RHI;
     auto *graphics = device->getMainQueue();
@@ -2162,10 +2178,13 @@ TEST_F(ConstructorArgumentsTest, CrossQueueImageOwnershipPreservesSampledValues)
     const auto output = createArgumentOutput(proxy);
     auto writer = proxy->createComputeClass<ArgumentStorageTextureCompute>(view, float4(0));
     auto reader = proxy->createComputeClass<ArgumentTextureCompute>(view, sampler, BufferRange(output), 0u);
+    eastl::vector<Submission> previousRead;
     for (uint32_t index = 0; index < 2; ++index)
     {
-        compute->submit({recordArgumentDispatch(*compute, writer->dispatchThreads(view, float4(index == 0 ? 0.8f : 0.4f, 0, 0, 1), 1, 1, 1))});
-        graphics->submit({recordArgumentDispatch(*graphics, reader->dispatchThreads(view, sampler, BufferRange(output, index * 4, 4), 3u, 1, 1, 1))});
+        const auto write = recordArgumentDispatch(*compute, writer->dispatchThreads(view, float4(index == 0 ? 0.8f : 0.4f, 0, 0, 1), 1, 1, 1));
+        const auto written = compute->submit({write}, previousRead);
+        const auto read = recordArgumentDispatch(*graphics, reader->dispatchThreads(view, sampler, BufferRange(output, index * 4, 4), 3u, 1, 1, 1));
+        previousRead = {graphics->submit({read}, {written})};
     }
     eastl::array<uint32_t, 2> observed{};
     proxy->graphicsQueue(0)->readBuffer(BufferRange(output, 0, sizeof(observed)), observed.data(), sizeof(observed))->submit();
@@ -2193,7 +2212,7 @@ TEST_F(ConstructorArgumentsTest, RejectedAcquireRetainsAcceptedRelease)
     rejectedQueue = compute->getNativeQueue();
     nativeQueueSubmit = VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2;
     VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2 = &rejectAcquireSubmit;
-    EXPECT_THROW(compute->submit({encoder}, {}), DeviceLostError);
+    EXPECT_THROW(compute->submit({encoder}, {accepted}), DeviceLostError);
     VULKAN_HPP_DEFAULT_DISPATCHER.vkQueueSubmit2 = nativeQueueSubmit;
     rejectedQueue = VK_NULL_HANDLE;
     EXPECT_TRUE(graphics->getResourceStateDB().hasUnacquiredRelease());
@@ -2292,23 +2311,479 @@ TEST_F(ConstructorArgumentsTest, CrossQueueBufferRetiresAfterBothTimelines)
     EXPECT_TRUE(buffer.isNull());
 }
 
-/// Verifies an established image layout permits two same-family readers and that a later writer joins both timelines.
-TEST(VulkanQueueFrontierTests, ReadersSharePreparedLayoutAndWriterJoins)
+/// Keeps buffer and image readers independent while rebuilding visibility and joining every reader before a write.
+TEST_F(ConstructorArgumentsTest, ParallelReadersKeepIndependentVisibilityAndWriterJoins)
 {
-    GVM::RHI::Vulkan::VKQueueFrontier frontier;
-    uint64_t wait = 0;
-    EXPECT_FALSE(frontier.advance(0, 3, 2, true, wait));
-    EXPECT_FALSE(frontier.advance(0, 3, 4, false, wait));
-    EXPECT_FALSE(frontier.advance(1, 3, 7, false, wait));
-    EXPECT_EQ(wait, 2u);
-    wait = 0;
-    EXPECT_FALSE(frontier.advance(0, 3, 11, false, wait));
-    EXPECT_EQ(wait, 0u);
-    EXPECT_FALSE(frontier.advance(0, 3, 13, true, wait));
-    EXPECT_EQ(wait, 7u);
-    wait = 0;
-    EXPECT_TRUE(frontier.advance(1, 5, 19, false, wait));
-    EXPECT_EQ(wait, 13u);
+    using namespace GVM::RHI;
+    using namespace GVM::RHI::Vulkan;
+    auto *queue = dynamic_cast<VKQueue *>(device->getMainQueue());
+    if (queue == nullptr)
+    {
+        GTEST_SKIP() << "Vulkan submission reconciliation is required.";
+    }
+    const auto buffer = device->createBuffer({.usage = BufferUsage::Storage, .size = 32});
+    const auto texture = createArgumentTexture(*device);
+    auto &nativeBuffer = *static_cast<VKBuffer *>(buffer.get());
+    auto &nativeTexture = *static_cast<VKTexture *>(texture.get());
+    VKResourceStateDB history;
+    // Logical queue slots make this regression independent of the device's native queue count.
+    const eastl::array<uint32_t, 5> queues{0, 1, 2, 0, 2};
+    const eastl::array<uint64_t, 5> values{2, 7, 3, 11, 5};
+    const eastl::array<eastl::array<uint64_t, MaxDeviceQueues>, 5> waits{{
+        {0, 0, 0}, {2, 0, 0}, {2, 0, 0}, {0, 0, 0}, {11, 7, 0}}};
+    for (size_t index = 0; index < queues.size(); ++index)
+    {
+        SCOPED_TRACE(index);
+        const auto access = index == 0 || index == queues.size() - 1 ?
+            vk::AccessFlagBits2::eShaderWrite : vk::AccessFlagBits2::eShaderRead;
+        VKTaskDependencyResolver resolver;
+        resolver.init(*queue);
+        // A first local access captures an entry summary without recording native commands.
+        resolver.synchronizeBufferRange({}, nativeBuffer, 0, 32, vk::PipelineStageFlagBits2::eComputeShader, access);
+        resolver.synchronizeTextureSubresources({}, nativeTexture, vk::ImageLayout::eGeneral,
+            vk::PipelineStageFlagBits2::eComputeShader, access);
+        VKResourceStateDB submission;
+        submission.beginSubmission(history, queues[index], queue->getQueueFamilyIndex(), values[index]);
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        resolver.prepareSubmission(submission, buffers, images);
+        EXPECT_EQ(submission.queueWaitValues(), waits[index]);
+        if (index != 0)
+        {
+            ASSERT_EQ(buffers.size(), 1u);
+            ASSERT_EQ(images.size(), 1u);
+            EXPECT_NE(buffers[0].srcAccessMask & vk::AccessFlagBits2::eShaderWrite, vk::AccessFlags2{});
+            EXPECT_NE(images[0].srcAccessMask & vk::AccessFlagBits2::eShaderWrite, vk::AccessFlags2{});
+            EXPECT_NE(buffers[0].dstAccessMask & access, vk::AccessFlags2{});
+            EXPECT_NE(images[0].dstAccessMask & access, vk::AccessFlags2{});
+            EXPECT_EQ(images[0].oldLayout, vk::ImageLayout::eGeneral);
+            EXPECT_EQ(images[0].newLayout, vk::ImageLayout::eGeneral);
+        }
+        submission.commitSubmission();
+        EXPECT_EQ(history.editBuffer(nativeBuffer).front().access.visibleReads, VKAccessScope{});
+        EXPECT_EQ(history.editTexture(nativeTexture).subresources.front().access.visibleReads, VKAccessScope{});
+    }
+}
+
+/// Treats an image layout transition as an exclusive use before allowing readers to share the resulting layout.
+TEST_F(ConstructorArgumentsTest, ReadOnlyImageLayoutTransitionJoinsAllReaders)
+{
+    using namespace GVM::RHI;
+    using namespace GVM::RHI::Vulkan;
+    auto *queue = dynamic_cast<VKQueue *>(device->getMainQueue());
+    if (queue == nullptr)
+    {
+        GTEST_SKIP() << "Vulkan submission reconciliation is required.";
+    }
+    const auto texture = createArgumentTexture(*device);
+    auto &nativeTexture = *static_cast<VKTexture *>(texture.get());
+    VKResourceStateDB history;
+    const eastl::array<uint32_t, 6> queues{0, 1, 2, 0, 1, 2};
+    const eastl::array<uint64_t, 6> values{2, 7, 3, 11, 13, 5};
+    const eastl::array<eastl::array<uint64_t, MaxDeviceQueues>, 6> waits{{
+        {0, 0, 0}, {2, 0, 0}, {2, 0, 0}, {0, 7, 3}, {11, 0, 0}, {11, 0, 0}}};
+    for (size_t index = 0; index < queues.size(); ++index)
+    {
+        SCOPED_TRACE(index);
+        const auto layout = index < 3 ? vk::ImageLayout::eGeneral : vk::ImageLayout::eShaderReadOnlyOptimal;
+        const auto access = index == 0 ? vk::AccessFlagBits2::eShaderWrite : vk::AccessFlagBits2::eShaderRead;
+        VKTaskDependencyResolver resolver;
+        resolver.init(*queue);
+        resolver.synchronizeTextureSubresources({}, nativeTexture, layout,
+            vk::PipelineStageFlagBits2::eComputeShader, access);
+        VKResourceStateDB submission;
+        submission.beginSubmission(history, queues[index], queue->getQueueFamilyIndex(), values[index]);
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        resolver.prepareSubmission(submission, buffers, images);
+        EXPECT_EQ(submission.queueWaitValues(), waits[index]);
+        ASSERT_EQ(images.size(), 1u);
+        EXPECT_EQ(images[0].newLayout, layout);
+        if (index == 3)
+        {
+            EXPECT_EQ(images[0].oldLayout, vk::ImageLayout::eGeneral);
+        }
+        submission.commitSubmission();
+    }
+}
+
+/// Joins prior readers for an EXCLUSIVE family acquire and preserves accepted history when the pending acquire is discarded.
+TEST_F(ConstructorArgumentsTest, DiscardedOwnershipAcquirePreservesAcceptedResourceHistory)
+{
+    using namespace GVM::RHI;
+    using namespace GVM::RHI::Vulkan;
+    auto *queue = dynamic_cast<VKQueue *>(device->getMainQueue());
+    if (queue == nullptr)
+    {
+        GTEST_SKIP() << "Vulkan submission reconciliation is required.";
+    }
+    const auto buffer = device->createBuffer({.usage = BufferUsage::Storage, .size = 32});
+    const auto texture = createArgumentTexture(*device);
+    auto &nativeBuffer = *static_cast<VKBuffer *>(buffer.get());
+    auto &nativeTexture = *static_cast<VKTexture *>(texture.get());
+    const auto family = queue->getQueueFamilyIndex();
+    VKResourceStateDB history;
+    const eastl::array<uint32_t, 3> queues{0, 0, 1};
+    const eastl::array<uint64_t, 3> values{2, 4, 7};
+    for (size_t index = 0; index < queues.size(); ++index)
+    {
+        const auto access = index == 0 ? vk::AccessFlagBits2::eShaderWrite : vk::AccessFlagBits2::eShaderRead;
+        VKTaskDependencyResolver resolver;
+        resolver.init(*queue);
+        resolver.synchronizeBufferRange({}, nativeBuffer, 0, 32, vk::PipelineStageFlagBits2::eComputeShader, access);
+        resolver.synchronizeTextureSubresources({}, nativeTexture, vk::ImageLayout::eGeneral,
+            vk::PipelineStageFlagBits2::eComputeShader, access);
+        VKResourceStateDB submission;
+        submission.beginSubmission(history, queues[index], family, values[index]);
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        resolver.prepareSubmission(submission, buffers, images);
+        submission.commitSubmission();
+    }
+    const auto bufferBefore = history.editBuffer(nativeBuffer).front();
+    const auto imageBefore = history.editTexture(nativeTexture).subresources.front();
+    {
+        // A synthetic foreign family exercises acquire preparation without issuing native ownership commands.
+        const uint32_t destinationFamily = family == 0 ? 1 : 0;
+        VKTaskDependencyResolver resolver;
+        resolver.init(*queue);
+        resolver.synchronizeBufferRange({}, nativeBuffer, 0, 32,
+            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderRead);
+        resolver.synchronizeTextureSubresources({}, nativeTexture, vk::ImageLayout::eGeneral,
+            vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderRead);
+        VKResourceStateDB submission;
+        submission.beginSubmission(history, 2, destinationFamily, 3);
+        eastl::vector<vk::BufferMemoryBarrier2> buffers;
+        eastl::vector<vk::ImageMemoryBarrier2> images;
+        resolver.prepareSubmission(submission, buffers, images);
+        EXPECT_EQ(submission.queueWaitValues(), (eastl::array<uint64_t, MaxDeviceQueues>{4, 7, 0}));
+        ASSERT_EQ(buffers.size(), 1u);
+        ASSERT_EQ(images.size(), 1u);
+        EXPECT_EQ(buffers[0].srcQueueFamilyIndex, family);
+        EXPECT_EQ(buffers[0].dstQueueFamilyIndex, destinationFamily);
+        EXPECT_EQ(buffers[0].srcStageMask, vk::PipelineStageFlags2{});
+        EXPECT_EQ(buffers[0].srcAccessMask, vk::AccessFlags2{});
+        EXPECT_EQ(buffers[0].dstStageMask, vk::PipelineStageFlagBits2::eAllCommands);
+        EXPECT_EQ(images[0].srcQueueFamilyIndex, family);
+        EXPECT_EQ(images[0].dstQueueFamilyIndex, destinationFamily);
+        EXPECT_EQ(images[0].srcStageMask, vk::PipelineStageFlags2{});
+        EXPECT_EQ(images[0].srcAccessMask, vk::AccessFlags2{});
+        EXPECT_EQ(images[0].dstStageMask, vk::PipelineStageFlagBits2::eAllCommands);
+        EXPECT_EQ(images[0].oldLayout, vk::ImageLayout::eGeneral);
+        EXPECT_EQ(images[0].newLayout, vk::ImageLayout::eGeneral);
+    }
+    const auto &bufferAfter = history.editBuffer(nativeBuffer).front();
+    const auto &imageAfter = history.editTexture(nativeTexture).subresources.front();
+    EXPECT_EQ(bufferAfter.access, bufferBefore.access);
+    EXPECT_EQ(bufferAfter.queueState, bufferBefore.queueState);
+    EXPECT_EQ(imageAfter.access, imageBefore.access);
+    EXPECT_EQ(imageAfter.queueState, imageBefore.queueState);
+    EXPECT_EQ(imageAfter.layout, imageBefore.layout);
+}
+
+/// Preserves declared storage-image access and unions read/write scopes for aliased fields in either order.
+TEST_F(ConstructorArgumentsTest, StorageTextureArgumentsPreserveReadSharingAndAliasedWrites)
+{
+    using namespace GVM::RHI;
+    if (dynamic_cast<Vulkan::VKDevice *>(device) == nullptr)
+    {
+        GTEST_SKIP() << "Vulkan native argument access scopes are required.";
+    }
+    const auto texture = createArgumentTexture(*device);
+    const auto view = texture->createView();
+    const eastl::array<ArgumentResource, 2> resources{view, view};
+    const eastl::array<uint8_t, 16> values{};
+    const eastl::array<StorageTextureAccess, 5> accesses{StorageTextureAccess::ReadOnly,
+        StorageTextureAccess::WriteOnly, StorageTextureAccess::ReadWrite, StorageTextureAccess::WriteOnly,
+        StorageTextureAccess::ReadOnly};
+    const eastl::array<vk::AccessFlags2, 5> expected{vk::AccessFlagBits2::eShaderRead,
+        vk::AccessFlagBits2::eShaderWrite, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite};
+    for (size_t index = 0; index < accesses.size(); ++index)
+    {
+        SCOPED_TRACE(index);
+        PipelineLayoutDescriptor descriptor{};
+        descriptor.arguments.byteSize = values.size();
+        ArgumentResourceLayout field{};
+        field.entry.binding = Vulkan::VKArgumentTable::StorageImageBinding;
+        field.entry.visibility = ShaderStage::Compute;
+        field.entry.storageTexture = {.access = accesses[index], .format = TextureFormat::RGBA8Unorm,
+            .viewDimension = TextureViewDimension::e2D};
+        descriptor.arguments.resources.push_back(field);
+        if (index >= 3)
+        {
+            field.offset = 8;
+            field.entry.storageTexture.access = accesses[index] == StorageTextureAccess::ReadOnly ?
+                StorageTextureAccess::WriteOnly : StorageTextureAccess::ReadOnly;
+            descriptor.arguments.resources.push_back(field);
+        }
+        const auto layout = device->createPipelineLayout(descriptor);
+        const auto arguments = device->createArguments({.layout = layout, .values = values,
+            .resources = {resources.data(), descriptor.arguments.resources.size()}});
+        const auto uses = static_cast<Vulkan::VKArguments *>(arguments.get())->getTextureUses();
+        ASSERT_EQ(uses.size(), 1u);
+        EXPECT_EQ(uses[0].accesses, expected[index]);
+    }
+}
+
+/// Verifies an established image layout permits two same-family readers and that a later writer joins both timelines.
+TEST(VulkanResourceStateDBTests, ReadersSharePreparedLayoutAndWriterJoins)
+{
+    GVM::RHI::Vulkan::VKResourceQueueState state;
+    eastl::array<uint64_t, GVM::RHI::Vulkan::MaxDeviceQueues> wait{};
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 2, true, wait));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 4, false, wait));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 1, 3, 7, false, wait));
+    EXPECT_EQ(wait[0], 2u);
+    wait.fill(0);
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 11, false, wait));
+    EXPECT_EQ(wait[1], 0u);
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 13, true, wait));
+    EXPECT_EQ(wait[1], 7u);
+    wait.fill(0);
+    EXPECT_TRUE(prepareTestQueueAccess(state, 1, 5, 19, false, wait));
+    EXPECT_EQ(wait[0], 13u);
+}
+
+/// Retains separate waits for both foreign readers and records the real ownership-release queue.
+TEST(VulkanResourceStateDBTests, ThreeReadersJoinWithoutMergingTimelineValues)
+{
+    using namespace GVM::RHI::Vulkan;
+    VKResourceQueueState state;
+    eastl::array<uint64_t, MaxDeviceQueues> waits{};
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 50, true, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 52, false, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 1, 3, 7, false, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 2, 3, 3, false, waits));
+    EXPECT_EQ(state.releaseQueueId, 2u);
+    waits.fill(0);
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 60, true, waits));
+    EXPECT_EQ(waits[0], 0u);
+    EXPECT_EQ(waits[1], 7u);
+    EXPECT_EQ(waits[2], 3u);
+    waits.fill(0);
+    EXPECT_TRUE(prepareTestQueueAccess(state, 2, 9, 4, false, waits));
+    EXPECT_EQ(waits[0], 60u);
+    EXPECT_EQ(state.releaseQueueId, 2u);
+    EXPECT_EQ(state.ownerFamily, 9u);
+    EXPECT_EQ(state.lastExclusiveQueueId, 2u);
+    EXPECT_EQ(state.lastExclusiveValue, 4u);
+    waits.fill(0);
+    EXPECT_TRUE(prepareTestQueueAccess(state, 1, 3, 8, true, waits));
+    EXPECT_EQ(waits[2], 4u);
+    EXPECT_EQ(state.releaseQueueId, 1u);
+}
+
+/// Joins readers during a family transfer even when the resource has never had a preceding writer.
+TEST(VulkanResourceStateDBTests, ReadOnlyOwnershipTransferJoinsAllPriorReaders)
+{
+    using namespace GVM::RHI::Vulkan;
+    VKResourceQueueState state;
+    eastl::array<uint64_t, MaxDeviceQueues> waits{};
+    EXPECT_FALSE(prepareTestQueueAccess(state, 0, 3, 5, false, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(state, 1, 3, 9, false, waits));
+    EXPECT_EQ(state.lastExclusiveValue, 0u);
+    EXPECT_EQ(state.releaseQueueId, 1u);
+    EXPECT_EQ(waits, (eastl::array<uint64_t, MaxDeviceQueues>{0, 0, 0}));
+    EXPECT_TRUE(prepareTestQueueAccess(state, 2, 7, 2, false, waits));
+    EXPECT_EQ(waits, (eastl::array<uint64_t, MaxDeviceQueues>{5, 9, 0}));
+    EXPECT_EQ(state.lastExclusiveQueueId, 2u);
+    EXPECT_EQ(state.lastExclusiveValue, 2u);
+    EXPECT_EQ(state.lastReadValues, (eastl::array<uint64_t, MaxDeviceQueues>{0, 0, 0}));
+}
+
+/// Preserves concurrent cross-family reads without triggering ownership transfer ping-pong.
+TEST(VulkanResourceStateDBTests, ConcurrentSharingAllowsCrossFamilyReadsWithoutOwnershipPingPong)
+{
+    using namespace GVM::RHI::Vulkan;
+    VKResourceQueueState state;
+    eastl::array<uint64_t, MaxDeviceQueues> waits{};
+    VKResourceStateDB history;
+    auto apply = [&](uint32_t q, uint32_t family, uint64_t value, bool exclusive) -> bool
+    {
+        VKResourceStateDB submission;
+        submission.beginSubmission(history, q, family, value);
+        const bool transfer = submission.prepareQueueAccess(state, exclusive, true);
+        waits = submission.queueWaitValues();
+        return transfer;
+    };
+    EXPECT_FALSE(apply(0, 0, 10, true));
+    EXPECT_FALSE(apply(1, 1, 20, false));
+    EXPECT_EQ(waits, (eastl::array<uint64_t, MaxDeviceQueues>{10, 0, 0}));
+    EXPECT_FALSE(apply(2, 2, 30, false));
+    EXPECT_EQ(waits, (eastl::array<uint64_t, MaxDeviceQueues>{10, 0, 0}));
+    EXPECT_EQ(state.lastReadValues[1], 20u);
+    EXPECT_EQ(state.lastReadValues[2], 30u);
+    EXPECT_FALSE(apply(0, 0, 40, true));
+    EXPECT_EQ(waits, (eastl::array<uint64_t, MaxDeviceQueues>{0, 20, 30}));
+    EXPECT_EQ(state.lastReadValues, (eastl::array<uint64_t, MaxDeviceQueues>{0, 0, 0}));
+}
+
+/// Accumulates independent dependencies from several resource ranges into a single pending submission.
+TEST(VulkanResourceStateDBTests, SubmissionJoinsDependenciesAcrossResourceRanges)
+{
+    using namespace GVM::RHI::Vulkan;
+    VKResourceStateDB history;
+    VKResourceStateDB submission;
+    VKResourceQueueState first;
+    VKResourceQueueState second;
+    eastl::array<uint64_t, MaxDeviceQueues> waits{};
+    EXPECT_FALSE(prepareTestQueueAccess(first, 1, 3, 7, true, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(first, 2, 3, 9, false, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(second, 2, 3, 3, true, waits));
+    EXPECT_FALSE(prepareTestQueueAccess(second, 1, 3, 11, false, waits));
+    submission.beginSubmission(history, 0, 3, 50);
+    EXPECT_FALSE(submission.prepareQueueAccess(first, true));
+    EXPECT_EQ(submission.queueWaitValues(), (eastl::array<uint64_t, MaxDeviceQueues>{0, 7, 9}));
+    EXPECT_FALSE(submission.prepareQueueAccess(second, true));
+    EXPECT_EQ(submission.queueWaitValues(), (eastl::array<uint64_t, MaxDeviceQueues>{0, 11, 9}));
+    EXPECT_EQ(first.lastExclusiveQueueId, 0u);
+    EXPECT_EQ(second.lastExclusiveQueueId, 0u);
+    EXPECT_EQ(first.lastExclusiveValue, 50u);
+    EXPECT_EQ(second.lastExclusiveValue, 50u);
+}
+
+/// Rejects invalid submission metadata before it can index resource timeline storage.
+TEST(VulkanResourceStateDBTests, RequiresValidActiveSubmissionContext)
+{
+    using namespace GVM::RHI::Vulkan;
+    VKResourceStateDB history;
+    VKResourceStateDB submission;
+    VKResourceQueueState state;
+    EXPECT_THROW(submission.prepareQueueAccess(state, true), std::logic_error);
+    EXPECT_THROW(submission.beginSubmission(history, MaxDeviceQueues, 3, 1), std::invalid_argument);
+    EXPECT_THROW(submission.beginSubmission(history, 0, VK_QUEUE_FAMILY_IGNORED, 1), std::invalid_argument);
+    EXPECT_THROW(submission.beginSubmission(history, 0, 3, 0), std::invalid_argument);
+    submission.beginSubmission(history, 0, 3, 1);
+    EXPECT_FALSE(submission.prepareQueueAccess(state, true));
+    submission.commitSubmission();
+    EXPECT_THROW(submission.prepareQueueAccess(state, true), std::logic_error);
+}
+
+/// Prefers a dedicated transfer family even when the universal family has spare native queues.
+TEST(VulkanQueueSelectionTests, DedicatedTransferFamilyTakesPriority)
+{
+    using namespace GVM::RHI::Vulkan;
+    eastl::array<vk::QueueFamilyProperties, 3> families{};
+    families[0].queueFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute;
+    families[0].queueCount = 3;
+    families[1].queueFlags = vk::QueueFlagBits::eCompute;
+    families[1].queueCount = 1;
+    families[2].queueFlags = vk::QueueFlagBits::eTransfer;
+    families[2].queueCount = 1;
+    const auto selections = selectDeviceQueues(families, 0);
+    EXPECT_EQ(selections[0].family, 0u);
+    EXPECT_EQ(selections[1].family, 0u);
+    EXPECT_EQ(selections[1].index, 1u);
+    EXPECT_EQ(selections[2].family, 2u);
+    EXPECT_EQ(selections[2].index, 0u);
+}
+
+/// Uses implicit transfer support and distinguishes one-, two-, and three-queue universal devices.
+TEST(VulkanQueueSelectionTests, UniversalQueueCountsBoundDistinctSelections)
+{
+    using namespace GVM::RHI::Vulkan;
+    eastl::array<vk::QueueFamilyProperties, 1> families{};
+    families[0].queueFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute;
+    for (uint32_t count = 1; count <= 3; ++count)
+    {
+        families[0].queueCount = count;
+        const auto selections = selectDeviceQueues(families, 0);
+        EXPECT_EQ(selections[0].family, 0u);
+        EXPECT_EQ(selections[1].family, count > 1 ? 0u : VK_QUEUE_FAMILY_IGNORED);
+        EXPECT_EQ(selections[2].family, count > 2 ? 0u : VK_QUEUE_FAMILY_IGNORED);
+        if (count == 3)
+        {
+            EXPECT_EQ(selections[2].index, 2u);
+        }
+    }
+}
+
+/// Selects a transfer queue without requiring an auxiliary compute queue and ignores unavailable families.
+TEST(VulkanQueueSelectionTests, TransferCanBeTheOnlyAuxiliaryQueue)
+{
+    using namespace GVM::RHI::Vulkan;
+    eastl::array<vk::QueueFamilyProperties, 3> families{};
+    families[0].queueFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute;
+    families[0].queueCount = 1;
+    families[1].queueFlags = vk::QueueFlagBits::eTransfer;
+    families[2].queueFlags = vk::QueueFlagBits::eTransfer;
+    families[2].queueCount = 1;
+    const auto selections = selectDeviceQueues(families, 0);
+    EXPECT_EQ(selections[1].family, VK_QUEUE_FAMILY_IGNORED);
+    EXPECT_EQ(selections[2].family, 2u);
+    EXPECT_THROW(selectDeviceQueues(families, 3), std::invalid_argument);
+}
+
+/// Checks the public preference against the native queue capacity advertised by the selected Vulkan device.
+TEST_F(ConstructorArgumentsTest, TransferPreferenceReturnsTheSelectedNativeQueue)
+{
+    using namespace GVM::RHI;
+    auto *nativeDevice = dynamic_cast<Vulkan::VKDevice *>(device);
+    if (nativeDevice == nullptr)
+    {
+        GTEST_SKIP() << "Native Vulkan queue selection is required.";
+    }
+    const auto &capabilities = nativeDevice->getCapabilities();
+    const auto &families = capabilities.getQueueFamilyProperties();
+    const auto selections = Vulkan::selectDeviceQueues({families.data(), families.size()}, capabilities.getGraphicsQueueFamilyIndex());
+    auto *transfer = dynamic_cast<Vulkan::VKQueue *>(device->getQueue({.prefer = QueuePreference::Transfer}));
+    ASSERT_NE(transfer, nullptr);
+    if (selections[2].family != VK_QUEUE_FAMILY_IGNORED)
+    {
+        EXPECT_EQ(transfer->getNativeQueue(), nativeDevice->getNativeDevice().getQueue(selections[2].family, selections[2].index));
+        EXPECT_NE(transfer, device->getMainQueue());
+        EXPECT_NE(transfer, device->getQueue({.prefer = QueuePreference::Compute}));
+    }
+    else
+    {
+        EXPECT_EQ(transfer, device->getQueue({.prefer = QueuePreference::Compute}));
+    }
+    nativeDevice->useSingleQueueForTesting();
+    EXPECT_EQ(device->getQueue({.prefer = QueuePreference::Transfer}), device->getMainQueue());
+    EXPECT_EQ(device->getQueue({.prefer = QueuePreference::Compute}), device->getMainQueue());
+}
+
+/// Infers read/write hazards across three distinct Vulkan queues without caller-provided semaphore dependencies.
+TEST_F(ConstructorArgumentsTest, ThreeQueueReadersJoinBeforeOverwrite)
+{
+    using namespace GVM::RHI;
+    auto *graphics = device->getMainQueue();
+    auto *compute = device->getQueue({.prefer = QueuePreference::Compute});
+    auto *transfer = device->getQueue({.prefer = QueuePreference::Transfer});
+    if (dynamic_cast<Vulkan::VKDevice *>(device) == nullptr ||
+        graphics == compute || graphics == transfer || compute == transfer)
+    {
+        GTEST_SKIP() << "Three distinct Vulkan queues are required.";
+    }
+    const auto source = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 32});
+    const auto first = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 32});
+    const auto second = device->createBuffer({.usage = BufferUsage::CopySrc | BufferUsage::CopyDst, .size = 32});
+    graphics->fillBuffer(source, 0x31);
+    graphics->submit({}, {});
+    compute->copyBufferToBuffer(source, first);
+    compute->submit({}, {});
+    transfer->copyBufferToBuffer(source, second);
+    transfer->submit({}, {});
+    graphics->fillBuffer(source, 0x42);
+    graphics->submit({}, {});
+    auto firstRead = graphics->readBufferAsync(first);
+    auto secondRead = graphics->readBufferAsync(second);
+    auto finalRead = graphics->readBufferAsync(source);
+    ASSERT_TRUE(graphics->submit({}, {}).wait(5'000'000'000ull));
+    firstRead->wait();
+    secondRead->wait();
+    finalRead->wait();
+    for (uint32_t index = 0; index < 32; ++index)
+    {
+        EXPECT_EQ(firstRead->getData()[index], 0x31u);
+        EXPECT_EQ(secondRead->getData()[index], 0x31u);
+        EXPECT_EQ(finalRead->getData()[index], 0x42u);
+    }
+    device->freeBuffer(source);
+    device->freeBuffer(first);
+    device->freeBuffer(second);
 }
 
 /// Reconciles an initial sampled read with later storage writes and sampled reads without assuming recording-time image layouts.

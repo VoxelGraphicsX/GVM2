@@ -79,6 +79,13 @@ export function getTestRegistry(sourceDir, binaryDir, options = {}) {
       environment: backendEnvironment
     },
     {
+      target: 'gvm_marl_upstream_smoke_tests',
+      group: 'dsl',
+      labels: ['integration', 'dsl', 'core', 'task-graph', 'gpu', 'marl'],
+      timeoutMs: 120000,
+      environment: backendEnvironment
+    },
+    {
       target: 'gvm_dsl_task_graph_tests',
       group: 'dsl',
       labels: ['integration', 'dsl', 'core', 'task-graph'],

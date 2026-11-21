@@ -31,6 +31,11 @@ GpuGraphTestNode::GpuGraphTestNode(eastl::shared_ptr<GpuGraphRecordingProbe> pro
 
 uint32_t GpuGraphTestNode::build(GVM::Core::RenderNode &node, uint32_t count) const
 {
+    if (mProbe->transferPasses)
+    {
+        node.fillBuffer(mProbe->buffer, static_cast<uint8_t>(count));
+        return count;
+    }
     if (mProbe->allocateProbeBuffer)
     {
         auto buffer = node.createBuffer({.label = "GraphLifetimeProbe",
