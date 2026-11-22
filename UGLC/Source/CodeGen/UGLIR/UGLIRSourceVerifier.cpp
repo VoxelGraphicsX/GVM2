@@ -524,10 +524,14 @@ namespace UGLC::CodeGen::UGLIR
             return value.rfind(prefix, 0) == 0;
         }
 
-        /** Returns true when a string contains the requested path fragment. */
+        /** Returns true when a string contains the requested path fragment across slash styles. */
         bool containsPathFragment(const std::string &value, const std::string &fragment)
         {
-            return value.find(fragment) != std::string::npos;
+            std::string normalizedValue = value;
+            std::string normalizedFragment = fragment;
+            std::replace(normalizedValue.begin(), normalizedValue.end(), '\\', '/');
+            std::replace(normalizedFragment.begin(), normalizedFragment.end(), '\\', '/');
+            return normalizedValue.find(normalizedFragment) != std::string::npos;
         }
 
         /** Returns a lambda expression hidden behind common wrapper expressions, or null when none exists. */

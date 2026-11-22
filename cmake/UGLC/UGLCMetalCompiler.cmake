@@ -1,6 +1,12 @@
 include_guard(GLOBAL)
 
-option(GVM_UGLC_EMBED_METALLIB "Embed an offline-compiled Metal library in generated C++ for every runtime backend." ON)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+    set(_gvm_uglc_embed_metallib_default ON)
+else()
+    set(_gvm_uglc_embed_metallib_default OFF)
+endif()
+option(GVM_UGLC_EMBED_METALLIB "Embed an offline-compiled Metal library in generated C++ for every runtime backend." ${_gvm_uglc_embed_metallib_default})
+unset(_gvm_uglc_embed_metallib_default)
 set(GVM_METAL_COMPILER "" CACHE FILEPATH "Apple Metal compiler executable (also supported by Apple's Windows Metal tools).")
 set(GVM_METAL_TARGET "air64-apple-macosx15.0.0" CACHE STRING "Target of the embedded Metal library, independent of the build host.")
 

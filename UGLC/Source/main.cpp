@@ -134,7 +134,7 @@ namespace
             {
                 const std::filesystem::path artifact = mOutputDir / name;
                 std::error_code error;
-                std::filesystem::remove_all(artifact, error);
+                std::filesystem::remove_all(UGLC::App::toExtendedFilesystemPath(artifact), error);
                 if (error) { throw std::runtime_error("Failed to invalidate shader artifact \"" + artifact.string() + "\": " + error.message()); }
             }
         }
@@ -811,6 +811,7 @@ struct CompilerOutputs
 /// Builds the configured cxxopts option set shared by the command-line parse.
 static cxxopts::Options makeCommandLineOptions()
 {
+    const char *defaultEmitMetallib = std::string_view(UGLC_DEFAULT_METAL_COMPILER).empty() ? "off" : "on";
     cxxopts::Options options("UGLC", "Compiler for C++ Rendering System Development");
     options.add_options()
         ("s,source", "source file", cxxopts::value<std::string>())
@@ -824,7 +825,7 @@ static cxxopts::Options makeCommandLineOptions()
     options.add_options()
         ("shader-pipeline", "shader pipeline: uglir or legacy (default: uglir)", cxxopts::value<std::string>())
         ("emit-argument-contracts-only", "validate constructor Args and execution calls, then export logical contracts without native shader artifacts")
-        ("emit-metallib", "embed a precompiled Metal library (on/off)", cxxopts::value<std::string>()->default_value("on"))
+        ("emit-metallib", "embed a precompiled Metal library (on/off)", cxxopts::value<std::string>()->default_value(defaultEmitMetallib))
         ("metal-compiler", "Apple Metal compiler executable", cxxopts::value<std::string>()->default_value(UGLC_DEFAULT_METAL_COMPILER))
         ("metal-target", "Metal library target triple", cxxopts::value<std::string>()->default_value("air64-apple-macosx15.0.0"))
         ("no-spirv-optimization", "validate and deliver unoptimized direct SPIR-V for explicit comparisons");
@@ -960,9 +961,13 @@ static bool validateInputPaths(const CompilerCommandLine &cmd)
     }
 
     for (const auto &includePath : cmd.includePaths)
-        llvm::outs() << "UGLC: found include path: " << includePath << '\n';
+    {
+        llvm::outs() << "UGLC: found include path: " << includePath.string() << '\n';
+    }
     for (const auto &rootPath : cmd.dslSourceRoots)
-        llvm::outs() << "UGLC: found DSL source root: " << rootPath << '\n';
+    {
+        llvm::outs() << "UGLC: found DSL source root: " << rootPath.string() << '\n';
+    }
     llvm::outs() << "UGLC: MSL PixelLocal implementation: framebuffer_fetch" << '\n';
     llvm::outs() << "UGLC: found output path: " << cmd.outputDir << '\n';
     return UGLC::App::ensureOutputDirectory(cmd.outputDir);
@@ -975,7 +980,7 @@ static TranslationUnitDiscovery runDiscoveryPass(const CompilerCommandLine &cmd)
     discoverPass.init(cmd.sourcePath, cmd.includePaths, cmd.dslSourceRoots);
     discoverPass.create({});
     const std::filesystem::path canonicalSourcePath = std::filesystem::weakly_canonical(cmd.sourcePath);
-    llvm::outs() << "found translation unit: " << canonicalSourcePath << '\n';
+    llvm::outs() << "found translation unit: " << canonicalSourcePath.string() << '\n';
     return {discoverPass.getResult(), canonicalSourcePath.string()};
 }
 
@@ -1208,7 +1213,7 @@ static bool writeGeneratedOutputs(
             // Keep backend shader preludes centralized in the registry so final
             // single-header assembly does not need to know which concrete
             // backends are currently participating in code generation.
-            finalHeader += "static const eastl::string " + shaderPrelude.variableName + " = R\"(" + shaderPrelude.sourceText + ")\";\n";
+            finalHeader += "static const eastl::string " + shaderPrelude.variableName + " = " + UGLC::CodeGen::FormatShaderTextExpression(shaderPrelude.sourceText) + ";\n";
         }
         finalHeader += generator.getResult();
 

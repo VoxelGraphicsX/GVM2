@@ -1,10 +1,14 @@
 include("${CMAKE_CURRENT_LIST_DIR}/UGLCMetalCompiler.cmake")
 
 function(UGLCOMPILE_LINTER TARGET_NAME SRC_FILE OUTPUT_PATH)
+    file(TO_CMAKE_PATH "${SRC_FILE}" _UGL_LINTER_SRC_FILE)
     set(UGLTempMainPath "${OUTPUT_PATH}/UGLTemp/${TARGET_NAME}.cpp")
     file(MAKE_DIRECTORY "${OUTPUT_PATH}/UGLTemp")
-    file(WRITE "${UGLTempMainPath}" "#include \"${SRC_FILE}\"\n int main(){return 0;}")
+    file(WRITE "${UGLTempMainPath}" "#include \"${_UGL_LINTER_SRC_FILE}\"\nint main()\n{\n    return 0;\n}\n")
     add_executable(${TARGET_NAME} ${UGLTempMainPath})
+    if(WIN32)
+        set_target_properties(${TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
 endfunction()
 
 function(UGLCOMPILE_GENERATED_HEADERS GENERATED_TARGET SRC_FILE OUTPUT_PATH UGL_COMPILER)

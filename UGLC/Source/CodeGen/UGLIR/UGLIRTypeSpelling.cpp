@@ -357,7 +357,11 @@ namespace UGLC::CodeGen::UGLIR
 
         bool containsPathFragment(const std::string &value, const std::string &fragment)
         {
-            return value.find(fragment) != std::string::npos;
+            std::string normalizedValue = value;
+            std::string normalizedFragment = fragment;
+            std::replace(normalizedValue.begin(), normalizedValue.end(), '\\', '/');
+            std::replace(normalizedFragment.begin(), normalizedFragment.end(), '\\', '/');
+            return normalizedValue.find(normalizedFragment) != std::string::npos;
         }
 
         std::string trimCopy(const std::string &input)

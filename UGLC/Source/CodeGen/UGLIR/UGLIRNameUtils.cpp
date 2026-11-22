@@ -12,6 +12,7 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <algorithm>
 #include <cctype>
 #include <memory>
 #include <sstream>
@@ -363,8 +364,9 @@ namespace UGLC::CodeGen::UGLIR
         }
         const auto &sources = resolvedDecl.getASTContext().getSourceManager();
         const auto location = sources.getExpansionLoc(resolvedDecl.getLocation());
-        const auto filename = sources.getFilename(location);
-        if ((overloaded || resolvedDecl.isOverloadedOperator() || llvm::isa<clang::CXXConversionDecl>(resolvedDecl)) && !sources.isInSystemHeader(location) && !filename.contains("/UGLHeaders/") && !filename.contains("\\UGLHeaders\\"))
+        std::string normalizedFilename = sources.getFilename(location).str();
+        std::replace(normalizedFilename.begin(), normalizedFilename.end(), '\\', '/');
+        if ((overloaded || resolvedDecl.isOverloadedOperator() || llvm::isa<clang::CXXConversionDecl>(resolvedDecl)) && !sources.isInSystemHeader(location) && normalizedFilename.find("/UGLHeaders/") == std::string::npos)
         {
             // Encode every byte, rather than sanitizing punctuation that can
             // collapse distinct pointer/reference and qualified signatures.

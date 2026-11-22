@@ -3,6 +3,7 @@
 #include "CPPVisitor.hpp"
 
 #include <CodeGen/CodeWriter.hpp>
+#include <CodeGen/GeneratedShaderArtifactSupport.hpp>
 #include <CodeGen/MSL/MSLPrelude.hpp>
 #include <CodeGen/MetalShaderCompiler.hpp>
 #include <CodeGen/DSLReservedIdentifierValidator.hpp>
@@ -243,9 +244,9 @@ namespace UGLC::CodeGen::CPP
         }
 
         writer.appendLine(mVisitor.mSpaceManager.getSpace() + "const UGLC::Generated::ShaderArtifact " + memberName + " = UGLC::Generated::MakeShaderArtifact(");
-        writer.appendLine(mVisitor.mSpaceManager.getSpace() + "    " + shaderHeaderVariableName + " + R\"(");
-        writer.appendRaw(emittedShader.sourceText);
-        writer.appendLine(")\",");
+        writer.appendRaw(mVisitor.mSpaceManager.getSpace() + "    " + shaderHeaderVariableName + " + ");
+        writer.appendRaw(FormatShaderTextExpression("\n" + emittedShader.sourceText));
+        writer.appendLine(",");
         if (usesDirectSpirv)
         {
             writer.appendLine(mVisitor.mSpaceManager.getSpace() + "    eastl::string{},");
@@ -253,17 +254,19 @@ namespace UGLC::CodeGen::CPP
 #if UGLC_ENABLE_LEGACY
         else
         {
-            writer.appendLine(mVisitor.mSpaceManager.getSpace() + "    R\"(");
+            std::string combinedHlsl = "\n";
             if (hlslShader.has_value())
             {
                 if (!hlslShader->preludeText.empty())
                 {
-                    writer.appendRaw(hlslShader->preludeText);
-                    writer.appendRaw("\n");
+                    combinedHlsl += hlslShader->preludeText;
+                    combinedHlsl += "\n";
                 }
-                writer.appendRaw(hlslShader->sourceText);
+                combinedHlsl += hlslShader->sourceText;
             }
-            writer.appendLine(")\",");
+            writer.appendRaw(mVisitor.mSpaceManager.getSpace() + "    ");
+            writer.appendRaw(FormatShaderTextExpression(combinedHlsl));
+            writer.appendLine(",");
         }
 #else
         else

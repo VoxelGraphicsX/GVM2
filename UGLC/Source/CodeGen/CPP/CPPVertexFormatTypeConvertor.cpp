@@ -1,5 +1,7 @@
 #include "CPPVertexFormatTypeConvertor.hpp"
 
+#include <stdexcept>
+
 namespace UGLC::CodeGen::CPP
 {
     namespace

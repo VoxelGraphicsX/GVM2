@@ -42,12 +42,40 @@ namespace UGLC::App
         }
     };
 
+    /** Converts long Windows paths into extended-length Win32 paths so file and directory operations work past MAX_PATH. */
+    inline std::filesystem::path toExtendedFilesystemPath(const std::filesystem::path &path)
+    {
+#if defined(_WIN32)
+        if (path.empty())
+        {
+            return path;
+        }
+        std::error_code absoluteError;
+        std::filesystem::path normalized = std::filesystem::absolute(path, absoluteError);
+        if (absoluteError)
+        {
+            normalized = path;
+        }
+        normalized = normalized.lexically_normal().make_preferred();
+        const std::wstring nativePath = normalized.wstring();
+        if (nativePath.size() >= 240 && nativePath.rfind(L"\\\\?\\", 0) != 0)
+        {
+            if (nativePath.rfind(L"\\\\", 0) == 0)
+            {
+                return std::filesystem::path(L"\\\\?\\UNC\\" + nativePath.substr(2));
+            }
+            return std::filesystem::path(L"\\\\?\\" + nativePath);
+        }
+#endif
+        return path;
+    }
+
     // Creates the requested output directory tree up front so the driver can
     // fail fast before spending time on translation work that cannot be written.
     inline bool ensureOutputDirectory(const std::filesystem::path &outputDir)
     {
         std::error_code ec;
-        std::filesystem::create_directories(outputDir, ec);
+        std::filesystem::create_directories(toExtendedFilesystemPath(outputDir), ec);
         if (ec)
         {
             std::cerr << "uglc: error: creating output directory " << outputDir << ": " << ec.message() << '\n';
@@ -64,7 +92,7 @@ namespace UGLC::App
         if (!parentDir.empty())
         {
             std::error_code ec;
-            std::filesystem::create_directories(parentDir, ec);
+            std::filesystem::create_directories(toExtendedFilesystemPath(parentDir), ec);
             if (ec)
             {
                 std::cerr << "uglc: error: creating parent directory for " << path << ": " << ec.message() << '\n';
@@ -72,7 +100,8 @@ namespace UGLC::App
             }
         }
 
-        std::ofstream outFile(path, std::ios::binary | std::ios::trunc);
+        const std::filesystem::path openPath = toExtendedFilesystemPath(path);
+        std::ofstream outFile(openPath, std::ios::binary | std::ios::trunc);
         if (!outFile.is_open())
         {
             std::cerr << "uglc: error: opening file " << path << " for writing.\n";
