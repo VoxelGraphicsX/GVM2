@@ -1,5 +1,6 @@
 #include <CodeGen/SingleHeaderGenerator.hpp>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -8,6 +9,33 @@
 #include <vector>
 
 namespace fs = std::filesystem;
+
+/** Creates a reparse-point include alias, falling back to an unprivileged NTFS directory junction on Windows. */
+static std::string createReparseIncludeAlias(const fs::path &entry,
+                                             const fs::path &shared,
+                                             const fs::path &canonicalDependency)
+{
+    const auto symlink = entry / "alias.hpp";
+    std::error_code removeError;
+    fs::remove(symlink, removeError);
+    std::error_code symlinkError;
+    fs::create_symlink(canonicalDependency, symlink, symlinkError);
+    if (!symlinkError)
+    {
+        return "alias.hpp";
+    }
+#if defined(_WIN32)
+    const auto junctionDir = entry / "linked_shared";
+    fs::remove_all(junctionDir, removeError);
+    const std::string mklinkCommand =
+        "\"mklink /J \"" + junctionDir.string() + "\" \"" + shared.string() + "\" >nul 2>&1\"";
+    if (std::system(mklinkCommand.c_str()) == 0 && fs::exists(junctionDir / "dep.hpp"))
+    {
+        return "linked_shared/dep.hpp";
+    }
+#endif
+    throw std::runtime_error("Failed to create symbolic link alias: " + symlinkError.message());
+}
 
 /** Writes one include-resolution fixture, reporting any filesystem failure. */
 static void writeSource(const fs::path &path, const std::string &content)
@@ -81,13 +109,11 @@ int main(int argc, char **argv)
                           {shared}, "struct SharedDependency");
     std::cout << "absolute_alias_include_ok\n";
 
-    const auto symlink = entry / "alias.hpp";
-    fs::remove(symlink);
-    fs::create_symlink(canonicalDependency, symlink);
-    verifyExpandedInclude(source, "#include \"alias.hpp\"\n", {shared}, "struct SharedDependency");
+    const std::string aliasInclude = createReparseIncludeAlias(entry, shared, canonicalDependency);
+    verifyExpandedInclude(source, "#include \"" + aliasInclude + "\"\n", {shared}, "struct SharedDependency");
     std::cout << "symlink_include_ok\n";
     verifyExpandedInclude(source,
-                          "#include \"../shared/dep.hpp\"\n#include \"alias.hpp\"\n",
+                          "#include \"../shared/dep.hpp\"\n#include \"" + aliasInclude + "\"\n",
                           {shared}, "struct SharedDependency");
     std::cout << "duplicate_alias_expanded_once_ok\n";
 

@@ -25,7 +25,11 @@ namespace
         EXPECT_NE(contents.find("TriangleRenderPipeline"), std::string::npos);
         EXPECT_NE(contents.find("createRenderPipeline"), std::string::npos);
         EXPECT_NE(contents.find("TriangleVertexShader"), std::string::npos);
+#if GVM_TEST_EXPECT_EMBEDDED_METALLIB
         EXPECT_NE(contents.find("static constexpr uint8_t vertexShaderArtifact_MetallibBytes[]"), std::string::npos);
+#else
+        EXPECT_EQ(contents.find("static constexpr uint8_t vertexShaderArtifact_MetallibBytes[]"), std::string::npos);
+#endif
         EXPECT_NE(contents.find("descriptor.metallib = artifact.metallib"), std::string::npos);
         EXPECT_NE(contents.find("_SpirvWords[]"), std::string::npos);
 

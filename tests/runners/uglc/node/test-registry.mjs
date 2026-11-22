@@ -635,7 +635,7 @@ function createExperimentalUglirInvalidUniformScalarCase() {
 }
 
 /** Creates the positive UGLIR fixture that should generate host artifacts from UGLIR-derived MSL and direct SPIR-V. */
-function createExperimentalUglirComputeBasicLoweringCase() {
+function createExperimentalUglirComputeBasicLoweringCase(embedMetallib = true) {
   return createFixtureCase({
     id: 'experimental-uglir-compute-basic-msl-direct-spirv',
     title: 'Experimental UGLIR shader pipeline: compute-basic generates MSL and direct SPIR-V',
@@ -696,9 +696,15 @@ function createExperimentalUglirComputeBasicLoweringCase() {
       await t.expectFileContains('generate_result.hpp', 'static constexpr uint32_t computeShaderArtifact_SpirvWords[] = {', 'Experimental direct writer should embed SPIR-V words.');
       const embeddedHeader = await t.readArtifact('generate_result.hpp');
       const metalBytes = embeddedHeader.match(/computeShaderArtifact_MetallibBytes\[\]\s*=\s*\{([^}]+)\}/s);
-      t.recordCheck('Generated C++ embeds a real metallib with MTLB magic alongside SPIR-V.',
-        metalBytes !== null && metalBytes[1].split(',').slice(0, 4).map(Number).join(',') === '77,84,76,66',
-        metalBytes ? 'MTLB byte payload present.' : 'Missing metallib array.');
+      if (embedMetallib) {
+        t.recordCheck('Generated C++ embeds a real metallib with MTLB magic alongside SPIR-V.',
+          metalBytes !== null && metalBytes[1].split(',').slice(0, 4).map(Number).join(',') === '77,84,76,66',
+          metalBytes ? 'MTLB byte payload present.' : 'Missing metallib array.');
+      } else {
+        t.recordCheck('Generated C++ omits embedded metallib bytes when offline Metal compilation is disabled.',
+          metalBytes === null,
+          metalBytes ? 'Unexpected metallib array present.' : 'Confirmed metallib array omitted.');
+      }
       await t.expectFileNotContains('generate_result.hpp', 'metallibByteSize', 'Vector length is the only Metal binary size.');
       const spirvWords = await readSpirvWordArray(t, 'generate_result.hpp', 'computeShaderArtifact_SpirvWords', 'Experimental UGLIR direct writer should produce a valid SPIR-V module.');
       t.recordCheck('Experimental UGLIR SPIR-V payload should be non-empty.', spirvWords !== null && spirvWords.length > 0, spirvWords ? `words=${spirvWords.length}` : 'Missing SPIR-V words.');
@@ -1570,14 +1576,14 @@ function createExperimentalUglirStageIOSemanticsCase() {
 }
 
 /** Compiles the backend readback shaders and verifies ordinary ABI declarations and explicit atomic addressing. */
-function createAtomicStorageCase(sourceDir) {
+function createAtomicStorageCase(sourceDir, embedMetallib = true) {
   const stems = ['AtomicStorageVectorPass', 'AtomicStoragePublicationPass'];
   return createFixtureCase({
     id: 'uglir-atomic-storage', title: 'UGLIR atomics preserve storage addresses, value copies, and ordering',
     group: 'uglir', labels: ['uglir', 'atomic', 'regression', 'compute', 'msl', 'spirv'],
     fixtureDir: 'atomic-storage', sourceFile: 'AtomicStorageCodegen.hpp',
     extraIncludeDirs: [path.join(sourceDir, 'tests/rhi_cases')],
-    uglcArgs: ['--shader-pipeline=uglir', '--emit-metallib=on', '--dsl-dir=' + path.join(sourceDir, 'tests/rhi_cases')],
+    uglcArgs: ['--shader-pipeline=uglir', ...(embedMetallib ? ['--emit-metallib=on'] : []), '--dsl-dir=' + path.join(sourceDir, 'tests/rhi_cases')],
     description: 'Compiles the exact GPU regressions for vector/scalar atomics, copied values, strong CAS, and cross-workgroup publication.',
     verify: async (t) => {
       await expectExperimentalSpirvOnlyPolicy(t, stems);
@@ -1869,6 +1875,7 @@ function createPipelineSelectionCases(enabled) {
 }
 
 export function getTestRegistry(sourceDir, profile) {
+  const embedMetallib = profile?.embedMetallib ?? (process.platform === 'darwin');
   return [
     ...[
       ['projection-write', 'InvalidTaskProjectionWrite.hpp', 'Deferred task field projections cannot be assigned'],
@@ -6795,7 +6802,7 @@ export function getTestRegistry(sourceDir, profile) {
           await t.expectStepOutputContains('run', 'uglir_dump_determinism_ok', 'Harness should confirm repeated UGLIR dumps are byte-identical.');
         }
       }),
-      createExperimentalUglirComputeBasicLoweringCase(),
+      createExperimentalUglirComputeBasicLoweringCase(embedMetallib),
       createFixtureCase({
         id: 'experimental-uglir-explicit-precision-construct-info',
         title: 'Experimental UGLIR shader pipeline: explicit precision constructors carry normalized construct metadata',
@@ -6833,7 +6840,7 @@ export function getTestRegistry(sourceDir, profile) {
       createExperimentalUglirSymbolicResourcesCase(),
       createExperimentalUglirStageIOSemanticsCase(),
       createExperimentalUglirNestedStageOutputCase(),
-      createAtomicStorageCase(sourceDir),
+      createAtomicStorageCase(sourceDir, embedMetallib),
       createFixtureCase({
         id: 'uglir-invalid-local-atomic', title: 'UGLIR atomics reject invocation-local targets',
         group: 'uglir', labels: ['uglir', 'atomic', 'diagnostic'],

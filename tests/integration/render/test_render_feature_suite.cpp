@@ -4,7 +4,12 @@
 #include <GVMRenderTestOptions.hpp>
 
 #include <SDL.h>
+#include <SDL_syswm.h>
+#if defined(__APPLE__)
 #include <SDL_metal.h>
+#else
+#include <SDL_vulkan.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -31,7 +36,9 @@ namespace
     struct RenderFeatureContext
     {
         SDL_Window *window = nullptr;
+#if defined(__APPLE__)
         SDL_MetalView metalView = nullptr;
+#endif
         GVM::RHI::Instance instance = nullptr;
         GVM::RHI::Device device = nullptr;
         GVM::RHI::Swapchain swapchain = nullptr;
@@ -431,6 +438,62 @@ namespace
         output << "}\n";
     }
 
+    /** Queries the current drawable pixel size of the SDL render test window across Metal and Vulkan surfaces. */
+    void queryRenderWindowDrawableSize(SDL_Window *window, int &drawableWidth, int &drawableHeight)
+    {
+        drawableWidth = 0;
+        drawableHeight = 0;
+#if defined(__APPLE__)
+        SDL_Metal_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+#else
+        SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+        {
+            SDL_GetWindowSizeInPixels(window, &drawableWidth, &drawableHeight);
+        }
+#endif
+    }
+
+    /** Builds a platform-native swapchain surface descriptor from the hidden SDL render test window. */
+    GVM::RHI::NativeSurfaceDescriptor makeRenderWindowNativeSurface(const RenderFeatureContext &ctx, const GVM::RHI::Extent3D &extentHint)
+    {
+        GVM::RHI::NativeSurfaceDescriptor surface = {};
+        surface.extentHint = extentHint;
+        surface.hasExtentHint = GVM::RHI::True;
+#if defined(__APPLE__)
+        surface.kind = GVM::RHI::NativeSurfaceKind::MetalLayer;
+        surface.surface = SDL_Metal_GetLayer(ctx.metalView);
+#elif defined(_WIN32)
+        SDL_SysWMinfo info = {};
+        SDL_VERSION(&info.version);
+        if (SDL_GetWindowWMInfo(ctx.window, &info) == SDL_TRUE)
+        {
+            surface.kind = GVM::RHI::NativeSurfaceKind::Win32Window;
+            surface.surface = info.info.win.window;
+            surface.displayOrInstance = info.info.win.hinstance;
+        }
+#elif defined(__linux__)
+        SDL_SysWMinfo info = {};
+        SDL_VERSION(&info.version);
+        if (SDL_GetWindowWMInfo(ctx.window, &info) == SDL_TRUE)
+        {
+            if (info.subsystem == SDL_SYSWM_WAYLAND)
+            {
+                surface.kind = GVM::RHI::NativeSurfaceKind::WaylandSurface;
+                surface.surface = info.info.wl.surface;
+                surface.displayOrInstance = info.info.wl.display;
+            }
+            else if (info.subsystem == SDL_SYSWM_X11)
+            {
+                surface.kind = GVM::RHI::NativeSurfaceKind::XlibWindow;
+                surface.surface = reinterpret_cast<void *>(static_cast<uintptr_t>(info.info.x11.window));
+                surface.displayOrInstance = info.info.x11.display;
+            }
+        }
+#endif
+        return surface;
+    }
+
     class DslRenderFeatureTests : public ::testing::Test
     {
     protected:
@@ -444,8 +507,10 @@ namespace
         {
             auto &ctx = context();
 
+#if defined(__APPLE__)
             SDL_SetHintWithPriority(SDL_HINT_MAC_BACKGROUND_APP, "1", SDL_HINT_OVERRIDE);
             SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
+#endif
             SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
             ctx.quitRequested = false;
             ctx.available = false;
@@ -473,13 +538,19 @@ namespace
             }
 
             logRenderPhase("Creating SDL window.");
+            Uint32 windowFlags = SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+#if defined(__APPLE__)
+            windowFlags |= SDL_WINDOW_METAL;
+#else
+            windowFlags |= SDL_WINDOW_VULKAN;
+#endif
             ctx.window = SDL_CreateWindow(
                 "GVM Render Feature Tests",
                 SDL_WINDOWPOS_CENTERED,
                 SDL_WINDOWPOS_CENTERED,
                 ctx.width,
                 ctx.height,
-                SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_METAL
+                windowFlags
             );
             if (ctx.window == nullptr)
             {
@@ -489,6 +560,7 @@ namespace
 
             pumpWindowEvents(ctx.window, ctx.warmupMs);
 
+#if defined(__APPLE__)
             logRenderPhase("Creating SDL Metal view.");
             ctx.metalView = SDL_Metal_CreateView(ctx.window);
             if (ctx.metalView == nullptr)
@@ -496,6 +568,7 @@ namespace
                 ctx.unavailableReason = SDL_GetError();
                 return;
             }
+#endif
 
             logRenderPhase("Creating GVM instance.");
             GVM::RHI::InstanceDescriptor descriptor = GVM::Tests::makeTestInstanceDescriptor();
@@ -520,15 +593,24 @@ namespace
             logRenderPhase("Creating GVM swapchain.");
             int drawableWidth = 0;
             int drawableHeight = 0;
-            SDL_Metal_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
+            queryRenderWindowDrawableSize(ctx.window, drawableWidth, drawableHeight);
             GVM::RHI::Extent3D swapchainExtent = {
                 .width = static_cast<uint32_t>(std::max(drawableWidth, 1)),
                 .height = static_cast<uint32_t>(std::max(drawableHeight, 1)),
                 .depth = 1,
             };
+            const GVM::RHI::NativeSurfaceDescriptor nativeSurface = makeRenderWindowNativeSurface(ctx, swapchainExtent);
+            if (nativeSurface.kind == GVM::RHI::NativeSurfaceKind::Undefined || nativeSurface.surface == nullptr)
+            {
+                ctx.unavailableReason = "Failed to extract native OS surface from SDL render test window.";
+                return;
+            }
             ctx.swapchain = ctx.instance->createSwapchain({
-                .A = SDL_Metal_GetLayer(ctx.metalView),
+                .nativeSurface = nativeSurface,
+#if defined(__APPLE__)
+                .A = nativeSurface.surface,
                 .B = &swapchainExtent,
+#endif
             });
             if (ctx.swapchain == nullptr)
             {
@@ -557,11 +639,13 @@ namespace
             }
             ctx.swapchain = nullptr;
             ctx.device = nullptr;
+#if defined(__APPLE__)
             if (ctx.metalView != nullptr)
             {
                 SDL_Metal_DestroyView(ctx.metalView);
                 ctx.metalView = nullptr;
             }
+#endif
             if (ctx.window != nullptr)
             {
                 SDL_DestroyWindow(ctx.window);
@@ -749,7 +833,7 @@ namespace
 
             int baselineDrawableWidth = 0;
             int baselineDrawableHeight = 0;
-            SDL_Metal_GetDrawableSize(ctx.window, &baselineDrawableWidth, &baselineDrawableHeight);
+            queryRenderWindowDrawableSize(ctx.window, baselineDrawableWidth, baselineDrawableHeight);
             const int resizedWindowWidth = std::max(1, ctx.width * 3 / 4);
             const int resizedWindowHeight = std::max(1, ctx.height * 3 / 4);
             const int framesPerPhase = std::min(8, std::max(1, ctx.simpleFrameCount));
@@ -763,7 +847,7 @@ namespace
 
             int drawableWidth = 0;
             int drawableHeight = 0;
-            SDL_Metal_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
+            queryRenderWindowDrawableSize(ctx.window, drawableWidth, drawableHeight);
             ASSERT_NE(drawableWidth, baselineDrawableWidth) << "SDL resize did not change the drawable width.";
             ASSERT_NE(drawableHeight, baselineDrawableHeight) << "SDL resize did not change the drawable height.";
 
@@ -781,7 +865,7 @@ namespace
 
             int restoredDrawableWidth = 0;
             int restoredDrawableHeight = 0;
-            SDL_Metal_GetDrawableSize(ctx.window, &restoredDrawableWidth, &restoredDrawableHeight);
+            queryRenderWindowDrawableSize(ctx.window, restoredDrawableWidth, restoredDrawableHeight);
             ASSERT_NE(restoredDrawableWidth, drawableWidth) << "SDL restore did not change the drawable width.";
             ASSERT_NE(restoredDrawableHeight, drawableHeight) << "SDL restore did not change the drawable height.";
 

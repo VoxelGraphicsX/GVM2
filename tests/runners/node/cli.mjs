@@ -557,6 +557,19 @@ function getExecutablePath(binaryRoot, target) {
   return path.join(binaryRoot, process.platform === 'win32' ? `${target}.exe` : target);
 }
 
+/** Prepends GVM shared-library directories to the child PATH on Windows so test executables resolve DLLs reliably. */
+function withPlatformRuntimeEnv(env, paths) {
+  if (process.platform !== 'win32') {
+    return env;
+  }
+  const merged = { ...env };
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+  const existingPath = merged[pathKey] ?? process.env[pathKey] ?? '';
+  const extraDirs = [paths.binaryDir, paths.binaryRoot].filter(Boolean);
+  merged[pathKey] = [...extraDirs, existingPath].filter(Boolean).join(path.delimiter);
+  return merged;
+}
+
 /** Finds the newest complete report regardless of its directory naming mode. */
 async function findMostRecentRunDir(paths) {
   const latest = listReports(paths.runsRoot)[0];
@@ -1812,11 +1825,11 @@ async function runOneTestTarget(entry, paths, runDir, profile) {
     return record.exitCode;
   }
 
-  const env = {
+  const env = withPlatformRuntimeEnv({
     ...entry.environment,
     ...(profile.environment ?? {}),
     GTEST_COLOR: 'yes'
-  };
+  }, paths);
 
   const result = await runStreamingCommand(executablePath, args, {
     cwd: sourceDir,

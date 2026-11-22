@@ -4,7 +4,9 @@
 #include <GVMRHI/GVMRHI.hpp>
 #include <GVMRHI/GVMRHI.Vulkan/VKTesting.hpp>
 #include "GVMCore/Private/GDeviceProxy.hpp"
+#if defined(__APPLE__)
 #include "MCommandEncoder.hpp"
+#endif
 
 #include <array>
 #include <cstdint>
@@ -160,6 +162,7 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
                 return;
             }
 
+#if defined(__APPLE__)
             if (instance->getBackend() == GVM::RHI::GraphicsBackend::Metal)
             {
                 auto *metalEncoder = static_cast<GVM::RHI::Metal::MCommandEncoder *>(encoders.back().get());
@@ -167,6 +170,7 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
                 metalEncoder->waitUntilCompleted();
                 return;
             }
+#endif
 
             if (instance->getBackend() == GVM::RHI::GraphicsBackend::Vulkan)
             {
@@ -1418,9 +1422,14 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
     TEST_F(RhiExecutionTest, TextureViewsRejectWrappedMipAndLayerCounts)
     {
         using namespace GVM::RHI;
-        auto texture = device->createTexture({.size = {8u, 8u, 1u}, .arrayLayerCount = 2u,
-            .mipLevelCount = 2u, .dimension = TextureDimension::e2D,
-            .format = TextureFormat::RGBA8Unorm, .usage = TextureUsage::TextureBinding});
+        auto texture = device->createTexture({
+            .usage = TextureUsage::TextureBinding,
+            .dimension = TextureDimension::e2D,
+            .size = {8u, 8u, 1u},
+            .format = TextureFormat::RGBA8Unorm,
+            .mipLevelCount = 2u,
+            .arrayLayerCount = 2u,
+        });
         TextureViewDescriptor view;
         view.baseMipLevel = 1u;
         view.mipLevelCount = ~uint32_t(0);
@@ -1437,17 +1446,27 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
     TEST_F(RhiExecutionTest, TextureViewsRejectIncompatibleDimensions)
     {
         using namespace GVM::RHI;
-        auto volume = device->createTexture({.size = {8u, 8u, 8u}, .arrayLayerCount = 1u,
-            .mipLevelCount = 1u, .dimension = TextureDimension::e3D,
-            .format = TextureFormat::RGBA8Unorm, .usage = TextureUsage::TextureBinding});
+        auto volume = device->createTexture({
+            .usage = TextureUsage::TextureBinding,
+            .dimension = TextureDimension::e3D,
+            .size = {8u, 8u, 8u},
+            .format = TextureFormat::RGBA8Unorm,
+            .mipLevelCount = 1u,
+            .arrayLayerCount = 1u,
+        });
         TextureViewDescriptor planarView;
         planarView.dimension = TextureViewDimension::e2D;
         EXPECT_THROW(volume->createView(planarView), std::invalid_argument);
         device->freeTexture(volume);
 
-        auto layers = device->createTexture({.size = {8u, 8u, 1u}, .arrayLayerCount = 4u,
-            .mipLevelCount = 1u, .dimension = TextureDimension::e2D,
-            .format = TextureFormat::RGBA8Unorm, .usage = TextureUsage::TextureBinding});
+        auto layers = device->createTexture({
+            .usage = TextureUsage::TextureBinding,
+            .dimension = TextureDimension::e2D,
+            .size = {8u, 8u, 1u},
+            .format = TextureFormat::RGBA8Unorm,
+            .mipLevelCount = 1u,
+            .arrayLayerCount = 4u,
+        });
         TextureViewDescriptor cubeView;
         cubeView.dimension = TextureViewDimension::Cube;
         cubeView.arrayLayerCount = 4u;
@@ -2349,8 +2368,8 @@ fragment float4 write_white_main(PersistenceVertexOut input [[stage_in]])
         auto texture = device->createTexture({
             .label = "AsyncReadbackTexture",
             .usage = GVM::RHI::TextureUsage::CopySrc | GVM::RHI::TextureUsage::CopyDst,
-            .format = GVM::RHI::TextureFormat::RGBA8Unorm,
             .size = {width, height, 1u},
+            .format = GVM::RHI::TextureFormat::RGBA8Unorm,
         });
         ASSERT_FALSE(texture.isNull());
         const std::array<uint8_t, 64u> sourceData = [] {

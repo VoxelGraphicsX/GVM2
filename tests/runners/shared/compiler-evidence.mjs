@@ -11,6 +11,7 @@ export async function captureCompilerEvidence(sourceDir, buildDir) {
       configuration[match[1]] = match[2];
     }
   }
-  return { schemaVersion: 1, sourceDir, compiler: { path: configuration.GVM_UGLC_EXECUTABLE || path.join(buildDir, 'UGLC') }, configuration,
+  const defaultCompilerName = process.platform === 'win32' ? 'UGLC.exe' : 'UGLC';
+  return { schemaVersion: 1, sourceDir, compiler: { path: configuration.GVM_UGLC_EXECUTABLE || path.join(buildDir, defaultCompilerName) }, configuration,
     host: { platform: process.platform, arch: process.arch, node: process.version } };
 }

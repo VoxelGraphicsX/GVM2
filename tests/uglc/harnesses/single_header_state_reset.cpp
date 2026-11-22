@@ -10,21 +10,29 @@ int main()
 {
     namespace fs = std::filesystem;
 
-    fs::create_directories("/tmp/uglc_single_header_case_one");
-    fs::create_directories("/tmp/uglc_single_header_case_two");
+    const fs::path tempRoot = fs::temp_directory_path() / "uglc_single_header_state_reset";
+    std::error_code cleanupEc;
+    fs::remove_all(tempRoot, cleanupEc);
+    const fs::path caseOneDir = tempRoot / "case_one";
+    const fs::path caseTwoDir = tempRoot / "case_two";
+    const fs::path cacheCaseRoot = tempRoot / "cache_case" / "root";
+    const fs::path rawStringDir = tempRoot / "raw_string_case";
+
+    fs::create_directories(caseOneDir);
+    fs::create_directories(caseTwoDir);
 
     {
-        std::ofstream("/tmp/uglc_single_header_case_one/shared_target.hpp") << "struct FromCaseOne {};\n";
-        std::ofstream("/tmp/uglc_single_header_case_one/main.hpp") << "#include \"shared_target.hpp\"\nstruct RunOneMarker {};\n";
+        std::ofstream(caseOneDir / "shared_target.hpp") << "struct FromCaseOne {};\n";
+        std::ofstream(caseOneDir / "main.hpp") << "#include \"shared_target.hpp\"\nstruct RunOneMarker {};\n";
     }
     {
-        std::ofstream("/tmp/uglc_single_header_case_two/shared_target.hpp") << "struct FromCaseTwo {};\n";
-        std::ofstream("/tmp/uglc_single_header_case_two/main.hpp") << "#include \"shared_target.hpp\"\nstruct RunTwoMarker {};\n";
+        std::ofstream(caseTwoDir / "shared_target.hpp") << "struct FromCaseTwo {};\n";
+        std::ofstream(caseTwoDir / "main.hpp") << "#include \"shared_target.hpp\"\nstruct RunTwoMarker {};\n";
     }
 
     UGLC::CodeGen::SingleHeaderGenerator generator;
 
-    generator.init("/tmp/uglc_single_header_case_one/main.hpp", {fs::path("/tmp/uglc_single_header_case_one")});
+    generator.init((caseOneDir / "main.hpp").string(), {caseOneDir});
     generator.create({});
     std::string first = generator.getResult();
     if (first.find("FromCaseOne") == std::string::npos || first.find("RunOneMarker") == std::string::npos)
@@ -32,7 +40,7 @@ int main()
         throw std::runtime_error("first run did not include expected case-one content");
     }
 
-    generator.init("/tmp/uglc_single_header_case_two/main.hpp", {fs::path("/tmp/uglc_single_header_case_two")});
+    generator.init((caseTwoDir / "main.hpp").string(), {caseTwoDir});
     generator.create({});
     std::string second = generator.getResult();
     if (second.find("FromCaseTwo") == std::string::npos || second.find("RunTwoMarker") == std::string::npos)
@@ -44,19 +52,19 @@ int main()
         throw std::runtime_error("second run leaked state from the first run");
     }
 
-    fs::create_directories("/tmp/uglc_single_header_cache_case/root");
+    fs::create_directories(cacheCaseRoot);
     {
-        std::ofstream("/tmp/uglc_single_header_cache_case/root/shared_target.hpp") << "struct FromDiskCacheCase {};\n";
-        std::ofstream("/tmp/uglc_single_header_cache_case/root/main.hpp") << "#include \"shared_target.hpp\"\nstruct CacheCaseMarker {};\n";
+        std::ofstream(cacheCaseRoot / "shared_target.hpp") << "struct FromDiskCacheCase {};\n";
+        std::ofstream(cacheCaseRoot / "main.hpp") << "#include \"shared_target.hpp\"\nstruct CacheCaseMarker {};\n";
     }
 
     UGLC::CodeGen::SingleHeaderGenerator cachedGenerator;
     std::unordered_map<std::string, std::string> loadedFiles;
     loadedFiles.emplace(
-        fs::weakly_canonical("/tmp/uglc_single_header_cache_case/root/shared_target.hpp").string(),
+        fs::weakly_canonical(cacheCaseRoot / "shared_target.hpp").string(),
         "struct FromMemoryCacheCase {};\n"
     );
-    cachedGenerator.init("/tmp/uglc_single_header_cache_case/root/main.hpp", {});
+    cachedGenerator.init((cacheCaseRoot / "main.hpp").string(), {});
     cachedGenerator.create(loadedFiles);
     std::string cachedResult = cachedGenerator.getResult();
     if (cachedResult.find("FromMemoryCacheCase") == std::string::npos)
@@ -68,10 +76,10 @@ int main()
         throw std::runtime_error("canonical cache lookup fell back to stale on-disk content");
     }
 
-    fs::create_directories("/tmp/uglc_single_header_raw_string_case");
+    fs::create_directories(rawStringDir);
     {
-        std::ofstream("/tmp/uglc_single_header_raw_string_case/after_raw.hpp") << "struct IncludedAfterShaderArtifact {};\n";
-        std::ofstream("/tmp/uglc_single_header_raw_string_case/main.hpp")
+        std::ofstream(rawStringDir / "after_raw.hpp") << "struct IncludedAfterShaderArtifact {};\n";
+        std::ofstream(rawStringDir / "main.hpp")
             << "struct Holder\n"
             << "{\n"
             << "    const auto shaderArtifact = UGLC::Generated::MakeShaderArtifact(\n"
@@ -86,7 +94,7 @@ int main()
     }
 
     UGLC::CodeGen::SingleHeaderGenerator rawStringGenerator;
-    rawStringGenerator.init("/tmp/uglc_single_header_raw_string_case/main.hpp", {fs::path("/tmp/uglc_single_header_raw_string_case")});
+    rawStringGenerator.init((rawStringDir / "main.hpp").string(), {rawStringDir});
     rawStringGenerator.create({});
     std::string rawStringResult = rawStringGenerator.getResult();
     if (rawStringResult.find("IncludedAfterShaderArtifact") == std::string::npos)
@@ -94,6 +102,7 @@ int main()
         throw std::runtime_error("single-header merge stopped expanding includes after a raw string closed with a trailing comma");
     }
 
+    fs::remove_all(tempRoot, cleanupEc);
     std::cout << "single_header_cache_lookup_ok\n";
     std::cout << "single_header_reuse_ok\n";
     std::cout << "single_header_raw_string_close_ok\n";

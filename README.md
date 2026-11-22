@@ -29,9 +29,10 @@ Hull and domain shader stages are not currently supported by UGLIR.
 
 | Platform / backend | Validation status |
 | --- | --- |
-| macOS on Apple silicon / Metal | Primary development platform; locally validated. |
-| macOS on Apple silicon / Vulkan via MoltenVK | Locally validated with a working Vulkan runtime. |
-| Linux and Windows | Platform code is present; full runtime validation is still outstanding. |
+| macOS on Apple silicon / Metal | Primary development platform; locally and CI validated. |
+| macOS on Apple silicon / Vulkan via KosmicKrisp | Locally validated on Apple silicon with macOS 26 (Metal 4) and the packaged KosmicKrisp 1.4 runtime. |
+| Windows x64 / Vulkan (MSVC + CMake) | Locally and CI validated with Visual Studio 2022 MSVC, Ninja / Ninja Multi-Config, and Vulkan 1.3+ (UGLIR pipeline). |
+| Linux / Vulkan | Platform code is present; full runtime validation runs on self-hosted Vulkan hardware. |
 | Android and OpenHarmony | Experimental sample host integration. |
 
 These statuses describe the current validation scope, not a compatibility
@@ -48,9 +49,10 @@ for automated checks.
   with its macOS SDK for Metal and Objective-C++.
 - Python 3 when using the automatic LLVM download for UGLC.
 - Node.js 20 or newer to run the test runners.
-- A working Vulkan loader and MoltenVK installation to run Vulkan applications.
-  Dependency downloads provide build headers and libraries, but do not install
-  a system Vulkan runtime.
+- On macOS, Vulkan execution requires Apple silicon, macOS 26 (Metal 4), and a
+  LunarG Vulkan 1.4 SDK providing `libvulkan_kosmickrisp.dylib` (set
+  `GVM_KOSMICKRISP_SDK` to `<sdk>/macOS` when configuring). Metal works
+  independently without a Vulkan runtime.
 
 ```sh
 git clone https://github.com/VoxelGraphicsX/GVM2.git GVM
@@ -94,15 +96,53 @@ cmake --build build/samples \
 ```
 
 The [triangle application](GVMRuntime_Samples/Test_01_Triangle/main.cpp) explicitly
-selects Vulkan. With Vulkan/MoltenVK available, run it from the repository root:
+selects Vulkan. With a packaged KosmicKrisp runtime on macOS (or a Vulkan 1.3+
+driver on Windows/Linux), run it from the repository root:
 
 ```sh
 ./build/samples/GVMRUNTIMES_SAMPLES_Test_01_Triangle_bin
 ```
 
 This opens an interactive window; closing it exits the sample. Its shaders use
-the default UGLIR pipeline. Additional examples are in
+the default UGLIR pipeline. Samples `Test_04_Cube` through `Test_10_ProceduralCityWorld`
+and `ReplayAttachmentHazard` default to Metal on macOS and Vulkan elsewhere, and
+accept `--backend=metal|vulkan` and `--frames=N`. Additional examples are in
 [GVMRuntime_Samples](GVMRuntime_Samples) and [GVMRHI_Samples](GVMRHI_Samples).
+
+## Quick start on Windows
+
+### Requirements
+
+- Git, CMake 3.22 or newer, Ninja, Python 3, and Node.js 20 or newer.
+- Visual Studio 2022 (or newer) C++ x64 build tools (`cl.exe` initialized via
+  *x64 Native Tools Command Prompt* or `vcvars64.bat`).
+- A Vulkan 1.3 or newer driver and loader (`vulkan-1.dll`) for GPU tests and
+  windowed samples.
+
+### Build UGLC, samples, and runtime on Windows
+
+Windows builds support the default UGLIR pipeline (`UGLC_ENABLE_LEGACY=OFF`)
+with both single-config (`Ninja`) and multi-config (`Ninja Multi-Config` /
+`Visual Studio`) CMake generators:
+
+```powershell
+cmake -S . -B build/windows -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DGVM_BUILD_SAMPLES=ON `
+  -DGVM_BUILD_TESTS=OFF `
+  -DGVM_BUILD_UGLC=ON `
+  -DGVM_RHI_ENABLE_VULKAN=ON `
+  -DUGLC_ENABLE_LEGACY=OFF
+cmake --build build/windows --parallel 8
+.\build\windows\GVMRUNTIMES_SAMPLES_Test_04_Cube_bin.exe --backend=vulkan
+```
+
+Top-level MSVC builds default to the shared release CRT (`MultiThreadedDLL`,
+`/MD`) across Debug and Release configurations so Debug applications can link
+against an installed Release GVM SDK without heap or allocator mismatches.
+Installed consumers that override `CMAKE_MSVC_RUNTIME_LIBRARY` to a different
+CRT are rejected at CMake configuration time; `add_subdirectory` source
+consumers inherit the parent project's `CMAKE_MSVC_RUNTIME_LIBRARY`.
 
 ## UGL examples
 

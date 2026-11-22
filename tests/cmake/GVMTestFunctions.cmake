@@ -26,6 +26,9 @@ function(gvm_add_gtest TARGET)
     set_target_properties(${TARGET} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${GVM_TEST_BINARY_ROOT}"
     )
+    if(WIN32 AND TARGET gvm_stage_test_runtime_dlls)
+        add_dependencies(${TARGET} gvm_stage_test_runtime_dlls)
+    endif()
 
     if(ARG_INCLUDE_DIRS)
         target_include_directories(${TARGET} PRIVATE ${ARG_INCLUDE_DIRS})
@@ -66,6 +69,9 @@ function(gvm_add_dsl_codegen_test TARGET DSL_SOURCE)
     )
 
     # Consume the generated host header as emitted.
+    target_compile_definitions(${TARGET} PRIVATE
+        GVM_TEST_EXPECT_EMBEDDED_METALLIB=$<BOOL:${GVM_UGLC_EMBED_METALLIB}>
+    )
     UGLCOMPILE(${TARGET} ${DSL_SOURCE} ${_generated_dir} ${GVM_UGLC_COMPILER}
         INCLUDE_DIRS ${_ugl_include_dirs}
         DSL_DIRS ${_ugl_dsl_dirs}

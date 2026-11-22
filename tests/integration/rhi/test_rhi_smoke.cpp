@@ -5,9 +5,11 @@
 #include <GVMCore/Private/GQueue.hpp>
 #include <GVMRHI/GVMRHI.hpp>
 #include <GVMRHI/Private/SubmissionState.hpp>
+#if defined(__APPLE__)
 #include "MCommandEncoder.hpp"
 #include "MDevice.hpp"
 #include "MQueue.hpp"
+#endif
 
 #include <array>
 #include <cstring>
@@ -397,6 +399,7 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
             ASSERT_NE(results[index], nullptr);
             EXPECT_EQ(results[index], results[index % 2]);
         }
+#if defined(__APPLE__)
         if (instance->getBackend() == GraphicsBackend::Metal)
         {
             const auto *graphics = dynamic_cast<Metal::MQueue *>(device->getMainQueue());
@@ -408,6 +411,7 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
             EXPECT_NE(transfer->getNativeQueue(), graphics->getNativeQueue());
             EXPECT_NE(transfer->getNativeQueue(), compute->getNativeQueue());
         }
+#endif
     }
 
     /// Carries copied bytes through transfer, compute, and graphics queues using explicit GPU dependencies.
@@ -621,6 +625,9 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
     /// Lets an independent upload pass a stalled producer, then verifies an explicit GPU wait orders the consuming copy.
     TEST_F(RhiSmokeTest, SubmissionMetalCrossQueueWaitAndTimeout)
     {
+#if !defined(__APPLE__)
+        GTEST_SKIP() << "This test exercises native Metal queues and a host-signaled Metal event.";
+#else
         if (!inlineMetalShaderSupported())
         {
             GTEST_SKIP() << "This test exercises native Metal queues and a host-signaled Metal event.";
@@ -676,6 +683,7 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
         }
         device->freeBuffer(source);
         device->freeBuffer(target);
+#endif
     }
 
     /// Verifies diagnostics wrappers preserve the dependency-aware submission contract.

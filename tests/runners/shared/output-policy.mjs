@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { RedactedText } from './report-redaction.mjs';
@@ -243,9 +244,15 @@ export async function runLoggedCommand(command, args, options, output) {
   const startedAt = new Date();
   const log = new RotatingLog(options.logPath, output.policy);
   const redact = options.redact ?? (text => text);
+  const childEnv = options.env ? { ...process.env, ...options.env } : { ...process.env };
+  if (process.platform === 'win32' && !childEnv.TMP && !childEnv.TEMP) {
+    const fallbackTmp = os.tmpdir();
+    childEnv.TMP = fallbackTmp;
+    childEnv.TEMP = fallbackTmp;
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: options.cwd, env: options.env ? { ...process.env, ...options.env } : process.env,
+      cwd: options.cwd, env: childEnv,
       shell: false, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe']
     });
     let captured = '';

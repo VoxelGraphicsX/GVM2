@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 /** Reads the explicit settings of an already built installation consumer. */
 function readCMakeCache(buildDirectory) {
   const cache = new Map();
-  for (const line of fs.readFileSync(path.join(buildDirectory, 'CMakeCache.txt'), 'utf8').split('\n')) {
+  for (const line of fs.readFileSync(path.join(buildDirectory, 'CMakeCache.txt'), 'utf8').split(/\r?\n/u)) {
     const match = /^([^/#][^:]*):[^=]+=(.*)$/u.exec(line);
     if (match) cache.set(match[1], match[2]);
   }
@@ -29,9 +29,15 @@ function checkCommand(command, args, logFile, expectedDiagnostic = '') {
   }
 }
 
-const { values } = parseArgs({ options: { 'consumer-build': { type: 'string' } } });
+const { values } = parseArgs({
+  options: {
+    'consumer-build': { type: 'string' },
+    'ctest-exclude': { type: 'string' },
+  },
+});
 assert.ok(values['consumer-build'], 'Specify --consumer-build with a successfully built tests/install project.');
 const consumerBuild = path.resolve(values['consumer-build']);
+const ctestExcludeArgs = values['ctest-exclude'] ? ['-E', values['ctest-exclude']] : [];
 const cache = readCMakeCache(consumerBuild);
 const checksDirectory = path.join(consumerBuild, 'dependency-checks');
 fs.mkdirSync(checksDirectory, { recursive: true });
@@ -39,7 +45,13 @@ const consumerSource = cache.get('CMAKE_HOME_DIRECTORY');
 const dependencySource = path.resolve(consumerSource, '../dependencies');
 const repositorySource = path.resolve(consumerSource, '../..');
 const commonArgs = [];
-for (const name of ['CMAKE_PREFIX_PATH', 'CPM_SOURCE_CACHE', 'CMAKE_OSX_SYSROOT']) {
+if (cache.get('CMAKE_GENERATOR')) {
+  commonArgs.push('-G', cache.get('CMAKE_GENERATOR'));
+}
+if (cache.get('CMAKE_GENERATOR_PLATFORM')) {
+  commonArgs.push('-A', cache.get('CMAKE_GENERATOR_PLATFORM'));
+}
+for (const name of ['CMAKE_MAKE_PROGRAM', 'CMAKE_PREFIX_PATH', 'CPM_SOURCE_CACHE', 'CMAKE_OSX_SYSROOT']) {
   if (cache.get(name)) commonArgs.push(`-D${name}=${cache.get(name)}`);
 }
 
@@ -50,8 +62,8 @@ for (const name of ['GVM_UGLC_EXECUTABLE', 'GVM_UGLC_RESOURCE_DIR']) {
   if (cache.get(name)) debugArgs.push(`-D${name}=${cache.get(name)}`);
 }
 checkCommand('cmake', debugArgs, path.join(checksDirectory, 'debug-configure.log'));
-checkCommand('cmake', ['--build', debugBuild, '--parallel', '3'], path.join(checksDirectory, 'debug-build.log'));
-checkCommand('ctest', ['--test-dir', debugBuild, '--output-on-failure'], path.join(checksDirectory, 'debug-execution.log'));
+checkCommand('cmake', ['--build', debugBuild, '--config', 'Debug', '--parallel', '3'], path.join(checksDirectory, 'debug-build.log'));
+checkCommand('ctest', ['--test-dir', debugBuild, '-C', 'Debug', '--output-on-failure', ...ctestExcludeArgs], path.join(checksDirectory, 'debug-execution.log'));
 console.log('Debug consumer: generated compute, shared layouts, include order and allocation passed.');
 
 for (const mode of ['installed', 'source']) {
@@ -61,8 +73,8 @@ for (const mode of ['installed', 'source']) {
     const buildDirectory = path.join(checksDirectory, 'source-consumer');
     checkCommand('cmake', ['-S', dependencySource, '-B', buildDirectory, ...commonArgs, ...sourceArgs,
       '-DCMAKE_BUILD_TYPE=Debug'], path.join(checksDirectory, 'source-configure.log'));
-    checkCommand('cmake', ['--build', buildDirectory, '--parallel', '3'], path.join(checksDirectory, 'source-build.log'));
-    checkCommand('ctest', ['--test-dir', buildDirectory, '--output-on-failure'], path.join(checksDirectory, 'source-execution.log'));
+    checkCommand('cmake', ['--build', buildDirectory, '--config', 'Debug', '--parallel', '3'], path.join(checksDirectory, 'source-build.log'));
+    checkCommand('ctest', ['--test-dir', buildDirectory, '-C', 'Debug', '--output-on-failure'], path.join(checksDirectory, 'source-execution.log'));
     console.log('Source consumer: public dependency targets, layouts, include order and allocation passed.');
   }
   for (const target of ['EABase', 'EASTL', 'glm::glm']) {
@@ -100,4 +112,15 @@ int main() { return 0; }
   checkCommand('cmake', ['--build', buildDirectory, '--parallel', '3'],
     path.join(checksDirectory, `${label}-build.log`), diagnostic);
   console.log(`${label}: rejected with a configuration diagnostic.`);
+}
+
+if (process.platform === 'win32' && cache.get('CMAKE_CXX_COMPILER_ID') === 'MSVC') {
+  checkCommand(
+    'cmake',
+    ['-S', dependencySource, '-B', path.join(checksDirectory, 'msvc-crt-conflict'),
+      ...commonArgs, '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL'],
+    path.join(checksDirectory, 'msvc-crt-conflict.log'),
+    'GVM MSVC runtime library conflict',
+  );
+  console.log('msvc-crt-conflict: rejected with an MSVC runtime library diagnostic.');
 }

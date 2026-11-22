@@ -476,7 +476,7 @@ namespace
     TEST(TaskRuntimeTests, LargeFanOutDagExceedingOldQueueCapSucceeds)
     {
         constexpr uint32_t kBranches = 5000;
-        TaskRuntime runtime({.workerCount = 4, .maximumTasksPerExecution = 16384});
+        TaskRuntime runtime({.maximumTasksPerExecution = 16384, .workerCount = 4});
         auto execution = runtime.submit([](uint32_t count)
         {
             TaskGraph graph;

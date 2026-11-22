@@ -34,3 +34,8 @@ add_executable(gvm_fmt_consumer main.cpp)
 # The public logging API must inherit fmt's include paths, definitions and library.
 target_link_libraries(gvm_fmt_consumer PRIVATE GVM::RHI)
 add_test(NAME fmt_parent_logging COMMAND gvm_fmt_consumer)
+if(WIN32)
+    set_tests_properties(fmt_parent_logging PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:GVM::RHI>"
+    )
+endif()

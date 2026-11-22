@@ -1,6 +1,9 @@
 import path from 'node:path';
 
 export function getDefaultProfileName() {
+  if (process.platform === 'win32') {
+    return 'windows-debug';
+  }
   return 'macos-debug';
 }
 
@@ -128,12 +131,82 @@ export function getProfile(sourceDir, profileName = getDefaultProfileName()) {
       environment: {
         TSAN_OPTIONS: `halt_on_error=0:print_stacktrace=1:suppressions=${path.join(sourceDir, 'tests', 'sanitizers', 'tsan.supp')}`
       }
+    },
+    'windows-debug': {
+      name: 'windows-debug',
+      generator: 'Ninja',
+      binaryDir: resolvePath(
+        sourceDir,
+        process.env.GVM_TEST_BUILD_DIR,
+        path.join(sourceDir, 'build', 'windows-tests-debug-ninja')
+      ),
+      buildType: 'Debug',
+      buildJobs: 8,
+      cmakeCache: {
+        CPM_USE_LOCAL_PACKAGES: 'ON',
+        GVM_BUILD_SAMPLES: 'OFF',
+        GVM_BUILD_TESTS: 'ON',
+        GVM_BUILD_TESTS_UNIT: 'ON',
+        GVM_BUILD_TESTS_RHI: 'ON',
+        GVM_BUILD_TESTS_DSL: 'ON',
+        GVM_BUILD_TESTS_RENDER: 'ON',
+        GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON'
+      }
+    },
+    'windows-overlay-off': {
+      name: 'windows-overlay-off',
+      generator: 'Ninja',
+      binaryDir: path.join(sourceDir, 'build', 'windows-tests-overlay-off-ninja'),
+      buildType: 'Debug',
+      buildJobs: 8,
+      cmakeCache: {
+        CPM_USE_LOCAL_PACKAGES: 'ON',
+        GVM_BUILD_SAMPLES: 'OFF',
+        GVM_BUILD_TESTS: 'ON',
+        GVM_BUILD_TESTS_UNIT: 'ON',
+        GVM_BUILD_TESTS_RHI: 'ON',
+        GVM_BUILD_TESTS_DSL: 'ON',
+        GVM_BUILD_TESTS_RENDER: 'ON',
+        GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
+        GVM_RHI_ENABLE_DIAGNOSTICS_OVERLAY: 'OFF'
+      }
+    },
+    'windows-cpu-probes': {
+      name: 'windows-cpu-probes',
+      generator: 'Ninja',
+      binaryDir: path.join(sourceDir, 'build', 'windows-tests-cpu-probes-ninja'),
+      buildType: 'Debug',
+      buildJobs: 8,
+      cmakeCache: {
+        CPM_USE_LOCAL_PACKAGES: 'ON',
+        GVM_BUILD_SAMPLES: 'OFF',
+        GVM_BUILD_TESTS: 'ON',
+        GVM_BUILD_TESTS_UNIT: 'ON',
+        GVM_BUILD_TESTS_RHI: 'ON',
+        GVM_BUILD_TESTS_DSL: 'ON',
+        GVM_BUILD_TESTS_RENDER: 'ON',
+        GVM_BUILD_UGLC: 'ON',
+        GVM_ENABLE_UPSTREAM_MARL: 'ON',
+        GVM_RHI_ENABLE_LOGGING: 'ON',
+        GVM_RHI_ENABLE_CPU_PROBES: 'ON'
+      }
     }
   };
 
   if (profileName === 'vulkan-debug') {
-    return { ...profiles['macos-debug'], name: profileName,
-      binaryDir: path.join(sourceDir, 'build', 'vulkan-tests-debug-make') };
+    const baseProfile = process.platform === 'win32'
+      ? profiles['windows-debug']
+      : profiles['macos-debug'];
+    const vulkanBuildLeaf = process.platform === 'win32'
+      ? 'vulkan-tests-debug-ninja'
+      : 'vulkan-tests-debug-make';
+    return {
+      ...baseProfile,
+      name: profileName,
+      binaryDir: path.join(sourceDir, 'build', vulkanBuildLeaf)
+    };
   }
   const profile = profiles[profileName];
   if (!profile) {

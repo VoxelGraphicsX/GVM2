@@ -74,6 +74,22 @@ namespace
 
     std::string shellQuote(const std::string &value)
     {
+#if defined(_WIN32)
+        std::string quoted = "\"";
+        for (const char ch : value)
+        {
+            if (ch == '"')
+            {
+                quoted += "\\\"";
+            }
+            else
+            {
+                quoted += ch;
+            }
+        }
+        quoted += "\"";
+        return quoted;
+#else
         std::string quoted = "'";
         for (const char ch : value)
         {
@@ -88,6 +104,7 @@ namespace
         }
         quoted += "'";
         return quoted;
+#endif
     }
 }
 
@@ -200,16 +217,28 @@ int main(int argc, char **argv)
         + " > " + shellQuote(failureLogPath.string())
         + " 2>&1";
 
-    if (std::system(command.c_str()) == 0)
+#if defined(_WIN32)
+    const std::string systemCommand = "\"" + command + "\"";
+#else
+    const std::string &systemCommand = command;
+#endif
+    if (std::system(systemCommand.c_str()) == 0)
     {
         return fail("UGLC unexpectedly returned success for an invalid output directory");
     }
 
     std::ifstream logInput(failureLogPath, std::ios::binary);
     std::string logContent((std::istreambuf_iterator<char>(logInput)), std::istreambuf_iterator<char>());
-    const bool creationFailed = logContent.find("Error creating output directory") != std::string::npos;
+    const bool creationFailed =
+        logContent.find("Error creating output directory") != std::string::npos
+        || logContent.find("uglc: error: creating output directory") != std::string::npos;
     const bool invalidationFailed = logContent.find("Failed to invalidate shader artifact") != std::string::npos;
-    if ((!creationFailed && !invalidationFailed) || logContent.find(invalidOutputDir.string()) == std::string::npos)
+    std::ostringstream quotedOutputDirStream;
+    quotedOutputDirStream << invalidOutputDir;
+    const bool mentionsOutputDir =
+        logContent.find(invalidOutputDir.string()) != std::string::npos
+        || logContent.find(quotedOutputDirStream.str()) != std::string::npos;
+    if ((!creationFailed && !invalidationFailed) || !mentionsOutputDir)
     {
         return fail("UGLC did not surface the output-directory failure diagnostic");
     }

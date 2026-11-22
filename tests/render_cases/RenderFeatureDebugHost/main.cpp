@@ -1,7 +1,11 @@
-#include "UGLBin/generate_result.hpp"
 #include <GVMRHI/GVMRHI.hpp>
 #include <SDL.h>
+#include <SDL_syswm.h>
+#if defined(__APPLE__)
 #include <SDL_metal.h>
+#else
+#include <SDL_vulkan.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -11,6 +15,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "UGLBin/generate_result.hpp"
 
 namespace
 {
@@ -30,7 +36,9 @@ namespace
     struct AppContext
     {
         SDL_Window *window = nullptr;
+#if defined(__APPLE__)
         SDL_MetalView metalView = nullptr;
+#endif
         GVM::RHI::Instance instance = nullptr;
         GVM::RHI::Device rawDevice = nullptr;
         GVM::Core::DeviceProxy device;
@@ -161,7 +169,9 @@ namespace
 
     void initAppContext(AppContext &ctx)
     {
+#if defined(__APPLE__)
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
+#endif
         SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 
         logStep("Initializing SDL.");
@@ -171,25 +181,33 @@ namespace
         }
 
         logStep("Creating SDL window.");
+        Uint32 windowFlags = SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
+#if defined(__APPLE__)
+        windowFlags |= SDL_WINDOW_METAL;
+#else
+        windowFlags |= SDL_WINDOW_VULKAN;
+#endif
         ctx.window = SDL_CreateWindow(
             "GVM Render Feature Debug",
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             ctx.width,
             ctx.height,
-            SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_METAL
+            windowFlags
         );
         if (ctx.window == nullptr)
         {
             throw std::runtime_error(SDL_GetError());
         }
 
+#if defined(__APPLE__)
         logStep("Creating SDL Metal view.");
         ctx.metalView = SDL_Metal_CreateView(ctx.window);
         if (ctx.metalView == nullptr)
         {
             throw std::runtime_error(SDL_GetError());
         }
+#endif
 
         logStep("Creating GVM instance and device.");
         ctx.instance = GVM::RHI::createInstance({
@@ -205,15 +223,60 @@ namespace
         logStep("Creating GVM swapchain.");
         int drawableWidth = 0;
         int drawableHeight = 0;
+#if defined(__APPLE__)
         SDL_Metal_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
+#else
+        SDL_Vulkan_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
+        if (drawableWidth <= 0 || drawableHeight <= 0)
+        {
+            SDL_GetWindowSizeInPixels(ctx.window, &drawableWidth, &drawableHeight);
+        }
+#endif
         GVM::RHI::Extent3D swapchainExtent = {
             .width = static_cast<uint32_t>(std::max(drawableWidth, 1)),
             .height = static_cast<uint32_t>(std::max(drawableHeight, 1)),
             .depth = 1,
         };
+        GVM::RHI::NativeSurfaceDescriptor nativeSurface = {};
+        nativeSurface.extentHint = swapchainExtent;
+        nativeSurface.hasExtentHint = GVM::RHI::True;
+#if defined(__APPLE__)
+        nativeSurface.kind = GVM::RHI::NativeSurfaceKind::MetalLayer;
+        nativeSurface.surface = SDL_Metal_GetLayer(ctx.metalView);
+#elif defined(_WIN32)
+        SDL_SysWMinfo info = {};
+        SDL_VERSION(&info.version);
+        if (SDL_GetWindowWMInfo(ctx.window, &info) == SDL_TRUE)
+        {
+            nativeSurface.kind = GVM::RHI::NativeSurfaceKind::Win32Window;
+            nativeSurface.surface = info.info.win.window;
+            nativeSurface.displayOrInstance = info.info.win.hinstance;
+        }
+#elif defined(__linux__)
+        SDL_SysWMinfo info = {};
+        SDL_VERSION(&info.version);
+        if (SDL_GetWindowWMInfo(ctx.window, &info) == SDL_TRUE)
+        {
+            if (info.subsystem == SDL_SYSWM_WAYLAND)
+            {
+                nativeSurface.kind = GVM::RHI::NativeSurfaceKind::WaylandSurface;
+                nativeSurface.surface = info.info.wl.surface;
+                nativeSurface.displayOrInstance = info.info.wl.display;
+            }
+            else if (info.subsystem == SDL_SYSWM_X11)
+            {
+                nativeSurface.kind = GVM::RHI::NativeSurfaceKind::XlibWindow;
+                nativeSurface.surface = reinterpret_cast<void *>(static_cast<uintptr_t>(info.info.x11.window));
+                nativeSurface.displayOrInstance = info.info.x11.display;
+            }
+        }
+#endif
         ctx.swapchain = ctx.instance->createSwapchain({
-            .A = SDL_Metal_GetLayer(ctx.metalView),
+            .nativeSurface = nativeSurface,
+#if defined(__APPLE__)
+            .A = nativeSurface.surface,
             .B = &swapchainExtent,
+#endif
         });
         if (ctx.swapchain == nullptr)
         {
@@ -241,11 +304,13 @@ namespace
             delete ctx.instance;
             ctx.instance = nullptr;
         }
+#if defined(__APPLE__)
         if (ctx.metalView != nullptr)
         {
             SDL_Metal_DestroyView(ctx.metalView);
             ctx.metalView = nullptr;
         }
+#endif
         if (ctx.window != nullptr)
         {
             SDL_DestroyWindow(ctx.window);

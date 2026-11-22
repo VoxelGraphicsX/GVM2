@@ -70,6 +70,15 @@ function readCMakeCacheBoolean(buildDir, key) {
   return ['1', 'ON', 'TRUE', 'YES'].includes(normalized);
 }
 
+/** Resolves whether generated host headers are expected to embed an offline-compiled metallib. */
+function resolveEmbedMetallib(buildDir) {
+  const rawValue = readCMakeCacheValue(buildDir, 'GVM_UGLC_EMBED_METALLIB');
+  if (rawValue !== '') {
+    return readCMakeCacheBoolean(buildDir, 'GVM_UGLC_EMBED_METALLIB');
+  }
+  return process.platform === 'darwin';
+}
+
 /** Returns only existing directory paths while preserving the first occurrence order. */
 function collectExistingDirectories(entries) {
   return entries.filter((entry) => typeof entry === 'string' && entry.length > 0 && fs.existsSync(entry) && fs.statSync(entry).isDirectory());
@@ -232,14 +241,30 @@ function resolveClangResourceDir(sourceDir, buildDir, rawProfile = {}) {
   return '';
 }
 
+/** Resolves the default host C++ compiler used for generated-header syntax and harness checks. */
+function resolveDefaultHostCompiler(llvmRoot) {
+  if (process.platform === 'win32') {
+    if (llvmRoot) {
+      const bundledClang = path.join(llvmRoot, 'bin', 'clang++.exe');
+      if (fs.existsSync(bundledClang)) {
+        return bundledClang;
+      }
+    }
+    return 'clang++';
+  }
+  return 'c++';
+}
+
 /** Builds a profile from JSON config and explicit command-line overrides. */
 function profileFromRawConfig(sourceDir, profileName, rawProfile = {}, profileOptions = {}) {
   const buildDirOverride = optionalString(profileOptions.buildDirOverride ?? profileOptions['build-dir']);
   const hasBuildDirOverride = buildDirOverride !== '';
+  const defaultBuildLeaf = process.platform === 'win32' ? 'windows-tests-debug-ninja' : 'macos-tests-debug-make';
+  const defaultUglcName = process.platform === 'win32' ? 'UGLC.exe' : 'UGLC';
   const buildDir = resolveConfiguredPath(
     sourceDir,
     hasBuildDirOverride ? buildDirOverride : (rawProfile.BuildDir ?? process.env.GVM_UGLC_TEST_BUILD_DIR),
-    path.join(sourceDir, 'build', 'macos-tests-debug-make')
+    path.join(sourceDir, 'build', defaultBuildLeaf)
   );
   const gvmRoot = resolveConfiguredPath(sourceDir, rawProfile.GVMRoot, path.join(sourceDir, 'GVM'));
   const uglHeadersDir = resolveConfiguredPath(sourceDir, rawProfile.UGLHeadersDir, path.join(gvmRoot, 'UGLHeaders'));
@@ -251,13 +276,14 @@ function profileFromRawConfig(sourceDir, profileName, rawProfile = {}, profileOp
   const uglcExecutable = resolveConfiguredPath(
     sourceDir,
     hasBuildDirOverride ? '' : rawProfile.UGLCExecutable,
-    path.join(buildDir, 'UGLC')
+    path.join(buildDir, defaultUglcName)
   );
   const buildJobs = parseBuildJobs(rawProfile.BuildJobs);
   const llvmRoot = resolveLLVMRoot(buildDir, rawProfile.LLVMRoot);
   const clangResourceDir = resolveClangResourceDir(sourceDir, buildDir, rawProfile);
   const llvmIncludeDirs = llvmRoot ? [path.join(llvmRoot, 'include')] : [];
   const legacyEnabled = readCMakeCacheBoolean(buildDir, 'UGLC_ENABLE_LEGACY');
+  const embedMetallib = resolveEmbedMetallib(buildDir);
 
   const optionalIncludeDirs = collectDependencyIncludeDirs(buildDir, dependencyRoot);
   const dependencyConfigIncludeDir = path.resolve(gvmRoot, '..', 'cmake', 'dependencies', 'include');
@@ -291,7 +317,7 @@ function profileFromRawConfig(sourceDir, profileName, rawProfile = {}, profileOp
     buildTimeoutMs: 10 * 60 * 1000,
     defaultTimeoutMs: 90 * 1000,
     autoOpenReport: optionalBoolean(rawProfile.AutoOpenReport, false),
-    hostCompiler: optionalString(rawProfile.HostCompiler, 'c++'),
+    hostCompiler: optionalString(rawProfile.HostCompiler, resolveDefaultHostCompiler(llvmRoot)),
     // Direct compiler probes must use the same dependency contract as GVM's CMake targets.
     hostCompileBaseArgs: ['-std=c++20', '-include', 'GVM/Dependencies/GLMConfig.h',
       '-DEASTL_USER_CONFIG_HEADER="GVM/Dependencies/EASTLConfig.h"',
@@ -301,6 +327,7 @@ function profileFromRawConfig(sourceDir, profileName, rawProfile = {}, profileOp
     clangResourceDir,
     llvmIncludeDirs,
     legacyEnabled,
+    embedMetallib,
     buildJobs,
     gvmRoot,
     dependencyRoot,

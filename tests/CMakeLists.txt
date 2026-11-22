@@ -19,6 +19,21 @@ target_include_directories(GVMTestCommon INTERFACE
     ${GVM_REPOSITORY_ROOT}/GVM/third_party
 )
 
+if(WIN32)
+    set(_gvm_test_runtime_stage_dir "${GVM_TEST_BINARY_ROOT}$<$<BOOL:${CMAKE_CONFIGURATION_TYPES}>:/$<CONFIG>>")
+    add_custom_target(gvm_stage_test_runtime_dlls
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${_gvm_test_runtime_stage_dir}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:GVMRHI>"
+            "$<TARGET_FILE:GVMCore>"
+            "$<TARGET_FILE:GVM>"
+            "${_gvm_test_runtime_stage_dir}"
+        DEPENDS GVMRHI GVMCore GVM
+        VERBATIM
+    )
+    unset(_gvm_test_runtime_stage_dir)
+endif()
+
 if(GVM_RHI_ENABLE_VULKAN)
     add_library(gvm_vulkan_test_support STATIC
         support/vulkan/GVMRHI/GVMRHI.Vulkan/VKTesting.cpp
@@ -82,13 +97,36 @@ if(GVM_BUILD_TESTS_UNIT)
         target_link_libraries(gvm_unit_rhi_values PRIVATE Vulkan::Headers volk::volk GPUOpen::VulkanMemoryAllocator)
     endif()
     if(GVM_BUILD_UGLC)
-        gvm_add_gtest(gvm_unit_uglc_spirv_validation
-            SOURCES unit/test_uglc_spirv_validation.cpp
+        if(MSVC)
+            add_executable(gvm_unit_uglc_spirv_validation
+                unit/test_uglc_spirv_validation.cpp
                 ${GVM_UGLC_SOURCE_DIR}/CodeGen/SPIRVEmitter/SPIRVValidation.cpp
-            LABELS unit whitebox uglir uglir spirv
-            INCLUDE_DIRS ${GVM_UGLC_SOURCE_DIR}
-            LINK_LIBS ${UGLC_SPIRV_TOOLS_TARGET} ${UGLC_SPIRV_TOOLS_OPT_TARGET}
-        )
+                ${googletest_SOURCE_DIR}/googletest/src/gtest-all.cc
+                ${googletest_SOURCE_DIR}/googletest/src/gtest_main.cc
+            )
+            target_compile_features(gvm_unit_uglc_spirv_validation PRIVATE cxx_std_20)
+            set_target_properties(gvm_unit_uglc_spirv_validation PROPERTIES
+                MSVC_RUNTIME_LIBRARY "MultiThreaded"
+                RUNTIME_OUTPUT_DIRECTORY "${GVM_TEST_BINARY_ROOT}"
+            )
+            target_include_directories(gvm_unit_uglc_spirv_validation PRIVATE
+                ${GVM_UGLC_SOURCE_DIR}
+                ${googletest_SOURCE_DIR}/googletest/include
+                ${googletest_SOURCE_DIR}/googletest
+            )
+            target_link_libraries(gvm_unit_uglc_spirv_validation PRIVATE
+                ${UGLC_SPIRV_TOOLS_TARGET}
+                ${UGLC_SPIRV_TOOLS_OPT_TARGET}
+            )
+        else()
+            gvm_add_gtest(gvm_unit_uglc_spirv_validation
+                SOURCES unit/test_uglc_spirv_validation.cpp
+                    ${GVM_UGLC_SOURCE_DIR}/CodeGen/SPIRVEmitter/SPIRVValidation.cpp
+                LABELS unit whitebox uglir uglir spirv
+                INCLUDE_DIRS ${GVM_UGLC_SOURCE_DIR}
+                LINK_LIBS ${UGLC_SPIRV_TOOLS_TARGET} ${UGLC_SPIRV_TOOLS_OPT_TARGET}
+            )
+        endif()
     endif()
 
     gvm_add_gtest(gvm_three_compat_tests
@@ -108,35 +146,48 @@ if(GVM_BUILD_TESTS_UNIT)
     )
 endif()
 
-if(APPLE AND GVM_BUILD_TESTS_RHI)
+if(GVM_BUILD_TESTS_RHI AND (APPLE OR GVM_RHI_ENABLE_VULKAN))
+    set(_rhi_smoke_sources
+        common/GVMHeadlessGTestMain.cpp
+        integration/rhi/test_rhi_smoke.cpp
+        integration/rhi/test_rhi_pipeline.cpp
+    )
+    set(_rhi_smoke_include_dirs
+        ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI
+    )
+    set(_rhi_smoke_link_libs)
+    if(APPLE)
+        list(APPEND _rhi_smoke_sources integration/rhi/test_rhi_indirect_ranges.cpp)
+        list(APPEND _rhi_smoke_include_dirs ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI/GVMRHI.Metal)
+        list(APPEND _rhi_smoke_link_libs "-framework Foundation" "-framework Metal")
+    endif()
     gvm_add_gtest(gvm_rhi_smoke_tests
-        SOURCES
-            common/GVMHeadlessGTestMain.cpp
-            integration/rhi/test_rhi_smoke.cpp
-            integration/rhi/test_rhi_pipeline.cpp
-            integration/rhi/test_rhi_indirect_ranges.cpp
-        LABELS integration blackbox rhi metal smoke
-        INCLUDE_DIRS
-            ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI
-            ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI/GVMRHI.Metal
-        LINK_LIBS
-            "-framework Foundation"
-            "-framework Metal"
+        SOURCES ${_rhi_smoke_sources}
+        LABELS integration blackbox rhi metal vulkan smoke
+        INCLUDE_DIRS ${_rhi_smoke_include_dirs}
+        LINK_LIBS ${_rhi_smoke_link_libs}
         NO_GTEST_MAIN
         RUN_SERIAL
     )
+    unset(_rhi_smoke_sources)
+    unset(_rhi_smoke_include_dirs)
+    unset(_rhi_smoke_link_libs)
 
+    set(_rhi_readback_include_dirs)
+    if(APPLE)
+        list(APPEND _rhi_readback_include_dirs ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI/GVMRHI.Metal)
+    endif()
     gvm_add_gtest(gvm_rhi_readback_tests
         SOURCES
             common/GVMHeadlessGTestMain.cpp
             integration/rhi/test_rhi_readback.cpp
-        LABELS integration blackbox rhi metal readback
-        INCLUDE_DIRS
-            ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI/GVMRHI.Metal
+        LABELS integration blackbox rhi metal vulkan readback
+        INCLUDE_DIRS ${_rhi_readback_include_dirs}
         NO_GTEST_MAIN
         RUN_SERIAL
         TIMEOUT 120
     )
+    unset(_rhi_readback_include_dirs)
 
     gvm_add_dsl_runtime_gtest(gvm_rhi_native_half_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/rhi_cases/NativeHalfCompute.hpp
@@ -485,16 +536,13 @@ if(APPLE AND GVM_BUILD_TESTS_RHI)
             SOURCES
                 common/GVMHeadlessGTestMain.cpp
                 integration/rhi/test_rhi_gpu_radix_sort.cpp
-            LABELS integration blackbox rhi metal compute radix sort headless uglir experimental
+            LABELS integration blackbox rhi metal vulkan compute radix sort headless uglir experimental
             INCLUDE_DIRS
                 ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI
                 ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
                 ${CMAKE_BINARY_DIR}/_deps/glm-src
             LINK_LIBS
                 glm::glm
-                "-framework Foundation"
-                "-framework Metal"
-                "-framework QuartzCore"
             UGL_INCLUDE_DIRS
                 ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
                 ${GVM_REPOSITORY_ROOT}/GVM/third_party
@@ -504,6 +552,9 @@ if(APPLE AND GVM_BUILD_TESTS_RHI)
             RUN_SERIAL
             TIMEOUT 300
         )
+        if(APPLE)
+            target_link_libraries(gvm_rhi_uglir_gpu_radix_sort_tests PRIVATE "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+        endif()
         target_compile_definitions(gvm_rhi_uglir_gpu_radix_sort_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
     gvm_add_dsl_runtime_gtest(gvm_rhi_spd_hiz_readback_tests
@@ -641,16 +692,13 @@ if(APPLE AND GVM_BUILD_TESTS_RHI)
         SOURCES
             common/GVMHeadlessGTestMain.cpp
             integration/rhi/test_rhi_gpu_radix_sort.cpp
-        LABELS integration blackbox rhi metal compute radix sort headless
+        LABELS integration blackbox rhi metal vulkan compute radix sort headless
         INCLUDE_DIRS
             ${GVM_REPOSITORY_ROOT}/GVM/GVMRHI
             ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
             ${CMAKE_BINARY_DIR}/_deps/glm-src
         LINK_LIBS
             glm::glm
-            "-framework Foundation"
-            "-framework Metal"
-            "-framework QuartzCore"
         UGL_INCLUDE_DIRS
             ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
             ${GVM_REPOSITORY_ROOT}/GVM/third_party
@@ -658,9 +706,12 @@ if(APPLE AND GVM_BUILD_TESTS_RHI)
         RUN_SERIAL
         TIMEOUT 300
     )
+    if(APPLE)
+        target_link_libraries(gvm_rhi_gpu_radix_sort_tests PRIVATE "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+    endif()
     target_compile_definitions(gvm_rhi_gpu_radix_sort_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
 elseif(GVM_BUILD_TESTS_RHI)
-    message(WARNING "GVM_BUILD_TESTS_RHI is enabled, but runtime RHI tests are only configured on Apple in this source tree.")
+    message(WARNING "GVM_BUILD_TESTS_RHI is enabled, but no runtime RHI backend is enabled in this build.")
 endif()
 
 if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
@@ -898,7 +949,7 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
             RUN_SERIAL
         )
 
-    if(APPLE AND GVM_BUILD_TESTS_RENDER)
+    if(GVM_BUILD_TESTS_RENDER AND (APPLE OR GVM_RHI_ENABLE_VULKAN))
         set(_render_baseline_uglc_args --shader-pipeline=uglir)
         if(UGLC_ENABLE_LEGACY)
             set(_render_baseline_uglc_args --shader-pipeline=legacy)
@@ -962,7 +1013,7 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
             )
             target_compile_definitions(gvm_dsl_uglir_render_feature_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
     elseif(GVM_BUILD_TESTS_RENDER)
-        message(WARNING "GVM_BUILD_TESTS_RENDER is enabled, but render runtime tests are only configured on Apple in this source tree.")
+        message(WARNING "GVM_BUILD_TESTS_RENDER is enabled, but no render runtime backend is enabled in this build.")
     endif()
 elseif(GVM_BUILD_TESTS_DSL)
     message(WARNING "GVM_BUILD_TESTS_DSL is ON but GVM_UGLC_COMPILER is unavailable. DSL tests will be skipped.")

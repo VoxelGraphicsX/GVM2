@@ -2417,6 +2417,7 @@ TEST_F(ConstructorArgumentsTest, DiscardedOwnershipAcquirePreservesAcceptedResou
     {
         GTEST_SKIP() << "Vulkan submission reconciliation is required.";
     }
+    static_cast<VKDevice *>(device)->useSingleQueueForTesting();
     const auto buffer = device->createBuffer({.usage = BufferUsage::Storage, .size = 32});
     const auto texture = createArgumentTexture(*device);
     auto &nativeBuffer = *static_cast<VKBuffer *>(buffer.get());

@@ -516,7 +516,7 @@ function createShadowFixturePlan(testCase, profile, caseDir) {
 
 function createHarnessPlan(testCase, profile, caseDir) {
   const binDir = path.join(caseDir, 'bin');
-  const executablePath = path.join(binDir, testCase.id);
+  const executablePath = path.join(binDir, process.platform === 'win32' ? `${testCase.id}.exe` : testCase.id);
   const includeArgs = [
     path.join(sourceDir, 'UGLC', 'Source'),
     path.join(sourceDir, 'UGLC', 'Source', 'CodeGen'),

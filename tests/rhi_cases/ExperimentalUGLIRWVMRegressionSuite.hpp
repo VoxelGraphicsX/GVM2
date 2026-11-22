@@ -1,6 +1,8 @@
 #ifndef GVM_TEST_RHI_EXPERIMENTAL_UGLIR_WVM_REGRESSION_SUITE_HPP
 #define GVM_TEST_RHI_EXPERIMENTAL_UGLIR_WVM_REGRESSION_SUITE_HPP
 
+#include <type_traits>
+
 #include "UGL.h"
 
 using namespace UGL;
@@ -197,11 +199,11 @@ static const half2 experimentalUGLIRWVMRegressionStaticHalfVectors[2] = {
 template <auto Value>
 inline uint experimentalUGLIRWVMRegressionAutoNttpMarker()
 {
-    if constexpr (__is_same(decltype(Value), bool))
+    if constexpr (std::is_same_v<decltype(Value), bool>)
     {
         return 1u;
     }
-    else if constexpr (__is_same(decltype(Value), int))
+    else if constexpr (std::is_same_v<decltype(Value), int>)
     {
         return 2u;
     }
