@@ -13,6 +13,11 @@ add_library(GVMLoggingSupport INTERFACE)
 add_library(GVM::LoggingSupport ALIAS GVMLoggingSupport)
 target_compile_definitions(GVMLoggingSupport INTERFACE GVM_LOGGING_ENABLED=$<IF:$<BOOL:${GVM_RHI_ENABLE_LOGGING}>,1,0>)
 target_compile_definitions(GVMLoggingSupport INTERFACE GVM_CPU_PROBE_ENABLED=$<IF:$<BOOL:${GVM_RHI_ENABLE_CPU_PROBES}>,1,0>)
+target_compile_options(GVMLoggingSupport
+    INTERFACE
+        "$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/utf-8>"
+        "$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/Zc:preprocessor>"
+)
 if(GVM_RHI_ENABLE_LOGGING)
     target_link_libraries(GVMLoggingSupport
         INTERFACE
@@ -32,6 +37,11 @@ set_target_properties(GVMRHI PROPERTIES
 )
 if(APPLE)
     set_target_properties(GVMRHI PROPERTIES INSTALL_RPATH "@loader_path")
+elseif(WIN32)
+    set_target_properties(GVMRHI PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
 endif()
 
 set(GVM_RHI_FACTORY_HAS_METAL 0)

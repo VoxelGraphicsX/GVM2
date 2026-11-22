@@ -1970,11 +1970,20 @@ namespace GVM::RHI
 
             static_assert(sizeof(TimestampRawResult) == sizeof(uint64_t));
             const uint64_t readbackBytes = static_cast<uint64_t>(mNextQuery) * sizeof(TimestampRawResult);
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                         queue->readBuffer(BufferRange(mResolveBuffer, 0u, readbackBytes), outResults.data(), readbackBytes);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
             eastl::vector<CommandEncoder> noUserEncoders;
             queue->submit(noUserEncoders);
         }
@@ -2196,16 +2205,21 @@ namespace GVM::RHI
                 static_cast<uint64_t>(mNextQuery) * sizeof(PassCounterStageUtilizationRawResult);
             const uint64_t statisticReadbackBytes =
                 static_cast<uint64_t>(mNextQuery) * sizeof(PassCounterStatisticRawResult);
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                         queue->readBuffer(BufferRange(mStageUtilizationResolveBuffer, 0u, stageReadbackBytes), outStageResults.data(), stageReadbackBytes);
-#pragma clang diagnostic pop
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                         queue->readBuffer(BufferRange(mStatisticResolveBuffer, 0u, statisticReadbackBytes), outStatisticResults.data(), statisticReadbackBytes);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
             eastl::vector<CommandEncoder> noUserEncoders;
             queue->submit(noUserEncoders);
         }

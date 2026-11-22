@@ -14,6 +14,7 @@ if(GVM_BUILD_TESTS)
         OPTIONS
             "BUILD_GMOCK OFF"
             "INSTALL_GTEST OFF"
+            "gtest_force_shared_crt ON"
     )
 
     if(TARGET gtest AND NOT TARGET GTest::gtest)
@@ -56,6 +57,7 @@ if(GVM_RHI_ENABLE_VULKAN)
     CPMAddPackage(
         NAME VulkanHeaders
         URL https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.3.280.0.tar.gz
+        FORCE YES
         OPTIONS
             "BUILD_TESTS OFF"
             "UPDATE_DEPS OFF"
@@ -64,6 +66,7 @@ if(GVM_RHI_ENABLE_VULKAN)
     CPMAddPackage(
         NAME volk
         URL https://github.com/zeux/volk/archive/refs/tags/1.4.304.tar.gz
+        FORCE YES
         OPTIONS
             "VOLK_PULL_IN_VULKAN ON"
             "VOLK_INSTALL OFF"
@@ -73,6 +76,7 @@ if(GVM_RHI_ENABLE_VULKAN)
     CPMAddPackage(
         NAME VulkanMemoryAllocator
         URL https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/v3.1.0.tar.gz
+        FORCE YES
         OPTIONS
             "VMA_BUILD_SAMPLES OFF"
             "VMA_BUILD_DOCUMENTATION OFF"
@@ -82,6 +86,7 @@ if(GVM_RHI_ENABLE_VULKAN)
     CPMAddPackage(
         NAME SPIRVReflect
         URL https://github.com/KhronosGroup/SPIRV-Reflect/archive/10b4f09a24d7ac1603071e767c089551dc6a3949.tar.gz
+        FORCE YES
         OPTIONS
             "SPIRV_REFLECT_EXECUTABLE OFF"
             "SPIRV_REFLECT_STATIC_LIB ON"
@@ -141,10 +146,8 @@ if(GVM_ENABLE_UPSTREAM_MARL AND NOT TARGET marl::marl AND NOT TARGET marl)
     else()
         CPMAddPackage(
             NAME marl
-            GITHUB_REPOSITORY google/marl
-            GIT_TAG main
-            GIT_SUBMODULES ""
-            GIT_SUBMODULES_RECURSE FALSE
+            URL https://github.com/google/marl/archive/b8406ab0a82524170ead6dd6c371b579bbc28b3e.tar.gz
+            FORCE YES
             OPTIONS
                 "MARL_BUILD_EXAMPLES OFF"
                 "MARL_BUILD_TESTS OFF"

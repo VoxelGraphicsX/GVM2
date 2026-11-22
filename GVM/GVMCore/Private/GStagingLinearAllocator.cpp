@@ -1,5 +1,7 @@
 #include "GStagingLinearAllocator.hpp"
 
+#include <string>
+
 namespace GVM::Core
 {
 

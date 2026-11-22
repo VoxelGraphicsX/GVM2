@@ -71,14 +71,17 @@ namespace GVM::Core::Private
         /// Shares task/pass/in-flight budgets and cross-subgraph GPU resource hazard tracking across one root execution tree.
         struct ExecutionBudget
         {
+            uint32_t maxInFlight = 1;
             std::atomic<uint32_t> taskCount{0};
             std::atomic<uint32_t> passCount{0};
             std::atomic<uint32_t> inFlightTasks{0};
-            std::atomic<bool> hasWaitingStates{false};
+            std::atomic<bool> hasCpuSlotWaiters{false};
             std::mutex coordinatorMutex;
             uint64_t nextGlobalGpuGroupId = 1;
             eastl::vector<SharedActiveGpuGroup> activeGpuGroups;
-            eastl::vector<eastl::weak_ptr<TaskExecutionState>> waitingStates;
+            eastl::vector<eastl::weak_ptr<TaskExecutionState>> cpuSlotWaiters;
+            size_t cpuSlotWaiterHead = 0;
+            eastl::vector<eastl::weak_ptr<TaskExecutionState>> gpuHazardWaiters;
         };
 
         struct ActiveChildExecution
@@ -150,16 +153,20 @@ namespace GVM::Core::Private
         static void cancelSubgraphTrees(eastl::vector<eastl::shared_ptr<TaskExecutionState>> roots) noexcept;
         /// Reserves up to requested slots from the shared root execution in-flight task budget.
         uint32_t tryAcquireSharedInFlightSlots(uint32_t requested, uint32_t maxInFlight) noexcept;
-        /// Registers this state in the shared budget waiter list under coordinatorMutex and re-checks slot availability.
+        /// Registers this state in the shared CPU in-flight waiter queue under coordinatorMutex and re-checks slot availability.
         bool registerWaitingAndCheckInFlightAvailable(uint32_t maxInFlight);
-        /// Registers this state in the shared budget waiter list while coordinatorMutex is already held.
-        void registerBudgetWaiterLocked();
-        /// Releases one shared in-flight task slot and wakes any throttled states in the execution tree.
+        /// Enqueues this state in the shared CPU in-flight waiter queue while coordinatorMutex is already held.
+        void registerCpuBudgetWaiterLocked();
+        /// Enqueues this state in the shared GPU hazard waiter list while coordinatorMutex is already held.
+        void registerGpuBudgetWaiterLocked();
+        /// Releases one shared in-flight task slot and wakes throttled CPU states up to the in-flight budget.
         void releaseSharedInFlightSlotAndWake() noexcept;
-        /// Removes one completed global GPU group from the shared budget and wakes any throttled states.
+        /// Removes one completed global GPU group from the shared budget and wakes GPU-throttled states.
         void releaseSharedGpuGroupAndWake(uint64_t globalId) noexcept;
-        /// Drains and dispatches states registered in mBudget->waitingStates outside locks.
-        void wakeBudgetWaiters() noexcept;
+        /// Dispatches queued CPU slot waiters outside locks until shared in-flight capacity is full or no waiters remain.
+        void wakeCpuBudgetWaiters() noexcept;
+        /// Drains and dispatches states waiting on shared GPU resource hazards outside locks.
+        void wakeGpuBudgetWaiters() noexcept;
         /// Returns true if any unsubmitted or in-flight parent GPU fragment reaches nodeIndex.
         bool hasUnfinishedGpuAncestorLocked(uint32_t nodeIndex) const;
         /// Builds an isolated plan, allocates stable slots, and makes dependency-free jobs ready.
@@ -245,6 +252,8 @@ namespace GVM::Core::Private
         size_t mReadyCursor = 0;
         bool mPrepared = false;
         bool mDispatching = false;
+        bool mQueuedInCpuSlotWaiters = false;
+        bool mQueuedInGpuHazardWaiters = false;
         bool mTerminalPublished = false;
         bool mHasExportedResources = false;
         mutable bool mExportedResourcesClaimed = false;

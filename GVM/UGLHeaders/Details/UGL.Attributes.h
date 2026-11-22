@@ -122,9 +122,15 @@
 #define GroupID UGL_ATTR(GroupID)
 #define GroupIndex UGL_ATTR(GroupIndex)
 
+#ifdef IN
+#undef IN
+#endif
 #define IN [[UGL_ATTR(IN)]]
 
 
+#ifdef OUT
+#undef OUT
+#endif
 #define OUT [[UGL_ATTR(OUT)]]
 
 

@@ -56,6 +56,11 @@ set_target_properties(GVMCore PROPERTIES
 )
 if(APPLE)
     set_target_properties(GVMCore PROPERTIES INSTALL_RPATH "@loader_path")
+elseif(WIN32)
+    set_target_properties(GVMCore PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
 endif()
 
 target_include_directories(GVMCore

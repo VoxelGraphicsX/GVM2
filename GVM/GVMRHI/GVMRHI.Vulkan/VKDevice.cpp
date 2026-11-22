@@ -608,6 +608,10 @@ namespace GVM::RHI::Vulkan
 
     eastl::vector<uint32_t> VKDevice::queueFamilyIndices() const
     {
+        if (mSingleQueueForTesting && mMainQueue != nullptr)
+        {
+            return {mMainQueue->getQueueFamilyIndex()};
+        }
         eastl::vector<uint32_t> families;
         for (const auto &selection : mQueueSelections)
         {

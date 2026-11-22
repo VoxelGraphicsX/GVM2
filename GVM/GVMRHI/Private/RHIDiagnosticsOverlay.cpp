@@ -1414,11 +1414,20 @@ namespace GVM::RHI::Private
 
         void DiagnosticsOverlayQueue::readBuffer(BufferRange buffer, void *data, uint64_t size)
         {
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                         mInnerQueue->readBuffer(buffer, data, size);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
         }
 
         void DiagnosticsOverlayQueue::writeTexture(const ImageCopyTexture &destination, void const *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &writeSize)
@@ -1428,11 +1437,20 @@ namespace GVM::RHI::Private
 
         void DiagnosticsOverlayQueue::readTexture(const ImageCopyTexture &source, void *data, uint64_t dataSize, const TextureDataLayout &dataLayout, const Extent3D &readSize)
         {
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                         mInnerQueue->readTexture(source, data, dataSize, dataLayout, readSize);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
         }
 
         void DiagnosticsOverlayQueue::uploadTexture(Texture destination, void const *data, uint64_t dataStorageBytes, const eastl::vector<uint64_t> &mipmapOffsetBytes)

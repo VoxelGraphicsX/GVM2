@@ -268,8 +268,19 @@ namespace GVM::RHI::Vulkan
             {
                 const auto &resolve = eastl::get<ResolveQueryCommand>(command);
                 auto &buffer = *static_cast<VKBuffer *>(resolve.destination.buffer.get());
+                // Order prior vkCmdResetQueryPool/vkCmdWriteTimestamp2 and cover drivers that lower 64-bit query resolve via compute.
+                vk::MemoryBarrier2 queryBarrier = {};
+                queryBarrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+                queryBarrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
+                queryBarrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+                queryBarrier.dstAccessMask = vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
+                vk::DependencyInfo queryDependency = {};
+                queryDependency.memoryBarrierCount = 1u;
+                queryDependency.pMemoryBarriers = &queryBarrier;
+                mCommandBuffer.pipelineBarrier2(queryDependency);
                 mTaskDependencyResolver.synchronizeBufferRange(mCommandBuffer, buffer, resolve.destination.offset,
-                    uint64_t(resolve.count) * sizeof(uint64_t), vk::PipelineStageFlagBits2::eCopy, vk::AccessFlagBits2::eTransferWrite);
+                    uint64_t(resolve.count) * sizeof(uint64_t), vk::PipelineStageFlagBits2::eAllCommands,
+                    vk::AccessFlagBits2::eTransferWrite | vk::AccessFlagBits2::eMemoryWrite);
                 mCommandBuffer.copyQueryPoolResults(static_cast<VKQuerySet *>(resolve.querySet.get())->getNativeQueryPool(),
                     resolve.first, resolve.count, buffer.getNativeBuffer(), resolve.destination.offset, sizeof(uint64_t),
                     vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);

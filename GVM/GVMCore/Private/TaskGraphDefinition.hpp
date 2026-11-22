@@ -16,7 +16,16 @@ namespace GVM::Core::Private
 {
     using TaskResults = eastl::vector<eastl::any>;
 
-    struct TaskGraphOutput;
+    class TaskGraphDefinition;
+
+    /// Identifies the definition and output of a graph entry without borrowing a builder's stack.
+    struct TaskGraphOutput
+    {
+        eastl::shared_ptr<TaskGraphDefinition> definition;
+        uint32_t index = 0;
+        eastl::function<eastl::any(const eastl::any &)> resolve;
+        eastl::function<eastl::vector<const void *>(const eastl::any &)> resources;
+    };
 
     /// Describes one owning operation and its earlier graph dependencies, independent of workers.
     struct TaskDefinition
@@ -40,15 +49,6 @@ namespace GVM::Core::Private
     private:
         mutable std::mutex mMutex;
         eastl::vector<TaskDefinition> mTasks;
-    };
-
-    /// Identifies the definition and output of a graph entry without borrowing a builder's stack.
-    struct TaskGraphOutput
-    {
-        eastl::shared_ptr<TaskGraphDefinition> definition;
-        uint32_t index = 0;
-        eastl::function<eastl::any(const eastl::any &)> resolve;
-        eastl::function<eastl::vector<const void *>(const eastl::any &)> resources;
     };
 
     /// Identifies native resource handles, trait-described C++ structs, and compiler-described records.

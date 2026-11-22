@@ -14,6 +14,7 @@ namespace GVM::Core::Private
     TaskExecutionState::TaskExecutionState(eastl::shared_ptr<TaskRuntimeState> runtime)
         : mRuntime(eastl::move(runtime)), mBudget(eastl::make_shared<ExecutionBudget>()), mOwnsRuntimeAdmission(true)
     {
+        mBudget->maxInFlight = mRuntime->maximumInFlight();
     }
 
     TaskExecutionState::TaskExecutionState(
@@ -398,48 +399,97 @@ namespace GVM::Core::Private
         return 0u;
     }
 
-    void TaskExecutionState::registerBudgetWaiterLocked()
+    void TaskExecutionState::registerCpuBudgetWaiterLocked()
     {
-        for (auto it = mBudget->waitingStates.begin(); it != mBudget->waitingStates.end();)
+        if (!mQueuedInCpuSlotWaiters)
         {
-            if (const auto locked = it->lock())
+            if (mBudget->cpuSlotWaiterHead >= 64u &&
+                mBudget->cpuSlotWaiterHead * 2u >= mBudget->cpuSlotWaiters.size())
             {
-                if (locked.get() == this)
-                {
-                    mBudget->hasWaitingStates.store(true, std::memory_order_seq_cst);
-                    return;
-                }
-                ++it;
+                mBudget->cpuSlotWaiters.erase(
+                    mBudget->cpuSlotWaiters.begin(),
+                    mBudget->cpuSlotWaiters.begin() + mBudget->cpuSlotWaiterHead);
+                mBudget->cpuSlotWaiterHead = 0u;
             }
-            else
-            {
-                it = mBudget->waitingStates.erase(it);
-            }
+            mBudget->cpuSlotWaiters.push_back(shared_from_this());
+            mQueuedInCpuSlotWaiters = true;
         }
-        mBudget->waitingStates.push_back(shared_from_this());
-        mBudget->hasWaitingStates.store(true, std::memory_order_seq_cst);
+        mBudget->hasCpuSlotWaiters.store(true, std::memory_order_seq_cst);
+    }
+
+    void TaskExecutionState::registerGpuBudgetWaiterLocked()
+    {
+        if (!mQueuedInGpuHazardWaiters)
+        {
+            mBudget->gpuHazardWaiters.push_back(shared_from_this());
+            mQueuedInGpuHazardWaiters = true;
+        }
     }
 
     bool TaskExecutionState::registerWaitingAndCheckInFlightAvailable(uint32_t maxInFlight)
     {
         std::lock_guard budgetLock(mBudget->coordinatorMutex);
-        registerBudgetWaiterLocked();
+        registerCpuBudgetWaiterLocked();
         return mBudget->inFlightTasks.load(std::memory_order_seq_cst) < maxInFlight;
     }
 
-    void TaskExecutionState::wakeBudgetWaiters() noexcept
+    void TaskExecutionState::wakeCpuBudgetWaiters() noexcept
+    {
+        const uint32_t maxInFlight = mBudget->maxInFlight;
+        for (;;)
+        {
+            eastl::shared_ptr<TaskExecutionState> nextState;
+            {
+                std::lock_guard budgetLock(mBudget->coordinatorMutex);
+                while (mBudget->cpuSlotWaiterHead < mBudget->cpuSlotWaiters.size())
+                {
+                    if (mBudget->inFlightTasks.load(std::memory_order_seq_cst) >= maxInFlight)
+                    {
+                        mBudget->hasCpuSlotWaiters.store(true, std::memory_order_seq_cst);
+                        if (mBudget->inFlightTasks.load(std::memory_order_seq_cst) >= maxInFlight)
+                        {
+                            return;
+                        }
+                    }
+                    auto state = mBudget->cpuSlotWaiters[mBudget->cpuSlotWaiterHead++].lock();
+                    if (state)
+                    {
+                        state->mQueuedInCpuSlotWaiters = false;
+                        nextState = eastl::move(state);
+                        break;
+                    }
+                }
+                if (!nextState)
+                {
+                    mBudget->cpuSlotWaiters.clear();
+                    mBudget->cpuSlotWaiterHead = 0u;
+                    mBudget->hasCpuSlotWaiters.store(false, std::memory_order_seq_cst);
+                    return;
+                }
+                if (mBudget->cpuSlotWaiterHead >= mBudget->cpuSlotWaiters.size())
+                {
+                    mBudget->cpuSlotWaiters.clear();
+                    mBudget->cpuSlotWaiterHead = 0u;
+                    mBudget->hasCpuSlotWaiters.store(false, std::memory_order_seq_cst);
+                }
+            }
+            nextState->dispatchReady();
+        }
+    }
+
+    void TaskExecutionState::wakeGpuBudgetWaiters() noexcept
     {
         eastl::vector<eastl::shared_ptr<TaskExecutionState>> toWake;
         {
             std::lock_guard budgetLock(mBudget->coordinatorMutex);
             eastl::vector<eastl::weak_ptr<TaskExecutionState>> pending;
-            pending.swap(mBudget->waitingStates);
-            mBudget->hasWaitingStates.store(false, std::memory_order_seq_cst);
+            pending.swap(mBudget->gpuHazardWaiters);
             toWake.reserve(pending.size());
             for (const auto &weakState : pending)
             {
                 if (auto state = weakState.lock())
                 {
+                    state->mQueuedInGpuHazardWaiters = false;
                     toWake.push_back(eastl::move(state));
                 }
             }
@@ -453,9 +503,9 @@ namespace GVM::Core::Private
     void TaskExecutionState::releaseSharedInFlightSlotAndWake() noexcept
     {
         mBudget->inFlightTasks.fetch_sub(1u, std::memory_order_seq_cst);
-        if (mBudget->hasWaitingStates.load(std::memory_order_seq_cst))
+        if (mBudget->hasCpuSlotWaiters.load(std::memory_order_seq_cst))
         {
-            wakeBudgetWaiters();
+            wakeCpuBudgetWaiters();
         }
     }
 
@@ -476,11 +526,11 @@ namespace GVM::Core::Private
                     break;
                 }
             }
-            shouldWake = !mBudget->waitingStates.empty();
+            shouldWake = !mBudget->gpuHazardWaiters.empty();
         }
         if (shouldWake)
         {
-            wakeBudgetWaiters();
+            wakeGpuBudgetWaiters();
         }
     }
 
@@ -877,7 +927,7 @@ namespace GVM::Core::Private
         {
             if (sharedActive.hasOpaque)
             {
-                registerBudgetWaiterLocked();
+                registerGpuBudgetWaiterLocked();
                 return false;
             }
         }
@@ -1130,7 +1180,7 @@ namespace GVM::Core::Private
 
         if (heldBackBySharedGpu)
         {
-            registerBudgetWaiterLocked();
+            registerGpuBudgetWaiterLocked();
         }
         if (!anySelected || (eagerReadbackOnly && !collectedDeferred && !collectedSubgraphUnblocker))
         {

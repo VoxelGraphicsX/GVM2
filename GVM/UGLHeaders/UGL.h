@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 // UGL / UGLC source contract:
 // 1. User-authored DSL code must not declare, store, pass, return, or manipulate raw pointers.
 //    This includes T*, void*, pointer arrays, pointer arithmetic, and nullptr-based pointer flow.

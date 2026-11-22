@@ -137,11 +137,20 @@ namespace GVM::Core
             throw std::out_of_range("QueueProxyImpl::readBuffer readback size exceeds source BufferRange.");
         }
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                     mQueue->readBuffer(buffer, data, size);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
         return this;
     }
 
@@ -219,11 +228,20 @@ namespace GVM::Core
 
         const auto mipExtent = computeMipExtent(source, miplevelOffset);
         const auto copyOrigin = resolveTextureCopyOrigin(source, arrayLayerOffset);
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#elif defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
                     mQueue->readTexture({.texture = source, .mipLevel = miplevelOffset, .origin = copyOrigin}, data, dataSize, {}, mipExtent);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif defined(__clang__)
 #pragma clang diagnostic pop
+#endif
         return this;
     }
 

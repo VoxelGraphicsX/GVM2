@@ -628,7 +628,7 @@ static GVM::RHI::ShaderModule ImGui_ImplGVM_CreateShaderModule(
 static GVM::RHI::BindGroup ImGui_ImplGVM_CreateImageBindGroup(GVM::RHI::BindGroupLayout layout, GVM::RHI::TextureView texture)
 {
     ImGui_ImplGVM_Data *bd = ImGui_ImplGVM_GetBackendData();
-    eastl::vector<GVM::RHI::BindGroupEntry> image_bg_entries = {(GVM::RHI::BindGroupEntry){.binding = 0, .textureView = texture}};
+    eastl::vector<GVM::RHI::BindGroupEntry> image_bg_entries = {GVM::RHI::BindGroupEntry{.binding = 0, .textureView = texture}};
 
     GVM::RHI::BindGroupDescriptor image_bg_descriptor = {};
     image_bg_descriptor.layout = layout;
@@ -1108,8 +1108,8 @@ bool ImGui_ImplGVM_CreateDeviceObjects()
 
     // Create resource bind group
     eastl::vector<GVM::RHI::BindGroupEntry> common_bg_entries = {
-        (GVM::RHI::BindGroupEntry){.binding = 0, .buffer = GVM::RHI::BufferRange(bd->renderResources.Uniforms, 0, MEMALIGN(sizeof(Uniforms), 16))},
-        (GVM::RHI::BindGroupEntry){.binding = 1, .sampler = bd->renderResources.Sampler},
+        GVM::RHI::BindGroupEntry{.binding = 0, .buffer = GVM::RHI::BufferRange(bd->renderResources.Uniforms, 0, MEMALIGN(sizeof(Uniforms), 16))},
+        GVM::RHI::BindGroupEntry{.binding = 1, .sampler = bd->renderResources.Sampler},
     };
     GVM::RHI::BindGroupDescriptor common_bg_descriptor = {};
     common_bg_descriptor.layout = bg_layouts[0];

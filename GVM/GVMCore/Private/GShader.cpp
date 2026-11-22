@@ -57,7 +57,7 @@ namespace GVM::Core
         };
     }
 
-    void IRenderClass::setBlendState(uint index, const GVM::RHI::BlendState &state)
+    void IRenderClass::setBlendState(uint32_t index, const GVM::RHI::BlendState &state)
     {
         this->pipelineDescriptor.fragment.targets[index].blend = state;
         this->pipelineDescriptor.fragment.targets[index].blendEnabled = true;
@@ -132,7 +132,7 @@ namespace GVM::Core
         return desp;
     }
 
-    RenderPassTaskDescriptor IRenderClass::run(uint indexCount, uint instanceCount, uint firstIndex, int baseVertex, uint firstInstance)
+    RenderPassTaskDescriptor IRenderClass::run(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int baseVertex, uint32_t firstInstance)
     {
         RenderPassTaskDescriptor desp;
         desp.drawFn = [binding = RenderSlotBinding{{pipeline, mSlotState, mRenderSet, mRenderSetBindGroupIndex},

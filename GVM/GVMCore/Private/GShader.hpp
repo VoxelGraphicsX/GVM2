@@ -9,7 +9,7 @@ namespace GVM::Core
     /** Holds Slot binding state that deferred tasks read and update in pass order, independent of the shader-class instance lifetime. */
     struct SlotTaskState
     {
-        eastl::map<uint, GVM::RHI::BindGroup> bindGroups;
+        eastl::map<uint32_t, GVM::RHI::BindGroup> bindGroups;
         bool vertexBufferSet = false;
         bool indexBufferSet = false;
     };
@@ -53,7 +53,7 @@ namespace GVM::Core
         GVM::RHI::RenderPipeline pipeline;
         eastl::shared_ptr<SlotTaskState> mSlotState = eastl::make_shared<SlotTaskState>();
 
-        void setBlendState(uint index, const GVM::RHI::BlendState &state);
+        void setBlendState(uint32_t index, const GVM::RHI::BlendState &state);
         void setPrimitiveTopology(RHI::PrimitiveTopology topology);
         void setCullMode(RHI::CullMode cullMode);
         /// Enables or disables pipeline depth writes without changing depth testing or compare state.
@@ -83,7 +83,7 @@ namespace GVM::Core
         // Deprecated legacy RenderSet-only entry. Requires a bound RenderSet and may be removed at any time.
         RenderPassTaskDescriptor run();
         RenderPassTaskDescriptor run(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
-        RenderPassTaskDescriptor run(uint indexCount, uint instanceCount, uint firstIndex, int baseVertex, uint firstInstance);
+        RenderPassTaskDescriptor run(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int baseVertex, uint32_t firstInstance);
         RenderPassTaskDescriptor run(GVM::RHI::BufferRange indirectBuffer, uint32_t indirectCommandCount, uint32_t stride);
         RenderPassTaskDescriptor drawIndirect(GVM::RHI::BufferRange indirectBuffer, uint32_t indirectCommandCount, uint32_t stride);
         /** Applies pass-ordered Slot bindings; command and count buffers are validated and retained when the task is recorded into a pass. */

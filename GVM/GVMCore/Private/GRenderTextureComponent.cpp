@@ -294,7 +294,7 @@ namespace GVM::Core
             textureNames[textureIndex] = textureInfo.textureName;
         }
 
-        mEntities.write(entity, (ComponentUseInfo){.textureNames = textureNames});
+        mEntities.write(entity, ComponentUseInfo{.textureNames = textureNames});
         if (mComponentIndexBuffer != nullptr)
         {
             mComponentIndexBuffer->reserveGPUBytes((entity + 1u) * getPerEntityTextureIndexBytes());

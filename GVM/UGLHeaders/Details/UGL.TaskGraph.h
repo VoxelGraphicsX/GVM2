@@ -195,6 +195,10 @@ namespace UGL
 
     namespace Private
     {
+        /// Identifies DSL callables that expose the RenderNode subgraph protocol.
+        template <class Callable>
+        concept HasRenderNodeProtocol = requires { typename Callable::RenderNodeProtocol; };
+
         template <class T>
         struct TypeIdentity
         {
@@ -298,7 +302,7 @@ namespace UGL
     public:
         /// Captures values and infers dependencies from Task arguments; functions are static declarations.
         template <class Callable, class... Arguments>
-        Task<typename Private::GraphResult<Callable, requires { typename Callable::RenderNodeProtocol; }, typename Private::TaskArgument<Arguments>::Value...>::Value>
+        Task<typename Private::GraphResult<Callable, Private::HasRenderNodeProtocol<Callable>, typename Private::TaskArgument<Arguments>::Value...>::Value>
         add(const Callable &callable, Arguments... arguments)
         {
             (void)callable;

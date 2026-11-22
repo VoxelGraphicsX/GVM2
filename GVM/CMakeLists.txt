@@ -7,6 +7,11 @@ include(GNUInstallDirs)
 add_library(GVMUGLHeaders INTERFACE)
 add_library(GVM::UGLHeaders ALIAS GVMUGLHeaders)
 target_compile_features(GVMUGLHeaders INTERFACE cxx_std_20)
+target_compile_options(GVMUGLHeaders
+    INTERFACE
+        "$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/utf-8>"
+        "$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/Zc:preprocessor>"
+)
 target_include_directories(GVMUGLHeaders
     INTERFACE
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/UGLHeaders>"
@@ -29,6 +34,11 @@ set_target_properties(GVM PROPERTIES
 
 if(APPLE)
     set_target_properties(GVM PROPERTIES INSTALL_RPATH "@loader_path")
+elseif(WIN32)
+    set_target_properties(GVM PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
 endif()
 
 set(GVM_INCLUDE_DIRS
