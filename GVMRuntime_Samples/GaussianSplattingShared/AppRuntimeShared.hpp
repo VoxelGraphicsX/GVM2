@@ -4,7 +4,8 @@
 #include "PlyLoader.hpp"
 #include "SceneSafety.hpp"
 
-#include <algorithm>
+#include <GVMRHI/GVMRHI.hpp>
+
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
@@ -13,11 +14,34 @@
 #include <filesystem>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 namespace GaussianSplattingShared
 {
     using LogFunction = void (*)(const std::string &message);
+
+    /**
+     * Holds the explicit command-line configuration shared by the 3DGS viewer samples.
+     *
+     * Use this reusable structure in both Test05 and Test06 host entry points so backend,
+     * frame limit, scene selection, and diagnostics capture options follow one CLI contract.
+     */
+    struct GaussianViewerCliOptions
+    {
+#if defined(__APPLE__)
+        GVM::RHI::GraphicsBackend backend = GVM::RHI::GraphicsBackend::Metal;
+#else
+        GVM::RHI::GraphicsBackend backend = GVM::RHI::GraphicsBackend::Vulkan;
+#endif
+        std::uint32_t maxFrames = 0u;
+        std::optional<std::string> scenePath;
+        bool capturePresent = false;
+        bool exitAfterCapture = false;
+        std::uint64_t captureFrame = 1u;
+        std::string captureDirectory;
+        std::optional<double> sortEntryFrustumDilation;
+    };
 
     /**
      * Sends one diagnostic message to the caller-provided log sink when one is available.
@@ -30,6 +54,200 @@ namespace GaussianSplattingShared
         {
             logFunction(message);
         }
+    }
+
+    /**
+     * Returns a lowercase copy of an ASCII option value for case-insensitive CLI parsing.
+     */
+    inline std::string toLowerAscii(const std::string &input)
+    {
+        std::string result = input;
+        for (char &character : result)
+        {
+            character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+        }
+        return result;
+    }
+
+    /**
+     * Parses a boolean CLI token (`1`, `true`, `yes`, `on`, `0`, `false`, `no`, `off`).
+     */
+    inline bool parseCliBoolValue(const std::string &rawValue, const char *optionName)
+    {
+        const std::string normalized = toLowerAscii(rawValue);
+        if (normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on")
+        {
+            return true;
+        }
+        if (normalized == "0" || normalized == "false" || normalized == "no" || normalized == "off")
+        {
+            return false;
+        }
+        throw std::runtime_error(std::string("Invalid boolean value for ") + optionName + ": " + rawValue);
+    }
+
+    /**
+     * Parses an unsigned 64-bit integer CLI option value.
+     */
+    inline std::uint64_t parseCliUint64Value(const std::string &rawValue, const char *optionName)
+    {
+        std::istringstream valueStream(rawValue);
+        std::uint64_t parsedValue = 0u;
+        char trailingCharacter = '\0';
+        if (rawValue.empty() || rawValue[0] == '-' || !(valueStream >> parsedValue) || (valueStream >> trailingCharacter))
+        {
+            throw std::runtime_error(std::string("Invalid unsigned integer for ") + optionName + ": " + rawValue);
+        }
+        return parsedValue;
+    }
+
+    /**
+     * Parses a double-precision floating-point CLI option value.
+     */
+    inline double parseCliDoubleValue(const std::string &rawValue, const char *optionName)
+    {
+        std::istringstream valueStream(rawValue);
+        double parsedValue = 0.0;
+        char trailingCharacter = '\0';
+        if (rawValue.empty() || !(valueStream >> parsedValue) || (valueStream >> trailingCharacter))
+        {
+            throw std::runtime_error(std::string("Invalid floating-point value for ") + optionName + ": " + rawValue);
+        }
+        return parsedValue;
+    }
+
+    /**
+     * Resolves the platform temporary directory used when `--capture-dir` is not explicitly specified.
+     */
+    inline std::string defaultCaptureDirectory()
+    {
+        std::error_code errorCode;
+        const std::filesystem::path tempDir = std::filesystem::temp_directory_path(errorCode);
+        if (errorCode || tempDir.empty())
+        {
+            return ".";
+        }
+        return tempDir.string();
+    }
+
+    /**
+     * Splits a `--flag=value` or `--flag value` argument when `argv[index]` matches `optionName`.
+     */
+    inline bool tryConsumeCliValue(
+        int argc,
+        char **argv,
+        int &index,
+        const char *optionName,
+        std::string &outValue)
+    {
+        const std::size_t nameLength = std::strlen(optionName);
+        if (std::strncmp(argv[index], optionName, nameLength) != 0)
+        {
+            return false;
+        }
+        if (argv[index][nameLength] == '=')
+        {
+            outValue = argv[index] + nameLength + 1u;
+            return true;
+        }
+        if (argv[index][nameLength] == '\0')
+        {
+            if (index + 1 >= argc)
+            {
+                throw std::runtime_error(std::string("Missing value for ") + optionName);
+            }
+            outValue = argv[++index];
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Parses explicit command-line options for the Test05 and Test06 3DGS sample viewers.
+     *
+     * Supported options:
+     *   --backend metal|vulkan
+     *   --frames <count>
+     *   --scene <ply-path> (or first positional argument)
+     *   --capture-present[=on|off]
+     *   --capture-exit-after[=on|off]
+     *   --capture-frame <frame-index>
+     *   --capture-dir <directory>
+     *   --frustum-dilation <float>
+     */
+    inline GaussianViewerCliOptions parseGaussianViewerCliOptions(int argc, char **argv)
+    {
+        GaussianViewerCliOptions options;
+        options.captureDirectory = defaultCaptureDirectory();
+
+        for (int index = 1; index < argc; ++index)
+        {
+            const char *arg = argv[index];
+            std::string value;
+
+            if (tryConsumeCliValue(argc, argv, index, "--backend", value))
+            {
+                const std::string normalized = toLowerAscii(value);
+                if (normalized == "metal")
+                {
+                    options.backend = GVM::RHI::GraphicsBackend::Metal;
+                }
+                else if (normalized == "vulkan")
+                {
+                    options.backend = GVM::RHI::GraphicsBackend::Vulkan;
+                }
+                else
+                {
+                    throw std::runtime_error("Unsupported --backend value (expected metal or vulkan): " + value);
+                }
+            }
+            else if (tryConsumeCliValue(argc, argv, index, "--frames", value))
+            {
+                options.maxFrames = static_cast<std::uint32_t>(parseCliUint64Value(value, "--frames"));
+            }
+            else if (tryConsumeCliValue(argc, argv, index, "--scene", value))
+            {
+                options.scenePath = value;
+            }
+            else if (std::strcmp(arg, "--capture-present") == 0)
+            {
+                options.capturePresent = true;
+            }
+            else if (std::strncmp(arg, "--capture-present=", 18) == 0)
+            {
+                options.capturePresent = parseCliBoolValue(arg + 18, "--capture-present");
+            }
+            else if (std::strcmp(arg, "--capture-exit-after") == 0)
+            {
+                options.exitAfterCapture = true;
+            }
+            else if (std::strncmp(arg, "--capture-exit-after=", 21) == 0)
+            {
+                options.exitAfterCapture = parseCliBoolValue(arg + 21, "--capture-exit-after");
+            }
+            else if (tryConsumeCliValue(argc, argv, index, "--capture-frame", value))
+            {
+                options.captureFrame = parseCliUint64Value(value, "--capture-frame");
+            }
+            else if (tryConsumeCliValue(argc, argv, index, "--capture-dir", value))
+            {
+                options.captureDirectory = value;
+            }
+            else if (tryConsumeCliValue(argc, argv, index, "--frustum-dilation", value))
+            {
+                options.sortEntryFrustumDilation = parseCliDoubleValue(value, "--frustum-dilation");
+            }
+            else if (arg[0] != '-' && !options.scenePath.has_value())
+            {
+                options.scenePath = std::string(arg);
+            }
+            else
+            {
+                throw std::runtime_error(std::string("Unknown command-line argument: ") + arg);
+            }
+        }
+
+        return options;
     }
 
     /**
@@ -60,116 +278,6 @@ namespace GaussianSplattingShared
         const char l = static_cast<char>(std::tolower(static_cast<unsigned char>(path[path.size() - 2u])));
         const char y = static_cast<char>(std::tolower(static_cast<unsigned char>(path[path.size() - 1u])));
         return dot == '.' && p == 'p' && l == 'l' && y == 'y';
-    }
-
-    /**
-     * Parses one boolean environment flag using the sample convention for truthy values.
-     *
-     * Valid true values are 1, true, yes, and on after case normalization; any missing or other value is false.
-     */
-    inline bool parseEnvFlag(const char *name)
-    {
-        const char *value = std::getenv(name);
-        if (value == nullptr)
-        {
-            return false;
-        }
-
-        std::string normalized = value;
-        std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
-        return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on";
-    }
-
-    /**
-     * Parses one optional unsigned integer from the process environment.
-     *
-     * Invalid non-empty values are ignored and reported through the provided sample log sink.
-     */
-    inline std::optional<std::uint64_t> parseEnvUint64(const char *name, LogFunction logFunction = nullptr)
-    {
-        const char *value = std::getenv(name);
-        if (value == nullptr || value[0] == '\0')
-        {
-            return std::nullopt;
-        }
-
-        std::istringstream valueStream(value);
-        std::uint64_t parsedValue = 0u;
-        char trailingCharacter = '\0';
-        if (!(valueStream >> parsedValue) || (valueStream >> trailingCharacter))
-        {
-            logMessage(logFunction, "ignored invalid integer env " + std::string(name) + "=" + value);
-            return std::nullopt;
-        }
-
-        return parsedValue;
-    }
-
-    /**
-     * Parses one optional double-precision value from the process environment.
-     *
-     * Invalid non-empty values are ignored and reported through the provided sample log sink.
-     */
-    inline std::optional<double> parseEnvDouble(const char *name, LogFunction logFunction = nullptr)
-    {
-        const char *value = std::getenv(name);
-        if (value == nullptr || value[0] == '\0')
-        {
-            return std::nullopt;
-        }
-
-        std::istringstream valueStream(value);
-        double parsedValue = 0.0;
-        char trailingCharacter = '\0';
-        if (!(valueStream >> parsedValue) || (valueStream >> trailingCharacter))
-        {
-            logMessage(logFunction, "ignored invalid float env " + std::string(name) + "=" + value);
-            return std::nullopt;
-        }
-
-        return parsedValue;
-    }
-
-    /**
-     * Parses one optional single-precision value from the process environment.
-     *
-     * Invalid non-empty values are ignored and reported through the provided sample log sink.
-     */
-    inline std::optional<float> parseEnvFloat(const char *name, LogFunction logFunction = nullptr)
-    {
-        const char *value = std::getenv(name);
-        if (value == nullptr || value[0] == '\0')
-        {
-            return std::nullopt;
-        }
-
-        std::istringstream valueStream(value);
-        float parsedValue = 0.0f;
-        char trailingCharacter = '\0';
-        if (!(valueStream >> parsedValue) || (valueStream >> trailingCharacter))
-        {
-            logMessage(logFunction, "ignored invalid float env " + std::string(name) + "=" + value);
-            return std::nullopt;
-        }
-
-        return parsedValue;
-    }
-
-    /**
-     * Returns a capture directory from an environment variable or /tmp when the variable is missing.
-     *
-     * The returned path is not created by this function; call ensureCaptureDirectoryExists when creation is required.
-     */
-    inline std::string getCaptureDirectory(const char *environmentName)
-    {
-        const char *directory = std::getenv(environmentName);
-        if (directory == nullptr || directory[0] == '\0')
-        {
-            return "/tmp";
-        }
-        return std::string(directory);
     }
 
     /**
@@ -205,19 +313,11 @@ namespace GaussianSplattingShared
         std::uint64_t captureSequence,
         const std::string &extension)
     {
-        std::string normalizedDirectory = captureDirectory.empty() ? std::string("/tmp") : captureDirectory;
-        while (normalizedDirectory.size() > 1u && normalizedDirectory.back() == '/')
-        {
-            normalizedDirectory.pop_back();
-        }
-
+        const std::filesystem::path baseDirectory = captureDirectory.empty()
+            ? std::filesystem::path(defaultCaptureDirectory())
+            : std::filesystem::path(captureDirectory);
         const std::string fileName = samplePrefix + "_" + stageLabel + "_frame_" + std::to_string(frameIndex) + "_capture_" + std::to_string(captureSequence) + extension;
-        if (normalizedDirectory == "/")
-        {
-            return normalizedDirectory + fileName;
-        }
-
-        return normalizedDirectory + "/" + fileName;
+        return (baseDirectory / fileName).string();
     }
 
     /**
@@ -247,27 +347,6 @@ namespace GaussianSplattingShared
         std::uint64_t captureSequence)
     {
         return buildCapturePath(captureDirectory, samplePrefix, "diagnostics", frameIndex, captureSequence, ".txt");
-    }
-
-    /**
-     * Parses the first sample scene path from command-line arguments.
-     *
-     * The parser accepts --scene <path> or the first non-option argument and leaves all other options to the caller.
-     */
-    inline std::optional<std::string> parseScenePath(int argc, char **argv)
-    {
-        for (int index = 1; index < argc; ++index)
-        {
-            if (std::strcmp(argv[index], "--scene") == 0 && index + 1 < argc)
-            {
-                return std::string(argv[index + 1]);
-            }
-            if (argv[index][0] != '-')
-            {
-                return std::string(argv[index]);
-            }
-        }
-        return std::nullopt;
     }
 
     /**

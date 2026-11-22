@@ -177,6 +177,7 @@ namespace GVM::Samples
         {
             throwSdlError("SDL_InitSubSystem");
         }
+        SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
         const uint32_t flags = buildSdlWindowFlags(createInfo);
         mImpl->window = SDL_CreateWindow(
@@ -285,6 +286,15 @@ namespace GVM::Samples
                 event.x = static_cast<float>(sdlEvent.motion.x);
                 event.y = static_cast<float>(sdlEvent.motion.y);
                 return true;
+            case SDL_DROPFILE:
+                if (sdlEvent.drop.file != nullptr)
+                {
+                    event.type = SampleWindowEvent::Type::FileDrop;
+                    event.droppedFilePath = sdlEvent.drop.file;
+                    SDL_free(sdlEvent.drop.file);
+                    return true;
+                }
+                break;
             default:
                 break;
             }

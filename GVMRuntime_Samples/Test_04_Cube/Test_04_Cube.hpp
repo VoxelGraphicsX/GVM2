@@ -1,3 +1,6 @@
+#ifndef TEST_04_CUBE_HPP
+#define TEST_04_CUBE_HPP
+
 #include "CheckerBoardBackground.hpp"
 #include "Composite.hpp"
 #include "Cube.hpp"
@@ -112,8 +115,12 @@ public:
 
         device->graphicsQueue(0)->computePass("CheckerBoardPass", checkerBoardBackground(albedoTexture->getWidth(), albedoTexture->getHeight(), 1))->renderPass("MainRenderPass", triangleFB, cube->setVertexBuffer(vertexBuffer), cube(36, 1, 0, 0))->computePass("CompositePass", composite(albedoTexture->getWidth(), albedoTexture->getHeight(), 1));
         auto nextTextureStatus = this->swapchain->queryNextTexture();
-        device->graphicsQueue(0)->renderToSwapchain(nextTextureStatus, albedoTexture)->submit();
+        device->graphicsQueue(0)
+            ->renderToSwapchain(nextTextureStatus, albedoTexture, UGL::RenderToSwapchainDescriptor{}, RenderImGui())
+            ->submit();
 
         this->swapchain->present();
     }
 };
+
+#endif // TEST_04_CUBE_HPP

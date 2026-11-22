@@ -2,6 +2,7 @@
 
 #include <GVMRHI/GVMRHI.hpp>
 
+#include <EASTL/string.h>
 #include <EASTL/unique_ptr.h>
 
 #include <cstdint>
@@ -41,6 +42,7 @@ namespace GVM::Samples
             PointerDown,
             PointerUp,
             PointerMove,
+            FileDrop,
         };
 
         Type type = Type::Quit;
@@ -50,6 +52,7 @@ namespace GVM::Samples
         float y = 0.0f;
         uint32_t width = 0;
         uint32_t height = 0;
+        eastl::string droppedFilePath = {};
     };
 
     /// Owns sample-level window, event, and native-surface state behind an SDL-like C++ interface.

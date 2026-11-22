@@ -286,12 +286,18 @@ if(GVM_BUILD_SAMPLES)
 	  endif()
 
 
-  set(GVMRUNTIMES_PORTABLE_WINDOWED_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture Test_07_TaskGraphSwapchain Test_08_PCGForestTaskGraph Test_09_SparseVoxelWorld Test_10_ProceduralCityWorld)
-  if(WIN32)
-    set(GVMRUNTIMES_SAMPLES ${GVMRUNTIMES_PORTABLE_WINDOWED_SAMPLES})
-  else()
-  set(GVMRUNTIMES_SAMPLES Test_01_Triangle Test_02_TriangleWithBuffer Test_03_TriangleWithTexture Test_04_Cube Test_05_3DGS_PLY_Compute Test_06_3DGS_PLY_ComputeSort_Graphics Test_07_TaskGraphSwapchain Test_08_PCGForestTaskGraph ReplayAttachmentHazard Test_09_SparseVoxelWorld Test_10_ProceduralCityWorld)
-  endif()
+  set(GVMRUNTIMES_SAMPLES
+    Test_01_Triangle
+    Test_02_TriangleWithBuffer
+    Test_03_TriangleWithTexture
+    Test_04_Cube
+    Test_05_3DGS_PLY_Compute
+    Test_06_3DGS_PLY_ComputeSort_Graphics
+    Test_07_TaskGraphSwapchain
+    Test_08_PCGForestTaskGraph
+    ReplayAttachmentHazard
+    Test_09_SparseVoxelWorld
+    Test_10_ProceduralCityWorld)
   set(GVM_3DGS_RUNTIME_SAMPLES Test_05_3DGS_PLY_Compute Test_06_3DGS_PLY_ComputeSort_Graphics)
   #set(GVMRUNTIMES_SAMPLES  Test_TriangleWithTexture)
   add_library(GVMRuntimeSampleTest01TriangleApp STATIC
@@ -368,6 +374,120 @@ if(GVM_BUILD_SAMPLES)
       ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
       ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_03_TriangleWithTexture)
   set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_03_TriangleWithTexture GVMRuntimeSampleTest03TriangleWithTextureApp)
+
+  add_library(GVMRuntimeSampleTest04CubeApp STATIC
+    GVMRuntime_Samples/Test_04_Cube/Test04CubeApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest04CubeApp PUBLIC GVMSampleWindowManager glm::glm)
+  target_include_directories(GVMRuntimeSampleTest04CubeApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest04CubeApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube/Test_04_Cube.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_04_Cube/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_04_Cube GVMRuntimeSampleTest04CubeApp)
+
+  add_library(GVMRuntimeSampleTest05GaussianPlyComputeApp STATIC
+    GVMRuntime_Samples/Test_05_3DGS_PLY_Compute/Test05GaussianPlyComputeApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest05GaussianPlyComputeApp PUBLIC GVMSampleWindowManager glm::glm)
+  target_include_directories(GVMRuntimeSampleTest05GaussianPlyComputeApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_05_3DGS_PLY_Compute
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest05GaussianPlyComputeApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_05_3DGS_PLY_Compute/Test_05_3DGS_PLY_Compute.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_05_3DGS_PLY_Compute/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_05_3DGS_PLY_Compute
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_05_3DGS_PLY_Compute
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_05_3DGS_PLY_Compute GVMRuntimeSampleTest05GaussianPlyComputeApp)
+
+  add_library(GVMRuntimeSampleTest06GaussianComputeSortGraphicsApp STATIC
+    GVMRuntime_Samples/Test_06_3DGS_PLY_ComputeSort_Graphics/Test06GaussianComputeSortGraphicsApp.cpp)
+  target_link_libraries(GVMRuntimeSampleTest06GaussianComputeSortGraphicsApp PUBLIC GVMSampleWindowManager glm::glm)
+  target_include_directories(GVMRuntimeSampleTest06GaussianComputeSortGraphicsApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_06_3DGS_PLY_ComputeSort_Graphics
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleTest06GaussianComputeSortGraphicsApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_06_3DGS_PLY_ComputeSort_Graphics/Test_06_3DGS_PLY_ComputeSort_Graphics.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/Test_06_3DGS_PLY_ComputeSort_Graphics/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_06_3DGS_PLY_ComputeSort_Graphics
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/GaussianSplattingShared
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_06_3DGS_PLY_ComputeSort_Graphics
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_Test_06_3DGS_PLY_ComputeSort_Graphics GVMRuntimeSampleTest06GaussianComputeSortGraphicsApp)
+
+  add_library(GVMRuntimeSampleReplayAttachmentHazardApp STATIC
+    GVMRuntime_Samples/ReplayAttachmentHazard/ReplayAttachmentHazardApp.cpp)
+  target_link_libraries(GVMRuntimeSampleReplayAttachmentHazardApp PUBLIC GVMSampleWindowManager glm::glm)
+  target_include_directories(GVMRuntimeSampleReplayAttachmentHazardApp PUBLIC
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/ReplayAttachmentHazard
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+    ${GVM_REPOSITORY_ROOT}/GVM
+    ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
+    ${GVM_REPOSITORY_ROOT}/GVM/third_party)
+  UGLCOMPILE(GVMRuntimeSampleReplayAttachmentHazardApp
+    ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/ReplayAttachmentHazard/ReplayAttachmentHazard.hpp
+    ${GVM_SAMPLE_GENERATED_ROOT}/ReplayAttachmentHazard/UGLBin
+    ${UGL_COMPILER}
+    INCLUDE_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVM/third_party
+      ${EASTL_SOURCE_DIR}/include
+      ${EABase_SOURCE_DIR}/include/Common
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/ReplayAttachmentHazard
+    DSL_DIRS
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils
+      ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/ReplayAttachmentHazard
+    UGLC_ARGS
+      --shader-pipeline=uglir)
+  set(GVM_RUNTIME_SAMPLE_APP_TARGET_ReplayAttachmentHazard GVMRuntimeSampleReplayAttachmentHazardApp)
 
   add_library(GVMRuntimeSampleTest07TaskGraphSwapchainApp STATIC
     GVMRuntime_Samples/Test_07_TaskGraphSwapchain/Test07TaskGraphSwapchainApp.cpp)
@@ -545,12 +665,12 @@ if(GVM_BUILD_SAMPLES)
 	      endif()
 
 	      target_link_libraries(${SAMPLE_NAME} ${GVM_LINK_LIBS} glm::glm)
-        if(SAMPLE STREQUAL "ReplayAttachmentHazard")
-          target_link_libraries(${SAMPLE_NAME} GVMSampleWindowManager)
-        endif()
 	      if(DEFINED ${GVM_RUNTIME_SAMPLE_APP_TARGET_VAR})
 	        target_link_libraries(${SAMPLE_NAME} ${${GVM_RUNTIME_SAMPLE_APP_TARGET_VAR}})
 	      endif()
+        if(WIN32)
+          set_target_properties(${SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+        endif()
 	      target_include_directories(${SAMPLE_NAME} PRIVATE ${GVM_REPOSITORY_ROOT}/GVM/third_party)
       target_include_directories(${SAMPLE_NAME} PRIVATE ${GVM_INCLUDE_DIRS})
       target_include_directories(${SAMPLE_NAME} PRIVATE ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders)
@@ -586,6 +706,9 @@ if(GVM_BUILD_SAMPLES)
     target_include_directories(${GVM_RENDER_DEBUG_SAMPLE_NAME} PRIVATE ${GVM_REPOSITORY_ROOT}/tests/render_cases/RenderFeatureDebugHost)
     target_include_directories(${GVM_RENDER_DEBUG_SAMPLE_NAME} PRIVATE ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube)
     target_include_directories(${GVM_RENDER_DEBUG_SAMPLE_NAME} PRIVATE ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/TestUtils)
+    if(WIN32)
+      set_target_properties(${GVM_RENDER_DEBUG_SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
   elseif(GVM_BUILD_SAMPLE_DESKTOP_BINARIES)
     message(WARNING "UGLC executable was not found, skipping DSL runtime sample binaries.")
   endif()

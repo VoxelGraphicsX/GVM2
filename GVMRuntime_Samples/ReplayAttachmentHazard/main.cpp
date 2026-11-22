@@ -1,9 +1,6 @@
+#include "ReplayAttachmentHazardApp.hpp"
 #include "SampleWindowManager.hpp"
-#include "UGLBin/generate_result.hpp"
 
-#include <GVMRHI/GVMRHI.hpp>
-
-#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -11,32 +8,39 @@
 
 namespace
 {
-    /// Holds the command-line configuration for one replay attachment hazard sample run.
-    struct ReplayAttachmentHazardSampleConfig
-    {
-        GVM::RHI::GraphicsBackend backend = GVM::RHI::GraphicsBackend::Vulkan;
-        uint32_t width = 1280;
-        uint32_t height = 720;
-        uint32_t frames = 600;
-        uint32_t grassInstanceCount = 178791;
-        uint32_t grassVertexCount = 39;
-        int consumerMode = int(ReplayAttachmentHazard::ConsumerModeTerrainGrass);
-        bool grassEnabled = true;
-        bool grassWritesReplay = false;
-        bool pixelLocalEnabled = true;
-        bool grassDrawIndirect = true;
-        bool grassBaryEnabled = true;
-    };
+    static constexpr int kConsumerModeReadOnly = 0;
+    static constexpr int kConsumerModeTerrainOnly = 1;
+    static constexpr int kConsumerModeTerrainGrass = 2;
 
-    /// Returns a stable lowercase display name for one graphics backend.
-    const char *backendName(GVM::RHI::GraphicsBackend backend)
+    /// Consumes a `--flag=value` or `--flag value` argument when `argv[index]` matches `optionName`.
+    bool tryConsumeOptionValue(
+        int argc,
+        char **argv,
+        int &index,
+        const char *optionName,
+        const char *&outValue)
     {
-        switch (backend)
+        const size_t optionLength = std::strlen(optionName);
+        if (std::strncmp(argv[index], optionName, optionLength) != 0)
         {
-        case GVM::RHI::GraphicsBackend::Metal: return "metal";
-        case GVM::RHI::GraphicsBackend::Vulkan: return "vulkan";
-        default: return "undefined";
+            return false;
         }
+        if (argv[index][optionLength] == '=')
+        {
+            outValue = argv[index] + optionLength + 1u;
+            return true;
+        }
+        if (argv[index][optionLength] == '\0')
+        {
+            if (index + 1 >= argc)
+            {
+                std::fprintf(stderr, "[replay-hazard] missing value for %s\n", optionName);
+                std::exit(2);
+            }
+            outValue = argv[++index];
+            return true;
+        }
+        return false;
     }
 
     /// Parses a non-negative decimal uint32 command-line value.
@@ -73,33 +77,33 @@ namespace
     }
 
     /// Applies one named hazard mode to the sample configuration.
-    void applyMode(ReplayAttachmentHazardSampleConfig &config, const char *mode)
+    void applyMode(GVM::Samples::ReplayAttachmentHazardSampleConfig &config, const char *mode)
     {
         if (std::strcmp(mode, "read-only") == 0)
         {
-            config.consumerMode = int(ReplayAttachmentHazard::ConsumerModeReadOnly);
+            config.consumerMode = kConsumerModeReadOnly;
             return;
         }
         if (std::strcmp(mode, "terrain-only") == 0)
         {
-            config.consumerMode = int(ReplayAttachmentHazard::ConsumerModeTerrainOnly);
+            config.consumerMode = kConsumerModeTerrainOnly;
             return;
         }
         if (std::strcmp(mode, "terrain-grass") == 0)
         {
-            config.consumerMode = int(ReplayAttachmentHazard::ConsumerModeTerrainGrass);
+            config.consumerMode = kConsumerModeTerrainGrass;
             return;
         }
         if (std::strcmp(mode, "omit-replay-in-grass") == 0)
         {
-            config.consumerMode = int(ReplayAttachmentHazard::ConsumerModeTerrainGrass);
+            config.consumerMode = kConsumerModeTerrainGrass;
             config.grassEnabled = true;
             config.grassWritesReplay = false;
             return;
         }
         if (std::strcmp(mode, "write-replay-in-grass") == 0)
         {
-            config.consumerMode = int(ReplayAttachmentHazard::ConsumerModeTerrainGrass);
+            config.consumerMode = kConsumerModeTerrainGrass;
             config.grassEnabled = true;
             config.grassWritesReplay = true;
             return;
@@ -115,24 +119,16 @@ namespace
     }
 
     /// Parses the replay hazard sample command line.
-    ReplayAttachmentHazardSampleConfig parseCommandLine(int argc, char **argv)
+    GVM::Samples::ReplayAttachmentHazardSampleConfig parseCommandLine(int argc, char **argv)
     {
-        ReplayAttachmentHazardSampleConfig config;
-        for (int i = 1; i < argc; ++i)
+        GVM::Samples::ReplayAttachmentHazardSampleConfig config;
+        for (int index = 1; index < argc; ++index)
         {
-            const char *arg = argv[i];
-            const auto requireValue = [&](const char *optionName) -> const char * {
-                if (i + 1 >= argc)
-                {
-                    std::fprintf(stderr, "[replay-hazard] missing value for %s\n", optionName);
-                    std::exit(2);
-                }
-                return argv[++i];
-            };
+            const char *arg = argv[index];
+            const char *value = nullptr;
 
-            if (std::strcmp(arg, "--backend") == 0)
+            if (tryConsumeOptionValue(argc, argv, index, "--backend", value))
             {
-                const char *value = requireValue(arg);
                 if (std::strcmp(value, "metal") == 0)
                 {
                     config.backend = GVM::RHI::GraphicsBackend::Metal;
@@ -147,41 +143,40 @@ namespace
                     std::exit(2);
                 }
             }
-            else if (std::strcmp(arg, "--width") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--width", value))
             {
-                config.width = parseUInt32(requireValue(arg), arg);
+                config.width = parseUInt32(value, "--width");
             }
-            else if (std::strcmp(arg, "--height") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--height", value))
             {
-                config.height = parseUInt32(requireValue(arg), arg);
+                config.height = parseUInt32(value, "--height");
             }
-            else if (std::strcmp(arg, "--frames") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--frames", value))
             {
-                config.frames = parseUInt32(requireValue(arg), arg);
+                config.frames = parseUInt32(value, "--frames");
             }
-            else if (std::strcmp(arg, "--grass-instances") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--grass-instances", value))
             {
-                config.grassInstanceCount = parseUInt32(requireValue(arg), arg);
+                config.grassInstanceCount = parseUInt32(value, "--grass-instances");
             }
-            else if (std::strcmp(arg, "--grass-vertices") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--grass-vertices", value))
             {
-                config.grassVertexCount = parseUInt32(requireValue(arg), arg);
+                config.grassVertexCount = parseUInt32(value, "--grass-vertices");
             }
-            else if (std::strcmp(arg, "--mode") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--mode", value))
             {
-                applyMode(config, requireValue(arg));
+                applyMode(config, value);
             }
-            else if (std::strcmp(arg, "--grass") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--grass", value))
             {
-                config.grassEnabled = parseOnOff(requireValue(arg), arg);
+                config.grassEnabled = parseOnOff(value, "--grass");
             }
-            else if (std::strcmp(arg, "--pixel-local") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--pixel-local", value))
             {
-                config.pixelLocalEnabled = parseOnOff(requireValue(arg), arg);
+                config.pixelLocalEnabled = parseOnOff(value, "--pixel-local");
             }
-            else if (std::strcmp(arg, "--replay-in-grass") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--replay-in-grass", value))
             {
-                const char *value = requireValue(arg);
                 if (std::strcmp(value, "write") == 0)
                 {
                     config.grassWritesReplay = true;
@@ -196,9 +191,8 @@ namespace
                     std::exit(2);
                 }
             }
-            else if (std::strcmp(arg, "--grass-draw") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--grass-draw", value))
             {
-                const char *value = requireValue(arg);
                 if (std::strcmp(value, "indirect") == 0)
                 {
                     config.grassDrawIndirect = true;
@@ -213,9 +207,9 @@ namespace
                     std::exit(2);
                 }
             }
-            else if (std::strcmp(arg, "--grass-bary") == 0)
+            else if (tryConsumeOptionValue(argc, argv, index, "--grass-bary", value))
             {
-                config.grassBaryEnabled = parseOnOff(requireValue(arg), arg);
+                config.grassBaryEnabled = parseOnOff(value, "--grass-bary");
             }
             else if (std::strcmp(arg, "--help") == 0)
             {
@@ -241,121 +235,40 @@ namespace
         }
         return config;
     }
-
-    /// Returns milliseconds elapsed between two steady-clock time points.
-    double elapsedMilliseconds(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
-    {
-        return std::chrono::duration<double, std::milli>(end - begin).count();
-    }
 } // namespace
 
+/// Runs the desktop ReplayAttachmentHazard sample through the shared SampleWindowManager host.
 int main(int argc, char **argv)
 {
     try
     {
-        const ReplayAttachmentHazardSampleConfig config = parseCommandLine(argc, argv);
+        const GVM::Samples::ReplayAttachmentHazardSampleConfig config = parseCommandLine(argc, argv);
 
         GVM::Samples::SampleWindowCreateInfo windowInfo;
-        windowInfo.title = "GVM Replay Attachment Hazard";
+        windowInfo.title = config.backend == GVM::RHI::GraphicsBackend::Metal
+            ? "GVM Replay Attachment Hazard (Metal)"
+            : "GVM Replay Attachment Hazard (Vulkan)";
         windowInfo.width = config.width;
         windowInfo.height = config.height;
         windowInfo.highDpi = true;
         windowInfo.preferredGraphicsBackend = config.backend;
+
         GVM::Samples::SampleWindowManager window(windowInfo);
+        auto app = eastl::make_unique<GVM::Samples::ReplayAttachmentHazardApp>(window, config);
 
-        GVM::RHI::Instance instance = GVM::RHI::createInstance({
-            .preferredBackend = config.backend,
-            .diagnosticsOverlay = {.enabled = GVM::RHI::True},
-        });
-        GVM::RHI::Device device = instance->createDevice();
-        GVM::RHI::Swapchain swapchain = instance->createSwapchain({
-            .nativeSurface = window.getNativeSurface(),
-        });
-
-        uint32_t drawableWidth = 1u;
-        uint32_t drawableHeight = 1u;
-        window.getDrawableSize(drawableWidth, drawableHeight);
-
-        auto renderer = ReplayAttachmentHazard::makeHazardRenderer();
-        renderer->init(device, swapchain, drawableWidth, drawableHeight);
-        renderer->setConsumerMode(config.consumerMode);
-        renderer->setGrassEnabled(config.grassEnabled ? 1 : 0);
-        renderer->setGrassWritesReplay(config.grassWritesReplay ? 1 : 0);
-        renderer->setPixelLocalEnabled(config.pixelLocalEnabled ? 1 : 0);
-        renderer->setGrassInstanceCount(static_cast<int>(config.grassInstanceCount));
-        renderer->setGrassVertexCount(static_cast<int>(config.grassVertexCount));
-        renderer->setGrassDrawIndirect(config.grassDrawIndirect ? 1 : 0);
-        renderer->setGrassBaryEnabled(config.grassBaryEnabled ? 1 : 0);
-
-        const char *activeBackend = backendName(instance->getBackend());
-        std::printf(
-            "[replay-hazard] active_backend=%s requested_backend=%s drawable=%ux%u frames=%u "
-            "grass=%u replay_in_grass=%s pixel_local=%u consumer_mode=%d grass_instances=%u "
-            "grass_vertices=%u grass_draw=%s grass_bary=%u\n",
-            activeBackend,
-            backendName(config.backend),
-            drawableWidth,
-            drawableHeight,
-            config.frames,
-            config.grassEnabled ? 1u : 0u,
-            config.grassWritesReplay ? "write" : "omit",
-            config.pixelLocalEnabled ? 1u : 0u,
-            config.consumerMode,
-            config.grassInstanceCount,
-            config.grassVertexCount,
-            config.grassDrawIndirect ? "indirect" : "direct",
-            config.grassBaryEnabled ? 1u : 0u);
-        std::printf(
-            "[replay-hazard] gpu_scope_legend=no-grass:scope0=BaseVisibilityPass,scope1=ConsumerPass; "
-            "grass:scope0=BaseVisibilityPass,scope1=GrassVisibilityPass,scope2=ConsumerPass\n");
-
-        double totalFrameMs = 0.0;
-        double maxFrameMs = 0.0;
         uint32_t renderedFrames = 0u;
-
-        for (uint32_t frame = 0; frame < config.frames; ++frame)
+        while (!app->shouldQuit())
         {
-            GVM::Samples::SampleWindowEvent event;
-            while (window.pollEvent(event))
-            {
-                if (event.type == GVM::Samples::SampleWindowEvent::Type::Quit)
-                {
-                    frame = config.frames;
-                    break;
-                }
-            }
-            if (frame >= config.frames)
+            app->processPendingEvents();
+            app->renderFrame();
+            ++renderedFrames;
+            if (config.frames > 0u && renderedFrames >= config.frames)
             {
                 break;
             }
-
-            const auto begin = std::chrono::steady_clock::now();
-            renderer->render();
-            const double frameMs = elapsedMilliseconds(begin, std::chrono::steady_clock::now());
-            totalFrameMs += frameMs;
-            maxFrameMs = frameMs > maxFrameMs ? frameMs : maxFrameMs;
-            ++renderedFrames;
-
-            if ((renderedFrames % 60u) == 0u)
-            {
-                std::printf("[replay-hazard] frame=%u cpu_frame_ms=%.3f\n", renderedFrames, frameMs);
-            }
         }
 
-        const double avgFrameMs = renderedFrames > 0u ? totalFrameMs / double(renderedFrames) : 0.0;
-        const double avgFps = avgFrameMs > 0.0 ? 1000.0 / avgFrameMs : 0.0;
-        std::printf(
-            "[replay-hazard-result] active_backend=%s frames=%u avg_frame_ms=%.3f avg_fps=%.2f max_frame_ms=%.3f\n",
-            activeBackend,
-            renderedFrames,
-            avgFrameMs,
-            avgFps,
-            maxFrameMs);
-
-        renderer = nullptr;
-        swapchain = nullptr;
-        device = nullptr;
-        GVM::RHI::destroyInstance(instance);
+        app->printSummary();
         return 0;
     }
     catch (const std::exception &error)

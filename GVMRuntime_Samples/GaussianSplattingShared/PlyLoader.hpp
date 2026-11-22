@@ -30,10 +30,12 @@
 #include <utility>
 #include <vector>
 
+#if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 namespace PlyLoader
 {
@@ -675,6 +677,9 @@ namespace PlyLoader
         int fd = -1;
         const std::uint8_t *data = nullptr;
         std::size_t size = 0u;
+#if defined(_WIN32)
+        std::vector<std::uint8_t> ownedBytes;
+#endif
 
         MappedReadOnlyFile() = default;
         MappedReadOnlyFile(const MappedReadOnlyFile &) = delete;
@@ -682,7 +687,17 @@ namespace PlyLoader
 
         MappedReadOnlyFile(MappedReadOnlyFile &&other) noexcept
             : fd(other.fd), data(other.data), size(other.size)
+#if defined(_WIN32)
+            , ownedBytes(std::move(other.ownedBytes))
+#endif
         {
+#if defined(_WIN32)
+            if (!ownedBytes.empty())
+            {
+                data = ownedBytes.data();
+                size = ownedBytes.size();
+            }
+#endif
             other.fd = -1;
             other.data = nullptr;
             other.size = 0u;
@@ -699,6 +714,14 @@ namespace PlyLoader
             fd = other.fd;
             data = other.data;
             size = other.size;
+#if defined(_WIN32)
+            ownedBytes = std::move(other.ownedBytes);
+            if (!ownedBytes.empty())
+            {
+                data = ownedBytes.data();
+                size = ownedBytes.size();
+            }
+#endif
             other.fd = -1;
             other.data = nullptr;
             other.size = 0u;
@@ -712,6 +735,9 @@ namespace PlyLoader
 
         void reset()
         {
+#if defined(_WIN32)
+            ownedBytes.clear();
+#else
             if (data != nullptr && size > 0u)
             {
                 munmap(const_cast<std::uint8_t *>(data), size);
@@ -720,6 +746,7 @@ namespace PlyLoader
             {
                 close(fd);
             }
+#endif
             fd = -1;
             data = nullptr;
             size = 0u;
@@ -879,6 +906,27 @@ namespace PlyLoader
     inline MappedReadOnlyFile mapReadOnlyFile(const std::string &path)
     {
         MappedReadOnlyFile file;
+#if defined(_WIN32)
+        std::ifstream stream(path, std::ios::binary | std::ios::ate);
+        if (!stream.is_open())
+        {
+            throw std::runtime_error("Failed to open PLY file for mapped fast path: " + path);
+        }
+        const std::streamoff byteCount = stream.tellg();
+        if (byteCount <= 0)
+        {
+            throw std::runtime_error("Failed to stat PLY file for mapped fast path: " + path);
+        }
+        file.ownedBytes.resize(static_cast<std::size_t>(byteCount));
+        stream.seekg(0, std::ios::beg);
+        if (!stream.read(reinterpret_cast<char *>(file.ownedBytes.data()), byteCount))
+        {
+            throw std::runtime_error("Failed to read PLY file for fast path: " + path);
+        }
+        file.data = file.ownedBytes.data();
+        file.size = file.ownedBytes.size();
+        return file;
+#else
         file.fd = open(path.c_str(), O_RDONLY);
         if (file.fd < 0)
         {
@@ -900,6 +948,7 @@ namespace PlyLoader
 
         file.data = static_cast<const std::uint8_t *>(mapping);
         return file;
+#endif
     }
 
     struct RawGaussian

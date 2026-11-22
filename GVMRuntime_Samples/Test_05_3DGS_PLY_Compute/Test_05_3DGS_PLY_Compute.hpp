@@ -2593,7 +2593,7 @@ public:
         quadFrameBuffer.color.clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
         quadFrameBuffer.color.storeOp = StoreOp::Store;
         frameQueue->renderPass("GsPresentPreparePass", quadFrameBuffer, presentQuad(3, 1, 0, 0))
-            ->renderToSwapchain(nextTextureStatus, presentTexture)
+            ->renderToSwapchain(nextTextureStatus, presentTexture, UGL::RenderToSwapchainDescriptor{}, RenderImGui())
             ->submit();
         swapchain->present();
         submittedFrameCount += 1u;

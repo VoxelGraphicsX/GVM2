@@ -1049,7 +1049,9 @@ public:
 
         auto nextTextureStatus = swapchain->queryNextTexture();
         swapchainStagingTexture = nextTextureStatus.texture;
-        frameQueue->renderToSwapchain(nextTextureStatus, outputTexture)->submit();
+        frameQueue
+            ->renderToSwapchain(nextTextureStatus, outputTexture, UGL::RenderToSwapchainDescriptor{}, RenderImGui())
+            ->submit();
         swapchain->present();
         submittedFrameCount += 1u;
     }

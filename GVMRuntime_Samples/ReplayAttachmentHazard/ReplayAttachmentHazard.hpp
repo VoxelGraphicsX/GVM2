@@ -679,7 +679,10 @@ namespace ReplayAttachmentHazard
             }
 
             auto nextTextureStatus = swapchain->queryNextTexture();
-            device->graphicsQueue(0)->renderToSwapchain(nextTextureStatus, outputTexture)->resolveTimestampProfiler(timestampProfiler)->submit();
+            device->graphicsQueue(0)
+                ->renderToSwapchain(nextTextureStatus, outputTexture, UGL::RenderToSwapchainDescriptor{}, RenderImGui())
+                ->resolveTimestampProfiler(timestampProfiler)
+                ->submit();
             printTimestampResultsIfNeeded();
             swapchain->present();
         }
