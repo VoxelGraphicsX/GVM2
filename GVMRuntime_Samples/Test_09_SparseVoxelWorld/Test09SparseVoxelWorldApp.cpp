@@ -93,8 +93,9 @@ namespace
         const float fovY = fovDeg * (3.14159265359f / 180.0f);
         constexpr float kZNear = 0.4f;
         constexpr float kZFar = 280.0f;
-        const float yScale = 1.0f / std::tan(fovY * 0.5f);
-        const float xScale = yScale / safeAspect;
+        const float focalLength = 1.0f / std::tan(fovY * 0.5f);
+        const float xScale = focalLength / safeAspect;
+        const float yScale = -focalLength;
         const float zA = kZFar / (kZFar - kZNear);
         const float zB = -(kZNear * kZFar) / (kZFar - kZNear);
 
@@ -1578,20 +1579,8 @@ namespace GVM::Samples
                 return 1;
             }
 
-            // Flip GPU readback vertically so row 0 is the top of the PNG image.
-            const size_t rowBytes = static_cast<size_t>(kCaptureWidth) * 4u;
-            std::vector<uint8_t> uprightRgba(expectedBytes);
-            for (uint32_t y = 0u; y < kCaptureHeight; ++y)
-            {
-                const uint32_t srcY = kCaptureHeight - 1u - y;
-                std::memcpy(
-                    uprightRgba.data() + static_cast<size_t>(y) * rowBytes,
-                    cap.pixels.data() + static_cast<size_t>(srcY) * rowBytes,
-                    rowBytes);
-            }
-
             const std::string outPath = (dirPath / shot.filename).string();
-            if (!writeRgba8Png(outPath.c_str(), kCaptureWidth, kCaptureHeight, uprightRgba.data()))
+            if (!writeRgba8Png(outPath.c_str(), kCaptureWidth, kCaptureHeight, cap.pixels.data()))
             {
                 std::fprintf(stderr, "[Test09 Capture] Failed to write PNG '%s'.\n", outPath.c_str());
                 return 1;

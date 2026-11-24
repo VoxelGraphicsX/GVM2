@@ -32,9 +32,13 @@ target_compile_features(GVMRHI PUBLIC cxx_std_20)
 target_compile_definitions(GVMRHI PUBLIC GVM_DIAGNOSTICS_OVERLAY_ENABLED=$<IF:$<BOOL:${GVM_RHI_ENABLE_DIAGNOSTICS_OVERLAY}>,1,0>)
 set_target_properties(GVMRHI PROPERTIES
     EXPORT_NAME RHI
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+if(NOT ANDROID AND NOT OHOS)
+    set_target_properties(GVMRHI PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+endif()
 if(APPLE)
     set_target_properties(GVMRHI PROPERTIES INSTALL_RPATH "@loader_path")
 elseif(WIN32)

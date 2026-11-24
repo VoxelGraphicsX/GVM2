@@ -28,9 +28,13 @@ add_subdirectory(GVMCore)
 
 set_target_properties(GVM PROPERTIES
     EXPORT_NAME GVM
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+if(NOT ANDROID AND NOT OHOS)
+    set_target_properties(GVM PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+endif()
 
 if(APPLE)
     set_target_properties(GVM PROPERTIES INSTALL_RPATH "@loader_path")

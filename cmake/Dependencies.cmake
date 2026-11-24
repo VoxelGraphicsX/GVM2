@@ -156,6 +156,12 @@ if(GVM_ENABLE_UPSTREAM_MARL AND NOT TARGET marl::marl AND NOT TARGET marl)
                 "MARL_IS_SUBPROJECT ON"
         )
     endif()
+    if(OHOS AND TARGET marl)
+        target_compile_options(marl PRIVATE
+            "$<$<COMPILE_LANGUAGE:CXX>:-include>"
+            "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_LIST_DIR}/ohos/MarlOhosCompat.h>"
+        )
+    endif()
     if(TARGET marl AND NOT TARGET marl::marl)
         add_library(marl::marl ALIAS marl)
     endif()

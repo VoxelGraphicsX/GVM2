@@ -61,6 +61,17 @@ namespace GVM::Samples
 
         mImpl->renderer = ReplayAttachmentHazard::makeHazardRenderer();
         mImpl->renderer->init(device(), swapchain(), drawableWidth, drawableHeight);
+        if (config.grassBaryEnabled)
+        {
+            try
+            {
+                mImpl->renderer->initBarycentricPasses();
+            }
+            catch (...)
+            {
+                mImpl->config.grassBaryEnabled = false;
+            }
+        }
         mImpl->renderer->setConsumerMode(config.consumerMode);
         mImpl->renderer->setGrassEnabled(config.grassEnabled ? 1 : 0);
         mImpl->renderer->setGrassWritesReplay(config.grassWritesReplay ? 1 : 0);
@@ -68,7 +79,7 @@ namespace GVM::Samples
         mImpl->renderer->setGrassInstanceCount(static_cast<int>(config.grassInstanceCount));
         mImpl->renderer->setGrassVertexCount(static_cast<int>(config.grassVertexCount));
         mImpl->renderer->setGrassDrawIndirect(config.grassDrawIndirect ? 1 : 0);
-        mImpl->renderer->setGrassBaryEnabled(config.grassBaryEnabled ? 1 : 0);
+        mImpl->renderer->setGrassBaryEnabled(mImpl->config.grassBaryEnabled ? 1 : 0);
 
         mImpl->activeBackend = hazardBackendName(instance()->getBackend());
         std::printf(
@@ -87,7 +98,7 @@ namespace GVM::Samples
             config.grassInstanceCount,
             config.grassVertexCount,
             config.grassDrawIndirect ? "indirect" : "direct",
-            config.grassBaryEnabled ? 1u : 0u);
+            mImpl->config.grassBaryEnabled ? 1u : 0u);
         std::printf(
             "[replay-hazard] gpu_scope_legend=no-grass:scope0=BaseVisibilityPass,scope1=ConsumerPass; "
             "grass:scope0=BaseVisibilityPass,scope1=GrassVisibilityPass,scope2=ConsumerPass\n");

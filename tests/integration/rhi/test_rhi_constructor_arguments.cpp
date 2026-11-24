@@ -118,6 +118,16 @@ namespace
         return recordArgumentDispatch(*device.getMainQueue(), task);
     }
 
+    /** Reports whether the active backend device supports storage buffer and image writes in the vertex stage. */
+    bool supportsVertexStageStorageWrites(GVM::RHI::Instance instance, GVM::RHI::Device device)
+    {
+        if (instance->getBackend() != GVM::RHI::GraphicsBackend::Vulkan)
+        {
+            return true;
+        }
+        return static_cast<GVM::RHI::Vulkan::VKDevice *>(device)->getCapabilities().getEnabledShaderFeatures().vertexPipelineStoresAndAtomics != VK_FALSE;
+    }
+
 }
 
 TEST_F(ConstructorArgumentsTest, CapturesReplacementValuesAndRangesBeforeDeferredRecording)
@@ -414,6 +424,10 @@ TEST_F(ConstructorArgumentsTest, RejectsZeroArgumentBudget)
 
 TEST_F(ConstructorArgumentsTest, DrawsReplacementArgsAndRestoresVertexBuffersAcrossPipelineChanges)
 {
+    if (!supportsVertexStageStorageWrites(instance, device))
+    {
+        GTEST_SKIP() << "The native Vulkan device does not expose vertexPipelineStoresAndAtomics.";
+    }
     GVM::Core::DeviceProxy proxy(device);
     auto output = createArgumentOutput(proxy);
     auto compatibilityOutput = createArgumentOutput(proxy);
@@ -458,6 +472,10 @@ TEST_F(ConstructorArgumentsTest, DrawsReplacementArgsAndRestoresVertexBuffersAcr
 /** Keeps index allocations and all draw controls independent after their public handles are freed. */
 TEST_F(ConstructorArgumentsTest, CapturesIndexedDrawResourcesFormatsAndControlsBeforeRecording)
 {
+    if (!supportsVertexStageStorageWrites(instance, device))
+    {
+        GTEST_SKIP() << "The native Vulkan device does not expose vertexPipelineStoresAndAtomics.";
+    }
     GVM::Core::DeviceProxy proxy(device);
     auto queue = proxy->graphicsQueue(0);
     auto output = createArgumentOutput(proxy);
@@ -639,6 +657,10 @@ TEST_F(ConstructorArgumentsTest, RebindsShaderArgumentsWithoutReplacingExplicitI
 /** Preserves indirect source ranges and shared ICB storage across different captured index bindings. */
 TEST_F(ConstructorArgumentsTest, DrawsCapturedIndirectArgsAfterFreeingBothControlBuffers)
 {
+    if (!supportsVertexStageStorageWrites(instance, device))
+    {
+        GTEST_SKIP() << "The native Vulkan device does not expose vertexPipelineStoresAndAtomics.";
+    }
     GVM::Core::DeviceProxy proxy(device);
     auto queue = proxy->graphicsQueue(0);
     auto output = createArgumentOutput(proxy);
@@ -1306,19 +1328,19 @@ TEST_F(ConstructorArgumentsTest, RejectsInvalidIndexedArgumentCapture)
 {
     GVM::Core::DeviceProxy proxy(device);
     auto output = createArgumentOutput(proxy);
-    auto raster = proxy->createRenderClass<ArgumentIndexedRaster>(float4(0), GVM::RHI::BufferRange(output), 0u);
+    auto raster = proxy->createRenderClass<ArgumentWriteRaster>(GVM::RHI::BufferRange(output), 0u);
     auto indices = proxy->createBuffer({.usage = GVM::RHI::BufferUsage::Index, .size = 16});
-    auto nullIndices = raster->drawIndexed(float4(1), GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange{},
+    auto nullIndices = raster->drawIndexed(GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange{},
         GVM::RHI::IndexFormat::Uint32, 3, 1, 0, 0, 0);
-    auto wrongUsage = raster->drawIndexed(float4(1), GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(output),
+    auto wrongUsage = raster->drawIndexed(GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(output),
         GVM::RHI::IndexFormat::Uint32, 3, 1, 0, 0, 0);
-    auto undefinedFormat = raster->drawIndexed(float4(1), GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(indices),
+    auto undefinedFormat = raster->drawIndexed(GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(indices),
         GVM::RHI::IndexFormat::Undefined, 3, 1, 0, 0, 0);
-    auto misaligned = raster->drawIndexed(float4(1), GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(indices, 1, 8),
+    auto misaligned = raster->drawIndexed(GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(indices, 1, 8),
         GVM::RHI::IndexFormat::Uint32, 3, 1, 0, 0, 0);
     GVM::RHI::BufferRange invalid(indices);
     invalid.size = 20;
-    auto outOfBounds = raster->drawIndexed(float4(1), GVM::RHI::BufferRange(output), 0u, invalid,
+    auto outOfBounds = raster->drawIndexed(GVM::RHI::BufferRange(output), 0u, invalid,
         GVM::RHI::IndexFormat::Uint32, 3, 1, 0, 0, 0);
     auto image = device->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment,
         .size = {1, 1, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
@@ -1346,9 +1368,9 @@ TEST_F(ConstructorArgumentsTest, RejectsIndirectCountsOutsideCachedDeviceCapabil
     auto output = createArgumentOutput(proxy);
     auto commands = proxy->createBuffer({.usage = GVM::RHI::BufferUsage::Indirect, .size = 64});
     auto indices = proxy->createBuffer({.usage = GVM::RHI::BufferUsage::Index, .size = 12});
-    auto raster = proxy->createRenderClass<ArgumentIndexedRaster>(float4(1), GVM::RHI::BufferRange(output), 0u);
-    auto indirect = raster->drawIndirect(float4(1), GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(commands), 2, 16);
-    auto indexed = raster->drawIndexedIndirect(float4(1), GVM::RHI::BufferRange(output), 0u,
+    auto raster = proxy->createRenderClass<ArgumentWriteRaster>(GVM::RHI::BufferRange(output), 0u);
+    auto indirect = raster->drawIndirect(GVM::RHI::BufferRange(output), 0u, GVM::RHI::BufferRange(commands), 2, 16);
+    auto indexed = raster->drawIndexedIndirect(GVM::RHI::BufferRange(output), 0u,
         GVM::RHI::BufferRange(indices), GVM::RHI::IndexFormat::Uint32, GVM::RHI::BufferRange(commands), 2, 20);
     auto color = device->createTexture({.usage = GVM::RHI::TextureUsage::RenderAttachment,
         .size = {1, 1, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
@@ -1981,6 +2003,10 @@ TEST_F(ConstructorArgumentsTest, UnionsOverlappingImageWritesBeforeAdvancingBatc
     {
         GTEST_SKIP() << "Checks the Vulkan batch state for mixed Slot and Args image views.";
     }
+    if (!supportsVertexStageStorageWrites(instance, device))
+    {
+        GTEST_SKIP() << "The native Vulkan device does not expose vertexPipelineStoresAndAtomics.";
+    }
     GVM::Core::DeviceProxy proxy(device);
     auto queue = proxy->graphicsQueue(0);
     auto image = device->createTexture({.usage = GVM::RHI::TextureUsage::StorageBinding | GVM::RHI::TextureUsage::CopySrc,
@@ -2241,7 +2267,7 @@ TEST_F(ConstructorArgumentsTest, DirectReadbackJoinsForeignWriter)
     buffer->unmap();
     const auto wait = vk::SemaphoreSubmitInfo{}.setSemaphore(gate.get()).setValue(1).setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
     // Bound the gate even if a regression blocks submit(), an assertion fails, or an exception unwinds the test.
-    std::jthread release([&](std::stop_token stop)
+    GVM::Tests::ScopedThread release([&](GVM::Tests::StopToken stop)
     {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline)
@@ -3275,7 +3301,7 @@ TEST_F(ConstructorArgumentsTest, RequiresArgumentsBeforeIndirectDrawsAndDispatch
         .size = {1, 1, 1}, .format = GVM::RHI::TextureFormat::RGBA8Unorm});
     ArgumentRasterTarget target;
     target.color = targetImage->createView();
-    auto raster = proxy->createRenderClass<ArgumentIndexedRaster>(float4(0), GVM::RHI::BufferRange(output), 0u);
+    auto raster = proxy->createRenderClass<ArgumentWriteRaster>(GVM::RHI::BufferRange(output), 0u);
     auto compute = proxy->createComputeClass<ArgumentWorkgroupCompute>(GVM::RHI::BufferRange(output), 0u);
     auto encoder = device->getMainQueue()->createCommandEncoder();
     auto render = encoder->beginRenderPass(target.getRenderPassDescriptor());

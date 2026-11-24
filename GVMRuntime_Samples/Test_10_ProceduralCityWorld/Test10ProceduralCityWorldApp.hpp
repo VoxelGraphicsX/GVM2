@@ -18,7 +18,11 @@ namespace GVM::Samples
     public:
         explicit Test10ProceduralCityWorldApp(
             SampleWindowManager &window,
+#if defined(__APPLE__)
             GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Metal);
+#else
+            GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Vulkan);
+#endif
 
         ~Test10ProceduralCityWorldApp() override;
 

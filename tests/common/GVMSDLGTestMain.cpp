@@ -1,4 +1,6 @@
+#if !defined(__OHOS__)
 #include <SDL.h>
+#endif
 #include <gtest/gtest.h>
 #include "GVMRenderTestOptions.hpp"
 #include <cstdio>

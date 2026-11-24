@@ -107,7 +107,6 @@ else()
 endif()
 option(GVM_BUILD_SAMPLE_DESKTOP_BINARIES "Build desktop executable sample binaries that own their own window." ${GVM_BUILD_SAMPLE_DESKTOP_BINARIES_DEFAULT})
 option(GVM_ANDROID_BUILD_TEST01_NATIVE "Build the Android NativeActivity shared library for Test01 Triangle." OFF)
-option(GVM_OHOS_BUILD_TEST01_XCOMPONENT "Build the OHOS XComponent shared library for Test01 Triangle." OFF)
 
 if(NOT GVM_RHI_ENABLE_LOGGING AND GVM_RHI_USE_SPDLOG_LOGGER)
     message(WARNING "GVM_RHI_USE_SPDLOG_LOGGER is ignored because GVM_RHI_ENABLE_LOGGING=OFF.")
@@ -155,7 +154,6 @@ message(STATUS "GVM Build Desktop Sample Binaries: ${GVM_BUILD_SAMPLE_DESKTOP_BI
 message(STATUS "GVM Build Advanced Samples: ${GVM_BUILD_ADVANCED_SAMPLES}")
 message(STATUS "GVM Build Three.js r185 Samples: ${GVM_BUILD_THREE_SAMPLES}")
 message(STATUS "GVM Android Test01 Native: ${GVM_ANDROID_BUILD_TEST01_NATIVE}")
-message(STATUS "GVM OHOS Test01 XComponent: ${GVM_OHOS_BUILD_TEST01_XCOMPONENT}")
 message(STATUS "GVM Repository Dependency Cache: ${GVM_USE_REPOSITORY_DEPENDENCY_CACHE}")
 message(STATUS "GVM Dependency Cache Root: ${GVM_DEPENDENCY_CACHE_ROOT}")
 if(DEFINED CPM_SOURCE_CACHE)
@@ -731,22 +729,51 @@ if(GVM_BUILD_SAMPLES)
         OUTPUT_NAME gvm_test01_triangle)
   endif()
 
-  if(OHOS AND GVM_OHOS_BUILD_TEST01_XCOMPONENT)
-    add_library(GVMRuntimeSampleTest01TriangleOhos SHARED
-      GVMRuntime_Samples/SampleWindowManager/OhosXComponentHost.cpp)
-    target_link_libraries(GVMRuntimeSampleTest01TriangleOhos
-      PRIVATE
-        GVMRuntimeSampleTest01TriangleApp
-        libace_napi.z.so
-        libace_ndk.z.so
-        libhilog_ndk.z.so
-        libnative_window.so)
-    target_include_directories(GVMRuntimeSampleTest01TriangleOhos
-      PRIVATE
-        ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager)
-    set_target_properties(GVMRuntimeSampleTest01TriangleOhos
-      PROPERTIES
-        OUTPUT_NAME gvm_test01_triangle)
+  if(OHOS)
+    foreach(SAMPLE IN LISTS GVMRUNTIMES_SAMPLES)
+      set(_gvm_sample_app_var "GVM_RUNTIME_SAMPLE_APP_TARGET_${SAMPLE}")
+      if(DEFINED ${_gvm_sample_app_var})
+        if(SAMPLE STREQUAL "Test_01_Triangle")
+          set(_gvm_ohos_module_name "gvm_test01_triangle")
+        else()
+          string(TOLOWER "${SAMPLE}" _gvm_sample_lower)
+          set(_gvm_ohos_module_name "gvm_${_gvm_sample_lower}")
+        endif()
+
+        add_library(GVMRuntimeSample_${SAMPLE}_Ohos SHARED
+          GVMRuntime_Samples/SampleWindowManager/OhosXComponentHost.cpp)
+        target_compile_definitions(GVMRuntimeSample_${SAMPLE}_Ohos
+          PRIVATE
+            GVM_OHOS_NAPI_MODULE_NAME="${_gvm_ohos_module_name}")
+        target_link_libraries(GVMRuntimeSample_${SAMPLE}_Ohos
+          PRIVATE
+            ${${_gvm_sample_app_var}}
+            libace_napi.z.so
+            libace_ndk.z.so
+            libhilog_ndk.z.so
+            libnative_window.so)
+        target_include_directories(GVMRuntimeSample_${SAMPLE}_Ohos
+          PRIVATE
+            ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager)
+        set_target_properties(GVMRuntimeSample_${SAMPLE}_Ohos
+          PROPERTIES
+            OUTPUT_NAME "${_gvm_ohos_module_name}")
+
+        add_executable(${SAMPLE}_ohos_bin
+          GVMRuntime_Samples/SampleWindowManager/OhosConsumerSampleMain.cpp)
+        target_link_libraries(${SAMPLE}_ohos_bin
+          PRIVATE
+            ${${_gvm_sample_app_var}}
+            libnative_image.so
+            libnative_window.so)
+        target_include_directories(${SAMPLE}_ohos_bin
+          PRIVATE
+            ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/SampleWindowManager)
+        set_target_properties(${SAMPLE}_ohos_bin
+          PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/gvm_samples/bin")
+      endif()
+    endforeach()
   endif()
 
   gvm_configure_mobile_sample_hosts()

@@ -4,6 +4,7 @@
 
 #include <EASTL/algorithm.h>
 #include <EASTL/array.h>
+#include <EASTL/sort.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/utility.h>
 
@@ -12,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <mutex>
 #include <stdexcept>
 
 namespace GVM::RHI::Private
@@ -28,6 +30,7 @@ namespace GVM::RHI::Private
         constexpr uint32_t AtlasCellSize = 8u;
         constexpr uint32_t AtlasWidth = AtlasColumns * AtlasCellSize;
         constexpr uint32_t AtlasHeight = AtlasRows * AtlasCellSize;
+        constexpr uint32_t VertexBufferRingCount = 4u;
         constexpr float OverlayBackgroundGlyphCode = -1.0f;
         constexpr float OverlayBackgroundPaddingX = 6.0f;
         constexpr float OverlayBackgroundPaddingY = 6.0f;
@@ -65,17 +68,51 @@ namespace GVM::RHI::Private
             RenderPipeline pipeline = nullptr;
         };
 
+        /// Identifies one automatic pass timestamp pair recorded into a diagnostics overlay command encoder.
+        struct DiagnosticsOverlayRecordedScope
+        {
+            uint32_t slotIndex = 0u;
+            uint64_t slotGeneration = 0u;
+            uint32_t firstQuery = 0u;
+        };
+
+        /// Holds one reusable host-visible vertex buffer slot so back-to-back overlay submits do not overwrite in-flight vertices.
+        struct DiagnosticsOverlayVertexBufferSlot
+        {
+            Buffer buffer = {};
+            uint64_t capacityBytes = 0u;
+        };
+
         /// Tracks one delayed timestamp profiler frame used by the runtime diagnostics overlay.
         struct DiagnosticsOverlayProfilerFrame
         {
             GpuTimestampFrameProfiler profiler;
             eastl::vector<TimestampRawResult> rawResults;
+            eastl::vector<bool> scopeResolved;
+            Submission lastSubmission = {};
+            bool hasTrackedSubmission = false;
             bool initialized = false;
             bool frameOpen = false;
             bool used = false;
             uint32_t scopeCount = 0u;
+            uint32_t pendingScopes = 0u;
+            uint64_t generation = 1u;
             uint64_t submittedFrameIndex = 0u;
         };
+
+        /// Orders recorded timestamp scopes by profiler slot and ascending query index for contiguous resolve coalescing.
+        bool isRecordedScopeBefore(const DiagnosticsOverlayRecordedScope &lhs, const DiagnosticsOverlayRecordedScope &rhs)
+        {
+            if (lhs.slotIndex != rhs.slotIndex)
+            {
+                return lhs.slotIndex < rhs.slotIndex;
+            }
+            if (lhs.slotGeneration != rhs.slotGeneration)
+            {
+                return lhs.slotGeneration < rhs.slotGeneration;
+            }
+            return lhs.firstQuery < rhs.firstQuery;
+        }
 
         static constexpr GlyphBitmap FontGlyphs[] = {
             {'!', {0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04}},
@@ -442,47 +479,59 @@ namespace GVM::RHI::Private
         }
 
         /// Owns the low-dependency text diagnostics overlay appended by the RHI private queue wrapper.
-        class DiagnosticsOverlayController final
+        class DiagnosticsOverlayController final : public RefCountedObject
         {
         public:
             /// Creates a diagnostics overlay controller from a device configuration and keeps all work disabled when the config is off.
             DiagnosticsOverlayController(Device device, DiagnosticsOverlayShaderProgramProvider shaderProvider);
             /// Releases transient overlay buffers, atlas resources, and timestamp resolve buffers owned by the controller.
-            ~DiagnosticsOverlayController();
+            ~DiagnosticsOverlayController() override;
 
             DiagnosticsOverlayController(const DiagnosticsOverlayController &) = delete;
             DiagnosticsOverlayController &operator=(const DiagnosticsOverlayController &) = delete;
+
+            /// Releases all GPU resources owned by the controller while the device is still alive.
+            void shutdown();
 
             /// Returns true when the controller should observe passes and append overlay rendering work.
             [[nodiscard]]
             bool isEnabled() const;
 
-            /// Allocates one internal timestamp scope for an automatically timed pass.
-            GpuTimestampFrameProfiler::Scope writePassScope(const eastl::string &label);
+            /// Allocates one internal timestamp scope for an automatically timed pass and records its slot metadata.
+            GpuTimestampFrameProfiler::Scope allocatePassScope(const eastl::string &label, DiagnosticsOverlayRecordedScope &outScope, bool &outRecorded);
 
-            /// Records the last color attachment in a render pass as the overlay target for the current submit.
-            void noteRenderPassTarget(const RenderPassDescriptor &descriptor);
+            /// Releases pending scope counts for encoders that were destroyed without being submitted.
+            void abandonRecordedScopes(const eastl::vector<DiagnosticsOverlayRecordedScope> &scopes);
 
-            /// Appends the diagnostics overlay render pass to the supplied real command encoder when a valid target exists.
-            void appendOverlayPass(CommandEncoder encoder, Queue uploadQueue);
-
-            /// Resolves the current timestamp profiler after all user passes for this submit have been encoded.
-            void resolveTimestampFrame(CommandEncoder encoder);
+            /// Builds an optional trailing command encoder that draws the overlay and resolves only the scopes recorded in this submit.
+            CommandEncoder buildPostSubmitEncoder(
+                Queue innerQueue,
+                const DiagnosticsOverlayTarget &target,
+                const eastl::vector<DiagnosticsOverlayRecordedScope> &submittedScopes,
+                bool &outResolvedTimestamps);
 
             /// Reads delayed timestamp results and advances frame-local overlay state after queue submission.
-            void afterSubmit(Queue queue);
+            void afterSubmit(
+                Queue innerQueue,
+                const Submission &completion,
+                bool hasTrackedCompletion,
+                bool hadRenderTarget,
+                bool resolvedTimestamps,
+                const eastl::vector<DiagnosticsOverlayRecordedScope> &submittedScopes);
 
         private:
             /// Initializes timestamp profiler slots when the device supports pass timestamp writes.
             void initializeTimestampProfilers();
             /// Releases timestamp resolve buffers created by profiler slots.
             void releaseTimestampProfilerBuffers();
-            /// Begins a timestamp frame lazily on the first automatic pass scope.
-            DiagnosticsOverlayProfilerFrame *beginTimestampFrameIfNeeded();
+            /// Begins or returns the currently open timestamp profiler frame under mMutex.
+            DiagnosticsOverlayProfilerFrame *beginTimestampFrameIfNeededLocked();
+            /// Appends the diagnostics overlay render pass to the supplied real command encoder under mMutex.
+            void appendOverlayPassLocked(CommandEncoder encoder, Queue uploadQueue, const DiagnosticsOverlayTarget &target);
             /// Creates or returns the overlay pipeline compatible with the target color format.
             RenderPipeline getPipelineForFormat(TextureFormat format);
-            /// Ensures the vertex upload buffer can hold the requested byte count.
-            void ensureVertexBufferCapacity(uint64_t requiredBytes);
+            /// Ensures the selected vertex upload buffer slot can hold the requested byte count.
+            Buffer ensureVertexBufferCapacity(uint32_t slotIndex, uint64_t requiredBytes);
             /// Ensures the runtime font atlas texture, sampler, and bind group exist and are uploaded.
             bool ensureFontAtlasResources(Queue uploadQueue);
             /// Builds display text rows from the latest CPU and GPU diagnostics state.
@@ -494,6 +543,7 @@ namespace GVM::RHI::Private
             /// Marks an unsupported target format as already reported.
             void rememberUnsupportedFormat(TextureFormat format);
 
+            mutable std::mutex mMutex;
             Device mDevice = nullptr;
             Logger mLogger = nullptr;
             RuntimeDiagnosticsOverlayConfig mConfig = {};
@@ -506,29 +556,31 @@ namespace GVM::RHI::Private
             Texture mFontAtlasTexture = {};
             TextureView mFontAtlasView = {};
             Sampler mFontSampler = {};
-            Buffer mVertexBuffer = {};
-            uint64_t mVertexBufferCapacityBytes = 0u;
+            eastl::array<DiagnosticsOverlayVertexBufferSlot, VertexBufferRingCount> mVertexBuffers = {};
+            uint32_t mNextVertexBufferSlot = 0u;
             eastl::vector<DiagnosticsOverlayPipelineEntry> mPipelines;
             eastl::vector<DiagnosticsOverlayProfilerFrame> mProfilerFrames;
             eastl::vector<TimestampRangeResult> mLastPassTimes;
             eastl::vector<DiagnosticsOverlayVertex> mVertices;
             eastl::vector<TextureFormat> mWarnedUnsupportedFormats;
-            DiagnosticsOverlayTarget mTarget = {};
             std::chrono::steady_clock::time_point mLastFrameTime = {};
             bool mEnabled = false;
             bool mTimestampAvailable = false;
             bool mHasLastFrameTime = false;
             bool mTimestampWarningLogged = false;
             bool mFailureLogged = false;
+            uint32_t mActiveProfilerSlot = 0u;
             uint64_t mFrameIndex = 0u;
         };
 
-        /// Wraps a real command encoder so overlay profiling and drawing stay inside the RHI layer.
+        /// Wraps a real command encoder so overlay profiling and target tracking stay local to each encoder until submit.
         class DiagnosticsOverlayCommandEncoder final : public CommandEncoderImpl
         {
         public:
             /// Creates a command encoder wrapper over a backend-native command encoder.
-            DiagnosticsOverlayCommandEncoder(DiagnosticsOverlayController *controller, Queue uploadQueue, CommandEncoder innerEncoder);
+            DiagnosticsOverlayCommandEncoder(eastl::intrusive_ptr<DiagnosticsOverlayController> controller, CommandEncoder innerEncoder);
+            /// Releases any unsubmitted timestamp scope reservations if the encoder was discarded before submission.
+            ~DiagnosticsOverlayCommandEncoder() override;
 
             /// Returns the backend-native command encoder used for actual submission.
             [[nodiscard]]
@@ -537,6 +589,13 @@ namespace GVM::RHI::Private
             /// Returns whether the wrapped encoder has already been ended.
             [[nodiscard]]
             bool isEnded() const;
+
+            /// Returns the last valid color render-pass target observed in this encoder.
+            [[nodiscard]]
+            const DiagnosticsOverlayTarget &getLastTarget() const;
+
+            /// Moves recorded automatic timestamp scopes to the submitting queue and marks this encoder submitted.
+            void consumeSubmissionMetadata(eastl::vector<DiagnosticsOverlayRecordedScope> &outScopes);
 
             /// Forwards begin to the backend-native command encoder.
             void begin() override;
@@ -553,14 +612,16 @@ namespace GVM::RHI::Private
             /// Forwards query-set resolve commands to the backend-native encoder.
             void resolveQuerySet(QuerySet querySet, uint32_t firstQuery, uint32_t queryCount, BufferRange destination) override;
 
-            /// Appends and resolves overlay work once, then ends the backend-native encoder.
+            /// Ends the backend-native encoder without mutating shared overlay resources on worker threads.
             void end() override;
 
         private:
-            DiagnosticsOverlayController *mController = nullptr;
-            Queue mUploadQueue = nullptr;
+            eastl::intrusive_ptr<DiagnosticsOverlayController> mController = nullptr;
             CommandEncoder mInnerEncoder = nullptr;
+            DiagnosticsOverlayTarget mLastTarget = {};
+            eastl::vector<DiagnosticsOverlayRecordedScope> mRecordedScopes;
             bool mEnded = false;
+            bool mSubmitted = false;
         };
 
         /// Wraps a backend queue to make diagnostics overlay injection transparent to Core and raw RHI users.
@@ -603,8 +664,10 @@ namespace GVM::RHI::Private
             void copyBufferToBufferMultipleRegion(Buffer source, Buffer destination, Buffer regions, uint32_t regionCount) override;
             /// Forwards a buffer fill command to the backend queue.
             void fillBuffer(BufferRange source, uint8_t value) override;
-        Readback readBufferAsync(BufferRange source) override;
-        Readback readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize) override;
+            /// Forwards an asynchronous buffer readback to the backend queue.
+            Readback readBufferAsync(BufferRange source) override;
+            /// Forwards an asynchronous texture readback to the backend queue.
+            Readback readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize) override;
             /// Ends wrapped encoders as needed, submits real backend encoders, and advances overlay readback state.
             void submit(const eastl::vector<CommandEncoder> &encoders) override;
             /// Forwards explicit GPU dependencies and returns the underlying completion handle.
@@ -613,9 +676,13 @@ namespace GVM::RHI::Private
             void destroy() override;
 
         private:
-            /// Unwraps recorded encoders, preserving the strict closed-encoder contract for tracked submissions.
-            eastl::vector<CommandEncoder> unwrapEncoders(const eastl::vector<CommandEncoder> &encoders, bool requireClosed);
-            eastl::unique_ptr<DiagnosticsOverlayController> mController;
+            /// Unwraps recorded encoders, collects submission-ordered target and timestamp metadata, and preserves closed-encoder checks.
+            eastl::vector<CommandEncoder> unwrapEncoders(
+                const eastl::vector<CommandEncoder> &encoders,
+                bool requireClosed,
+                DiagnosticsOverlayTarget &outTarget,
+                eastl::vector<DiagnosticsOverlayRecordedScope> &outScopes);
+            eastl::intrusive_ptr<DiagnosticsOverlayController> mController;
             Queue mInnerQueue = nullptr;
         };
 
@@ -650,90 +717,219 @@ namespace GVM::RHI::Private
 
         DiagnosticsOverlayController::~DiagnosticsOverlayController()
         {
+            shutdown();
+        }
+
+        void DiagnosticsOverlayController::shutdown()
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            mEnabled = false;
+            mTimestampAvailable = false;
             mPipelines.clear();
             mFontBindGroup = nullptr;
             mPipelineLayout = nullptr;
             mFontBindGroupLayout = nullptr;
             mVertexShader = nullptr;
             mFragmentShader = nullptr;
-            if (mDevice != nullptr && !mVertexBuffer.isNull())
+            if (mDevice != nullptr)
             {
-                mDevice->freeBuffer(mVertexBuffer);
-                mVertexBuffer.reset();
+                for (DiagnosticsOverlayVertexBufferSlot &slot : mVertexBuffers)
+                {
+                    if (!slot.buffer.isNull())
+                    {
+                        mDevice->freeBuffer(slot.buffer);
+                        slot.buffer.reset();
+                        slot.capacityBytes = 0u;
+                    }
+                }
+                if (!mFontAtlasTexture.isNull())
+                {
+                    mDevice->freeTexture(mFontAtlasTexture);
+                    mFontAtlasTexture.reset();
+                }
+                mFontAtlasView.reset();
+                if (!mFontSampler.isNull())
+                {
+                    mDevice->freeSampler(mFontSampler);
+                    mFontSampler.reset();
+                }
+                releaseTimestampProfilerBuffers();
             }
-            if (mDevice != nullptr && !mFontAtlasTexture.isNull())
-            {
-                mDevice->freeTexture(mFontAtlasTexture);
-                mFontAtlasTexture.reset();
-            }
-            if (mDevice != nullptr && !mFontSampler.isNull())
-            {
-                mDevice->freeSampler(mFontSampler);
-                mFontSampler.reset();
-            }
-            releaseTimestampProfilerBuffers();
+            mProfilerFrames.clear();
+            mDevice = nullptr;
         }
 
         bool DiagnosticsOverlayController::isEnabled() const
         {
+            std::lock_guard<std::mutex> lock(mMutex);
             return mEnabled;
         }
 
-        GpuTimestampFrameProfiler::Scope DiagnosticsOverlayController::writePassScope(const eastl::string &label)
+        GpuTimestampFrameProfiler::Scope DiagnosticsOverlayController::allocatePassScope(
+            const eastl::string &label,
+            DiagnosticsOverlayRecordedScope &outScope,
+            bool &outRecorded)
         {
+            outRecorded = false;
+            std::lock_guard<std::mutex> lock(mMutex);
             if (!mEnabled || !mTimestampAvailable || mConfig.showPassTimes == False)
             {
                 return {};
             }
 
-            DiagnosticsOverlayProfilerFrame *frame = beginTimestampFrameIfNeeded();
+            DiagnosticsOverlayProfilerFrame *frame = beginTimestampFrameIfNeededLocked();
             if (frame == nullptr || frame->scopeCount >= mConfig.maxPassScopes)
             {
                 return {};
             }
 
             GpuTimestampFrameProfiler::Scope scope = frame->profiler.writePass(label);
+            outScope.slotIndex = mActiveProfilerSlot;
+            outScope.slotGeneration = frame->generation;
+            outScope.firstQuery = scope.timestampWrites.beginningOfPassWriteIndex;
             frame->used = true;
             ++frame->scopeCount;
+            ++frame->pendingScopes;
+            outRecorded = true;
             return scope;
         }
 
-        void DiagnosticsOverlayController::noteRenderPassTarget(const RenderPassDescriptor &descriptor)
+        void DiagnosticsOverlayController::abandonRecordedScopes(const eastl::vector<DiagnosticsOverlayRecordedScope> &scopes)
         {
-            if (!mEnabled)
+            if (scopes.empty())
             {
                 return;
             }
 
-            for (auto iterator = descriptor.colorAttachments.rbegin(); iterator != descriptor.colorAttachments.rend(); ++iterator)
+            std::lock_guard<std::mutex> lock(mMutex);
+            for (const DiagnosticsOverlayRecordedScope &scope : scopes)
             {
-                const RenderPassColorAttachment &attachment = *iterator;
-                if (attachment.view.isNull())
+                if (scope.slotIndex >= mProfilerFrames.size())
                 {
                     continue;
                 }
-
-                mTarget.view = attachment.view;
-                mTarget.format = attachment.view->getFormat();
-                mTarget.width = attachment.view->getWidth();
-                mTarget.height = attachment.view->getHeight();
-                return;
+                DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[scope.slotIndex];
+                if (frame.generation == scope.slotGeneration && frame.pendingScopes > 0u)
+                {
+                    --frame.pendingScopes;
+                }
             }
         }
 
-        void DiagnosticsOverlayController::appendOverlayPass(CommandEncoder encoder, Queue uploadQueue)
+        CommandEncoder DiagnosticsOverlayController::buildPostSubmitEncoder(
+            Queue innerQueue,
+            const DiagnosticsOverlayTarget &target,
+            const eastl::vector<DiagnosticsOverlayRecordedScope> &submittedScopes,
+            bool &outResolvedTimestamps)
         {
-            if (!mEnabled || encoder == nullptr || uploadQueue == nullptr || mTarget.view.isNull() || mTarget.width == 0u || mTarget.height == 0u)
+            outResolvedTimestamps = false;
+            std::lock_guard<std::mutex> lock(mMutex);
+            eastl::vector<DiagnosticsOverlayRecordedScope> liveScopes;
+            liveScopes.reserve(submittedScopes.size());
+            for (const DiagnosticsOverlayRecordedScope &scope : submittedScopes)
+            {
+                if (scope.slotIndex >= mProfilerFrames.size())
+                {
+                    continue;
+                }
+                DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[scope.slotIndex];
+                if (frame.generation != scope.slotGeneration)
+                {
+                    continue;
+                }
+                if (frame.pendingScopes > 0u)
+                {
+                    --frame.pendingScopes;
+                }
+                if (frame.initialized)
+                {
+                    liveScopes.push_back(scope);
+                }
+            }
+
+            const bool shouldDrawOverlay =
+                mEnabled && innerQueue != nullptr && !target.view.isNull() && target.width > 0u && target.height > 0u;
+            const bool shouldResolveTimestamps =
+                mEnabled && mTimestampAvailable && innerQueue != nullptr && !liveScopes.empty();
+            if (!shouldDrawOverlay && !shouldResolveTimestamps)
+            {
+                return nullptr;
+            }
+
+            CommandEncoder postEncoder = innerQueue->createCommandEncoder();
+            if (postEncoder == nullptr)
+            {
+                return nullptr;
+            }
+            postEncoder->begin();
+
+            if (shouldDrawOverlay)
+            {
+                appendOverlayPassLocked(postEncoder, innerQueue, target);
+            }
+
+            if (shouldResolveTimestamps)
+            {
+                eastl::sort(liveScopes.begin(), liveScopes.end(), isRecordedScopeBefore);
+                size_t cursor = 0u;
+                while (cursor < liveScopes.size())
+                {
+                    const DiagnosticsOverlayRecordedScope &first = liveScopes[cursor];
+                    DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[first.slotIndex];
+                    const uint32_t rangeFirstQuery = first.firstQuery;
+                    uint32_t rangeQueryCount = 2u;
+
+                    size_t next = cursor + 1u;
+                    while (next < liveScopes.size())
+                    {
+                        const DiagnosticsOverlayRecordedScope &candidate = liveScopes[next];
+                        if (candidate.slotIndex != first.slotIndex ||
+                            candidate.slotGeneration != first.slotGeneration ||
+                            candidate.firstQuery != rangeFirstQuery + rangeQueryCount)
+                        {
+                            break;
+                        }
+                        rangeQueryCount += 2u;
+                        ++next;
+                    }
+
+                    QuerySet querySet = frame.profiler.getQuerySet();
+                    Buffer resolveBuffer = frame.profiler.getResolveBuffer();
+                    if (querySet != nullptr && !resolveBuffer.isNull())
+                    {
+                        const uint32_t rawStrideBytes = querySet->getResultStrideBytes();
+                        const uint64_t strideBytes = rawStrideBytes > 0u ? static_cast<uint64_t>(rawStrideBytes) : sizeof(uint64_t);
+                        postEncoder->resolveQuerySet(
+                            querySet,
+                            rangeFirstQuery,
+                            rangeQueryCount,
+                            BufferRange(resolveBuffer, static_cast<uint64_t>(rangeFirstQuery) * strideBytes, static_cast<uint64_t>(rangeQueryCount) * strideBytes));
+                        outResolvedTimestamps = true;
+                    }
+                    cursor = next;
+                }
+            }
+
+            postEncoder->end();
+            return postEncoder;
+        }
+
+        void DiagnosticsOverlayController::appendOverlayPassLocked(
+            CommandEncoder encoder,
+            Queue uploadQueue,
+            const DiagnosticsOverlayTarget &target)
+        {
+            if (!mEnabled || encoder == nullptr || uploadQueue == nullptr || target.view.isNull() || target.width == 0u || target.height == 0u)
             {
                 return;
             }
 
-            if (!isSupportedOverlayTargetFormat(mTarget.format))
+            if (!isSupportedOverlayTargetFormat(target.format))
             {
-                if (!hasWarnedUnsupportedFormat(mTarget.format))
+                if (!hasWarnedUnsupportedFormat(target.format))
                 {
-                    GVMLogWarn(mLogger, OverlayLogCategory, "event=overlay_unsupported_target_format format={}", static_cast<uint32_t>(mTarget.format));
-                    rememberUnsupportedFormat(mTarget.format);
+                    GVMLogWarn(mLogger, OverlayLogCategory, "event=overlay_unsupported_target_format format={}", static_cast<uint32_t>(target.format));
+                    rememberUnsupportedFormat(target.format);
                 }
                 return;
             }
@@ -747,33 +943,35 @@ namespace GVM::RHI::Private
 
                 eastl::vector<eastl::string> lines;
                 buildTextLines(lines);
-                buildTextVertices(lines, mTarget);
+                buildTextVertices(lines, target);
                 if (mVertices.empty())
                 {
                     return;
                 }
 
                 const uint64_t vertexBytes = static_cast<uint64_t>(mVertices.size()) * sizeof(DiagnosticsOverlayVertex);
-                ensureVertexBufferCapacity(vertexBytes);
-                mVertexBuffer->map();
-                void *vertexData = mVertexBuffer->getMappedRange(0u, vertexBytes);
+                const uint32_t bufferSlot = mNextVertexBufferSlot;
+                mNextVertexBufferSlot = (mNextVertexBufferSlot + 1u) % VertexBufferRingCount;
+                Buffer vertexBuffer = ensureVertexBufferCapacity(bufferSlot, vertexBytes);
+                vertexBuffer->map();
+                void *vertexData = vertexBuffer->getMappedRange(0u, vertexBytes);
                 std::memcpy(vertexData, mVertices.data(), static_cast<size_t>(vertexBytes));
-                mVertexBuffer->unmap();
-                RenderPipeline pipeline = getPipelineForFormat(mTarget.format);
-                BufferRange vertexRange(mVertexBuffer, 0u, vertexBytes);
+                vertexBuffer->unmap();
+                RenderPipeline pipeline = getPipelineForFormat(target.format);
+                BufferRange vertexRange(vertexBuffer, 0u, vertexBytes);
 
                 RenderPassDescriptor overlayPass = {};
                 overlayPass.label = "DiagnosticsOverlay";
                 overlayPass.colorAttachments.push_back({
-                    .view = mTarget.view,
+                    .view = target.view,
                     .loadOp = LoadOp::Load,
                     .storeOp = StoreOp::Store,
                     .clearValue = {0.0, 0.0, 0.0, 0.0},
                 });
 
                 RenderPassEncoder passEncoder = encoder->beginRenderPass(overlayPass);
-                passEncoder->setViewport(0.0f, 0.0f, static_cast<float>(mTarget.width), static_cast<float>(mTarget.height), 0.0f, 1.0f);
-                passEncoder->setScissorRect(0u, 0u, mTarget.width, mTarget.height);
+                passEncoder->setViewport(0.0f, 0.0f, static_cast<float>(target.width), static_cast<float>(target.height), 0.0f, 1.0f);
+                passEncoder->setScissorRect(0u, 0u, target.width, target.height);
                 passEncoder->setPipeline(pipeline);
                 passEncoder->setBindGroup(mFontBindGroup, 0u);
                 passEncoder->setVertexBuffer(vertexRange, 0u);
@@ -791,68 +989,121 @@ namespace GVM::RHI::Private
             }
         }
 
-        void DiagnosticsOverlayController::resolveTimestampFrame(CommandEncoder encoder)
+        void DiagnosticsOverlayController::afterSubmit(
+            Queue innerQueue,
+            const Submission &completion,
+            bool hasTrackedCompletion,
+            bool hadRenderTarget,
+            bool resolvedTimestamps,
+            const eastl::vector<DiagnosticsOverlayRecordedScope> &submittedScopes)
         {
-            if (!mEnabled || !mTimestampAvailable || encoder == nullptr)
+            std::lock_guard<std::mutex> lock(mMutex);
+            if (!mEnabled || (!hadRenderTarget && submittedScopes.empty()))
             {
                 return;
             }
 
-            const uint32_t frameSlot = static_cast<uint32_t>(mFrameIndex % mProfilerFrames.size());
-            DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[frameSlot];
-            if (!frame.frameOpen || !frame.used)
+            for (const DiagnosticsOverlayRecordedScope &scope : submittedScopes)
             {
-                return;
-            }
-
-            frame.profiler.resolve(encoder);
-            frame.submittedFrameIndex = mFrameIndex;
-        }
-
-        void DiagnosticsOverlayController::afterSubmit(Queue queue)
-        {
-            if (!mEnabled)
-            {
-                return;
-            }
-
-            if (mTimestampAvailable && queue != nullptr && !mProfilerFrames.empty())
-            {
-                const uint32_t latency = eastl::min<uint32_t>(mConfig.timestampReadbackLatencyFrames, static_cast<uint32_t>(mProfilerFrames.size() - 1u));
-                if (mFrameIndex >= latency)
+                if (scope.slotIndex >= mProfilerFrames.size())
                 {
-                    const uint32_t readSlot = static_cast<uint32_t>((mFrameIndex + mProfilerFrames.size() - latency) % mProfilerFrames.size());
-                    DiagnosticsOverlayProfilerFrame &readFrame = mProfilerFrames[readSlot];
-                    if (readFrame.used && readFrame.submittedFrameIndex + latency <= mFrameIndex)
+                    continue;
+                }
+                DiagnosticsOverlayProfilerFrame &slot = mProfilerFrames[scope.slotIndex];
+                if (slot.generation != scope.slotGeneration)
+                {
+                    continue;
+                }
+                if (resolvedTimestamps && slot.initialized)
+                {
+                    const uint32_t ordinal = scope.firstQuery / 2u;
+                    if (ordinal < slot.scopeResolved.size())
                     {
-                        try
+                        slot.scopeResolved[ordinal] = true;
+                    }
+                }
+                slot.submittedFrameIndex = mFrameIndex;
+                if (hasTrackedCompletion)
+                {
+                    slot.lastSubmission = completion;
+                    slot.hasTrackedSubmission = true;
+                }
+            }
+
+            if (mActiveProfilerSlot < mProfilerFrames.size())
+            {
+                DiagnosticsOverlayProfilerFrame &activeFrame = mProfilerFrames[mActiveProfilerSlot];
+                if (activeFrame.frameOpen && (hadRenderTarget || activeFrame.scopeCount >= mConfig.maxPassScopes))
+                {
+                    activeFrame.frameOpen = false;
+                    activeFrame.submittedFrameIndex = mFrameIndex;
+                }
+            }
+
+            if (mTimestampAvailable && innerQueue != nullptr && !mProfilerFrames.empty())
+            {
+                const uint32_t latency = mProfilerFrames.size() > 1u
+                    ? eastl::min<uint32_t>(mConfig.timestampReadbackLatencyFrames, static_cast<uint32_t>(mProfilerFrames.size() - 1u))
+                    : 0u;
+                uint32_t readySlot = static_cast<uint32_t>(mProfilerFrames.size());
+                uint64_t oldestSubmittedFrame = UINT64_MAX;
+                for (uint32_t slotIndex = 0u; slotIndex < static_cast<uint32_t>(mProfilerFrames.size()); ++slotIndex)
+                {
+                    const DiagnosticsOverlayProfilerFrame &candidate = mProfilerFrames[slotIndex];
+                    if (!candidate.initialized || candidate.frameOpen || !candidate.used || candidate.pendingScopes != 0u)
+                    {
+                        continue;
+                    }
+                    if (mFrameIndex < candidate.submittedFrameIndex + latency)
+                    {
+                        continue;
+                    }
+                    if (candidate.hasTrackedSubmission && !candidate.lastSubmission.isComplete())
+                    {
+                        continue;
+                    }
+                    if (candidate.submittedFrameIndex < oldestSubmittedFrame)
+                    {
+                        oldestSubmittedFrame = candidate.submittedFrameIndex;
+                        readySlot = slotIndex;
+                    }
+                }
+
+                if (readySlot < mProfilerFrames.size())
+                {
+                    DiagnosticsOverlayProfilerFrame &readFrame = mProfilerFrames[readySlot];
+                    try
+                    {
+                        readFrame.profiler.readbackBlocking(innerQueue, readFrame.rawResults);
+                        const eastl::vector<TimestampRangeResult> allResults = readFrame.profiler.buildRangeResults(readFrame.rawResults);
+                        mLastPassTimes.clear();
+                        mLastPassTimes.reserve(allResults.size());
+                        for (const TimestampRangeResult &result : allResults)
                         {
-                            readFrame.profiler.readbackBlocking(queue, readFrame.rawResults);
-                            mLastPassTimes = readFrame.profiler.buildRangeResults(readFrame.rawResults);
-                            readFrame.used = false;
-                            readFrame.frameOpen = false;
-                            readFrame.scopeCount = 0u;
-                        }
-                        catch (const std::exception &error)
-                        {
-                            if (!mTimestampWarningLogged)
+                            const uint32_t ordinal = result.beginIndex / 2u;
+                            if (ordinal < readFrame.scopeResolved.size() && readFrame.scopeResolved[ordinal])
                             {
-                                GVMLogWarn(mLogger, OverlayLogCategory, "event=timestamp_readback_disabled error=\"{}\"", error.what());
-                                mTimestampWarningLogged = true;
+                                mLastPassTimes.push_back(result);
                             }
-                            mTimestampAvailable = false;
                         }
+                        readFrame.used = false;
+                        readFrame.scopeCount = 0u;
+                        readFrame.hasTrackedSubmission = false;
+                        readFrame.lastSubmission = {};
+                    }
+                    catch (const std::exception &error)
+                    {
+                        if (!mTimestampWarningLogged)
+                        {
+                            GVMLogWarn(mLogger, OverlayLogCategory, "event=timestamp_readback_disabled error=\"{}\"", error.what());
+                            mTimestampWarningLogged = true;
+                        }
+                        mTimestampAvailable = false;
                     }
                 }
             }
 
-            const uint32_t currentSlot = !mProfilerFrames.empty() ? static_cast<uint32_t>(mFrameIndex % mProfilerFrames.size()) : 0u;
-            if (!mProfilerFrames.empty())
-            {
-                mProfilerFrames[currentSlot].frameOpen = false;
-            }
             ++mFrameIndex;
-            mTarget = {};
         }
 
         void DiagnosticsOverlayController::initializeTimestampProfilers()
@@ -868,7 +1119,7 @@ namespace GVM::RHI::Private
                 return;
             }
 
-            const uint32_t frameCount = eastl::max(2u, mConfig.timestampReadbackLatencyFrames + 1u);
+            const uint32_t frameCount = eastl::max(6u, mConfig.timestampReadbackLatencyFrames * 2u + 2u);
             mProfilerFrames.resize(frameCount);
             try
             {
@@ -876,6 +1127,7 @@ namespace GVM::RHI::Private
                 {
                     DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[frameIndex];
                     frame.profiler.init(mDevice, mConfig.maxPassScopes, makeFormattedString("DiagnosticsOverlay.TimestampFrame%u", frameIndex));
+                    frame.scopeResolved.assign(mConfig.maxPassScopes, false);
                     frame.initialized = true;
                 }
                 mTimestampAvailable = true;
@@ -910,31 +1162,74 @@ namespace GVM::RHI::Private
                 frame.initialized = false;
                 frame.used = false;
                 frame.frameOpen = false;
+                frame.pendingScopes = 0u;
+                frame.hasTrackedSubmission = false;
+                frame.lastSubmission = {};
             }
         }
 
-        DiagnosticsOverlayProfilerFrame *DiagnosticsOverlayController::beginTimestampFrameIfNeeded()
+        DiagnosticsOverlayProfilerFrame *DiagnosticsOverlayController::beginTimestampFrameIfNeededLocked()
         {
             if (mProfilerFrames.empty())
             {
                 return nullptr;
             }
 
-            const uint32_t frameSlot = static_cast<uint32_t>(mFrameIndex % mProfilerFrames.size());
-            DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[frameSlot];
-            if (!frame.initialized)
+            if (mActiveProfilerSlot < mProfilerFrames.size())
+            {
+                DiagnosticsOverlayProfilerFrame &current = mProfilerFrames[mActiveProfilerSlot];
+                if (current.initialized && current.frameOpen)
+                {
+                    return &current;
+                }
+            }
+
+            const uint32_t slotCount = static_cast<uint32_t>(mProfilerFrames.size());
+            uint32_t chosenSlot = slotCount;
+            for (uint32_t offset = 1u; offset <= slotCount; ++offset)
+            {
+                const uint32_t candidateIndex = (mActiveProfilerSlot + offset) % slotCount;
+                const DiagnosticsOverlayProfilerFrame &candidate = mProfilerFrames[candidateIndex];
+                if (candidate.initialized && !candidate.frameOpen && candidate.pendingScopes == 0u && !candidate.used)
+                {
+                    chosenSlot = candidateIndex;
+                    break;
+                }
+            }
+
+            if (chosenSlot >= slotCount)
+            {
+                for (uint32_t offset = 1u; offset <= slotCount; ++offset)
+                {
+                    const uint32_t candidateIndex = (mActiveProfilerSlot + offset) % slotCount;
+                    const DiagnosticsOverlayProfilerFrame &candidate = mProfilerFrames[candidateIndex];
+                    if (candidate.initialized && !candidate.frameOpen && candidate.pendingScopes == 0u &&
+                        (!candidate.hasTrackedSubmission || candidate.lastSubmission.isComplete()))
+                    {
+                        chosenSlot = candidateIndex;
+                        break;
+                    }
+                }
+            }
+
+            if (chosenSlot >= slotCount)
             {
                 return nullptr;
             }
-            if (!frame.frameOpen)
-            {
-                frame.profiler.reset();
-                frame.rawResults.clear();
-                frame.frameOpen = true;
-                frame.used = false;
-                frame.scopeCount = 0u;
-                frame.submittedFrameIndex = mFrameIndex;
-            }
+
+            mActiveProfilerSlot = chosenSlot;
+            DiagnosticsOverlayProfilerFrame &frame = mProfilerFrames[chosenSlot];
+            frame.profiler.reset();
+            frame.rawResults.clear();
+            frame.scopeResolved.assign(mConfig.maxPassScopes, false);
+            frame.hasTrackedSubmission = false;
+            frame.lastSubmission = {};
+            frame.frameOpen = true;
+            frame.used = false;
+            frame.scopeCount = 0u;
+            frame.pendingScopes = 0u;
+            ++frame.generation;
+            frame.submittedFrameIndex = mFrameIndex;
             return &frame;
         }
 
@@ -1013,25 +1308,27 @@ namespace GVM::RHI::Private
             return entry.pipeline;
         }
 
-        void DiagnosticsOverlayController::ensureVertexBufferCapacity(uint64_t requiredBytes)
+        Buffer DiagnosticsOverlayController::ensureVertexBufferCapacity(uint32_t slotIndex, uint64_t requiredBytes)
         {
-            if (requiredBytes <= mVertexBufferCapacityBytes && !mVertexBuffer.isNull())
+            DiagnosticsOverlayVertexBufferSlot &slot = mVertexBuffers[slotIndex % VertexBufferRingCount];
+            if (requiredBytes <= slot.capacityBytes && !slot.buffer.isNull())
             {
-                return;
+                return slot.buffer;
             }
 
-            if (!mVertexBuffer.isNull())
+            if (!slot.buffer.isNull())
             {
-                mDevice->freeBuffer(mVertexBuffer);
-                mVertexBuffer.reset();
+                mDevice->freeBuffer(slot.buffer);
+                slot.buffer.reset();
             }
 
-            mVertexBufferCapacityBytes = calculateExpandedBufferSize(requiredBytes);
+            slot.capacityBytes = calculateExpandedBufferSize(requiredBytes);
             BufferDescriptor descriptor = {};
-            descriptor.label = "DiagnosticsOverlay.GlyphVertices";
+            descriptor.label = makeFormattedString("DiagnosticsOverlay.GlyphVertices%u", slotIndex % VertexBufferRingCount);
             descriptor.usage = BufferUsage::Vertex | BufferUsage::CopyDst | BufferUsage::MapWrite;
-            descriptor.size = mVertexBufferCapacityBytes;
-            mVertexBuffer = mDevice->createBuffer(descriptor);
+            descriptor.size = slot.capacityBytes;
+            slot.buffer = mDevice->createBuffer(descriptor);
+            return slot.buffer;
         }
 
         bool DiagnosticsOverlayController::ensureFontAtlasResources(Queue uploadQueue)
@@ -1288,11 +1585,18 @@ namespace GVM::RHI::Private
             mWarnedUnsupportedFormats.push_back(format);
         }
 
-        DiagnosticsOverlayCommandEncoder::DiagnosticsOverlayCommandEncoder(DiagnosticsOverlayController *controller, Queue uploadQueue, CommandEncoder innerEncoder)
-            : mController(controller)
-            , mUploadQueue(uploadQueue)
+        DiagnosticsOverlayCommandEncoder::DiagnosticsOverlayCommandEncoder(eastl::intrusive_ptr<DiagnosticsOverlayController> controller, CommandEncoder innerEncoder)
+            : mController(eastl::move(controller))
             , mInnerEncoder(eastl::move(innerEncoder))
         {
+        }
+
+        DiagnosticsOverlayCommandEncoder::~DiagnosticsOverlayCommandEncoder()
+        {
+            if (!mSubmitted && !mRecordedScopes.empty() && mController != nullptr)
+            {
+                mController->abandonRecordedScopes(mRecordedScopes);
+            }
         }
 
         CommandEncoder DiagnosticsOverlayCommandEncoder::getInnerEncoder() const
@@ -1303,6 +1607,21 @@ namespace GVM::RHI::Private
         bool DiagnosticsOverlayCommandEncoder::isEnded() const
         {
             return mEnded;
+        }
+
+        const DiagnosticsOverlayTarget &DiagnosticsOverlayCommandEncoder::getLastTarget() const
+        {
+            return mLastTarget;
+        }
+
+        void DiagnosticsOverlayCommandEncoder::consumeSubmissionMetadata(eastl::vector<DiagnosticsOverlayRecordedScope> &outScopes)
+        {
+            if (!mRecordedScopes.empty())
+            {
+                outScopes.insert(outScopes.end(), mRecordedScopes.begin(), mRecordedScopes.end());
+                mRecordedScopes.clear();
+            }
+            mSubmitted = true;
         }
 
         void DiagnosticsOverlayCommandEncoder::begin()
@@ -1318,11 +1637,25 @@ namespace GVM::RHI::Private
             RenderPassDescriptor descriptor = pass;
             if (mController != nullptr && !hasExplicitTimestampWrites(descriptor.timestampWrites))
             {
-                descriptor.timestampWrites = mController->writePassScope(descriptor.label).timestampWrites;
+                DiagnosticsOverlayRecordedScope recordedScope = {};
+                bool recorded = false;
+                descriptor.timestampWrites = mController->allocatePassScope(descriptor.label, recordedScope, recorded).timestampWrites;
+                if (recorded)
+                {
+                    mRecordedScopes.push_back(recordedScope);
+                }
             }
-            if (mController != nullptr)
+            for (auto iterator = descriptor.colorAttachments.rbegin(); iterator != descriptor.colorAttachments.rend(); ++iterator)
             {
-                mController->noteRenderPassTarget(descriptor);
+                const RenderPassColorAttachment &attachment = *iterator;
+                if (!attachment.view.isNull())
+                {
+                    mLastTarget.view = attachment.view;
+                    mLastTarget.format = attachment.view->getFormat();
+                    mLastTarget.width = attachment.view->getWidth();
+                    mLastTarget.height = attachment.view->getHeight();
+                    break;
+                }
             }
             return mInnerEncoder->beginRenderPass(descriptor);
         }
@@ -1332,7 +1665,13 @@ namespace GVM::RHI::Private
             BlitPassDescriptor descriptor = pass;
             if (mController != nullptr && !hasExplicitTimestampWrites(descriptor.timestampWrites))
             {
-                descriptor.timestampWrites = mController->writePassScope(descriptor.label).timestampWrites;
+                DiagnosticsOverlayRecordedScope recordedScope = {};
+                bool recorded = false;
+                descriptor.timestampWrites = mController->allocatePassScope(descriptor.label, recordedScope, recorded).timestampWrites;
+                if (recorded)
+                {
+                    mRecordedScopes.push_back(recordedScope);
+                }
             }
             return mInnerEncoder->beginBlitPass(descriptor);
         }
@@ -1342,7 +1681,13 @@ namespace GVM::RHI::Private
             ComputePassDescriptor descriptor = pass;
             if (mController != nullptr && !hasExplicitTimestampWrites(descriptor.timestampWrites))
             {
-                descriptor.timestampWrites = mController->writePassScope(descriptor.label).timestampWrites;
+                DiagnosticsOverlayRecordedScope recordedScope = {};
+                bool recorded = false;
+                descriptor.timestampWrites = mController->allocatePassScope(descriptor.label, recordedScope, recorded).timestampWrites;
+                if (recorded)
+                {
+                    mRecordedScopes.push_back(recordedScope);
+                }
             }
             return mInnerEncoder->beginComputePass(descriptor);
         }
@@ -1357,11 +1702,6 @@ namespace GVM::RHI::Private
             if (mEnded)
             {
                 return;
-            }
-            if (mController != nullptr)
-            {
-                mController->appendOverlayPass(mInnerEncoder, mUploadQueue);
-                mController->resolveTimestampFrame(mInnerEncoder);
             }
             mInnerEncoder->end();
             mEnded = true;
@@ -1396,7 +1736,8 @@ namespace GVM::RHI::Private
         {
             if (mInnerQueue != nullptr)
             {
-                return mInnerQueue->getMaxUnsubmittedCommandEncoderCount();
+                const uint32_t innerCapacity = mInnerQueue->getMaxUnsubmittedCommandEncoderCount();
+                return innerCapacity > 1u ? innerCapacity - 1u : 1u;
             }
             return 1024u;
         }
@@ -1404,7 +1745,7 @@ namespace GVM::RHI::Private
         CommandEncoder DiagnosticsOverlayQueue::createCommandEncoder()
         {
             CommandEncoder innerEncoder = mInnerQueue->createCommandEncoder();
-            return new DiagnosticsOverlayCommandEncoder(mController.get(), mInnerQueue, innerEncoder);
+            return new DiagnosticsOverlayCommandEncoder(mController, innerEncoder);
         }
 
         void DiagnosticsOverlayQueue::writeBuffer(BufferRange buffer, void const *data, uint64_t size)
@@ -1422,7 +1763,7 @@ namespace GVM::RHI::Private
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
-                        mInnerQueue->readBuffer(buffer, data, size);
+            mInnerQueue->readBuffer(buffer, data, size);
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #elif defined(__clang__)
@@ -1445,7 +1786,7 @@ namespace GVM::RHI::Private
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
             /* Readback stays on the deprecated synchronous path so callers that already submit+block keep the same timing. */
-                        mInnerQueue->readTexture(source, data, dataSize, dataLayout, readSize);
+            mInnerQueue->readTexture(source, data, dataSize, dataLayout, readSize);
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #elif defined(__clang__)
@@ -1486,30 +1827,50 @@ namespace GVM::RHI::Private
         void DiagnosticsOverlayQueue::fillBuffer(BufferRange source, uint8_t value)
         {
             mInnerQueue->fillBuffer(source, value);
-    }
-
-    Readback DiagnosticsOverlayQueue::readBufferAsync(BufferRange source)
-    {
-        return mInnerQueue->readBufferAsync(source);
-    }
-
-    Readback DiagnosticsOverlayQueue::readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize)
-    {
-        return mInnerQueue->readTextureAsync(source, dataLayout, readSize);
         }
 
-        eastl::vector<CommandEncoder> DiagnosticsOverlayQueue::unwrapEncoders(const eastl::vector<CommandEncoder> &encoders, bool requireClosed)
+        Readback DiagnosticsOverlayQueue::readBufferAsync(BufferRange source)
         {
+            return mInnerQueue->readBufferAsync(source);
+        }
+
+        Readback DiagnosticsOverlayQueue::readTextureAsync(const ImageCopyTexture &source, const TextureDataLayout &dataLayout, const Extent3D &readSize)
+        {
+            return mInnerQueue->readTextureAsync(source, dataLayout, readSize);
+        }
+
+        eastl::vector<CommandEncoder> DiagnosticsOverlayQueue::unwrapEncoders(
+            const eastl::vector<CommandEncoder> &encoders,
+            bool requireClosed,
+            DiagnosticsOverlayTarget &outTarget,
+            eastl::vector<DiagnosticsOverlayRecordedScope> &outScopes)
+        {
+            outTarget = {};
+            outScopes.clear();
+            if (requireClosed)
+            {
+                for (const CommandEncoder &encoder : encoders)
+                {
+                    if (encoder == nullptr)
+                    {
+                        throw std::invalid_argument("Submission requires nonnull command encoders.");
+                    }
+                    if (const auto *overlayEncoder = dynamic_cast<const DiagnosticsOverlayCommandEncoder *>(encoder.get()))
+                    {
+                        if (!overlayEncoder->isEnded())
+                        {
+                            throw std::invalid_argument("Submission requires closed overlay command encoders.");
+                        }
+                    }
+                }
+            }
+
             eastl::vector<CommandEncoder> innerEncoders;
-            innerEncoders.reserve(encoders.size());
+            innerEncoders.reserve(encoders.size() + 1u);
             for (const CommandEncoder &encoder : encoders)
             {
                 if (encoder == nullptr)
                 {
-                    if (requireClosed)
-                    {
-                        throw std::invalid_argument("Submission requires nonnull command encoders.");
-                    }
                     continue;
                 }
 
@@ -1517,12 +1878,14 @@ namespace GVM::RHI::Private
                 {
                     if (!overlayEncoder->isEnded())
                     {
-                        if (requireClosed)
-                        {
-                            throw std::invalid_argument("Submission requires closed overlay command encoders.");
-                        }
                         overlayEncoder->end();
                     }
+                    const DiagnosticsOverlayTarget &encoderTarget = overlayEncoder->getLastTarget();
+                    if (!encoderTarget.view.isNull() && encoderTarget.width > 0u && encoderTarget.height > 0u)
+                    {
+                        outTarget = encoderTarget;
+                    }
+                    overlayEncoder->consumeSubmissionMetadata(outScopes);
                     innerEncoders.push_back(overlayEncoder->getInnerEncoder());
                 }
                 else
@@ -1536,26 +1899,54 @@ namespace GVM::RHI::Private
 
         void DiagnosticsOverlayQueue::submit(const eastl::vector<CommandEncoder> &encoders)
         {
-            mInnerQueue->submit(unwrapEncoders(encoders, false));
-            if (mController && mController->isEnabled())
+            DiagnosticsOverlayTarget target = {};
+            eastl::vector<DiagnosticsOverlayRecordedScope> submittedScopes;
+            eastl::vector<CommandEncoder> innerEncoders = unwrapEncoders(encoders, false, target, submittedScopes);
+            bool resolvedTimestamps = false;
+            if (mController != nullptr)
             {
-                mController->afterSubmit(mInnerQueue);
+                CommandEncoder postEncoder = mController->buildPostSubmitEncoder(mInnerQueue, target, submittedScopes, resolvedTimestamps);
+                if (postEncoder != nullptr)
+                {
+                    innerEncoders.push_back(eastl::move(postEncoder));
+                }
+            }
+            mInnerQueue->submit(innerEncoders);
+            if (mController != nullptr)
+            {
+                mController->afterSubmit(mInnerQueue, Submission{}, false, !target.view.isNull(), resolvedTimestamps, submittedScopes);
             }
         }
 
         Submission DiagnosticsOverlayQueue::submit(const eastl::vector<CommandEncoder> &encoders, const eastl::vector<Submission> &waits)
         {
-            auto completion = mInnerQueue->submit(unwrapEncoders(encoders, true), waits);
-            if (mController && mController->isEnabled())
+            DiagnosticsOverlayTarget target = {};
+            eastl::vector<DiagnosticsOverlayRecordedScope> submittedScopes;
+            eastl::vector<CommandEncoder> innerEncoders = unwrapEncoders(encoders, true, target, submittedScopes);
+            bool resolvedTimestamps = false;
+            if (mController != nullptr)
             {
-                mController->afterSubmit(mInnerQueue);
+                CommandEncoder postEncoder = mController->buildPostSubmitEncoder(mInnerQueue, target, submittedScopes, resolvedTimestamps);
+                if (postEncoder != nullptr)
+                {
+                    innerEncoders.push_back(eastl::move(postEncoder));
+                }
+            }
+            Submission completion = mInnerQueue->submit(innerEncoders, waits);
+            if (mController != nullptr)
+            {
+                mController->afterSubmit(mInnerQueue, completion, true, !target.view.isNull(), resolvedTimestamps, submittedScopes);
             }
             return completion;
         }
 
         void DiagnosticsOverlayQueue::destroy()
         {
-            mController.reset();
+            if (mController != nullptr)
+            {
+                mController->shutdown();
+                mController.reset();
+            }
             mInnerQueue = nullptr;
         }
     } // namespace

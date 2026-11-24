@@ -139,9 +139,27 @@ namespace
         state.application = GVM::Samples::createSampleApplication(*state.window);
     }
 
-    /// Recreates the active sample after OHOS reports an XComponent surface size change.
+    /// Updates the active sample window geometry in-place on resize, recreating the app only if the window handle changed.
     void recreateApplicationForWindow(OhosSampleHostState &state, OH_NativeXComponent *component, void *window)
     {
+        if (component == nullptr || window == nullptr)
+        {
+            return;
+        }
+        auto *nativeWindow = static_cast<OHNativeWindow *>(window);
+        if (state.application != nullptr && state.window != nullptr && state.nativeWindow == nativeWindow)
+        {
+            state.nativeXComponent = component;
+            const GVM::RHI::NativeSurfaceDescriptor surface = makeOhosSurfaceDescriptor(component, nativeWindow);
+            state.window->updateNativeSurface(surface);
+
+            GVM::Samples::SampleWindowEvent resizeEvent = {};
+            resizeEvent.type = GVM::Samples::SampleWindowEvent::Type::Resized;
+            resizeEvent.width = surface.extentHint.width;
+            resizeEvent.height = surface.extentHint.height;
+            state.window->pushEvent(resizeEvent);
+            return;
+        }
         createApplicationForWindow(state, component, window);
     }
 
@@ -218,7 +236,7 @@ namespace
         }
 
         GVM::Samples::SampleWindowEvent event;
-        event.pointerId = touchEvent.numPoints > 0 ? static_cast<int>(touchEvent.touchPoints[0].id) : 0;
+        event.pointerId = touchEvent.numPoints > 0 ? static_cast<int>(touchEvent.touchPoints[0].id) + 1 : 1;
         event.x = touchEvent.x;
         event.y = touchEvent.y;
 

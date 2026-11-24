@@ -3,12 +3,18 @@
 #include <GVMTestCommon.hpp>
 #include <GVMRenderTestOptions.hpp>
 
+#if defined(__OHOS__)
+#include <native_buffer/native_buffer.h>
+#include <native_image/native_image.h>
+#include <native_window/external_window.h>
+#else
 #include <SDL.h>
 #include <SDL_syswm.h>
 #if defined(__APPLE__)
 #include <SDL_metal.h>
 #else
 #include <SDL_vulkan.h>
+#endif
 #endif
 
 #include <algorithm>
@@ -21,6 +27,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "generate_result.hpp"
@@ -35,9 +42,14 @@ namespace
 
     struct RenderFeatureContext
     {
+#if defined(__OHOS__)
+        OH_NativeImage *consumerSurface = nullptr;
+        OHNativeWindow *window = nullptr;
+#else
         SDL_Window *window = nullptr;
 #if defined(__APPLE__)
         SDL_MetalView metalView = nullptr;
+#endif
 #endif
         GVM::RHI::Instance instance = nullptr;
         GVM::RHI::Device device = nullptr;
@@ -97,9 +109,58 @@ namespace
         }
     };
 
-    /// Pumps events without showing or focusing the hidden test window; close requests cancel execution.
-    void pumpWindowEvents(SDL_Window *window, int warmupMs)
+#if defined(__OHOS__)
+    /** Drains all presented buffers from an OpenHarmony consumer surface so the swapchain producer never stalls. */
+    void drainOhosConsumerBuffers(OH_NativeImage *consumerSurface)
     {
+        if (consumerSurface == nullptr)
+        {
+            return;
+        }
+        OHNativeWindowBuffer *buffer = nullptr;
+        int fenceFd = -1;
+        while (OH_NativeImage_AcquireNativeWindowBuffer(consumerSurface, &buffer, &fenceFd) == 0 && buffer != nullptr)
+        {
+            (void)OH_NativeImage_ReleaseNativeWindowBuffer(consumerSurface, buffer, fenceFd);
+            buffer = nullptr;
+            fenceFd = -1;
+        }
+    }
+
+    /** Resizes an OpenHarmony consumer surface and its paired producer native window. */
+    void resizeOhosConsumerWindow(RenderFeatureContext &ctx, int width, int height)
+    {
+        const int clampedWidth = std::max(width, 1);
+        const int clampedHeight = std::max(height, 1);
+        if (ctx.consumerSurface != nullptr)
+        {
+            (void)OH_ConsumerSurface_SetDefaultSize(ctx.consumerSurface, clampedWidth, clampedHeight);
+        }
+        if (ctx.window != nullptr)
+        {
+            (void)OH_NativeWindow_NativeWindowHandleOpt(ctx.window, SET_BUFFER_GEOMETRY, clampedWidth, clampedHeight);
+        }
+    }
+
+    /** Drains OpenHarmony consumer buffers during a bounded settle window. */
+    void pumpWindowEvents(RenderFeatureContext &ctx, int warmupMs)
+    {
+        drainOhosConsumerBuffers(ctx.consumerSurface);
+        if (warmupMs > 0)
+        {
+            const auto start = std::chrono::steady_clock::now();
+            while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < warmupMs)
+            {
+                drainOhosConsumerBuffers(ctx.consumerSurface);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+    }
+#else
+    /// Pumps events without showing or focusing the hidden test window; close requests cancel execution.
+    void pumpWindowEvents(RenderFeatureContext &ctx, int warmupMs)
+    {
+        SDL_Window *window = ctx.window;
         if (window == nullptr)
         {
             return;
@@ -119,6 +180,7 @@ namespace
             SDL_Delay(10);
         }
     }
+#endif
 
     /// Restores the SDL window's original size when the scope exits, even on fatal assertions.
     struct ScopedWindowSizeRestore
@@ -129,15 +191,26 @@ namespace
 
         explicit ScopedWindowSizeRestore(RenderFeatureContext &context) : ctx(context)
         {
+#if defined(__OHOS__)
+            if (ctx.window != nullptr)
+            {
+                (void)OH_NativeWindow_NativeWindowHandleOpt(ctx.window, GET_BUFFER_GEOMETRY, &originalHeight, &originalWidth);
+            }
+#else
             SDL_GetWindowSize(ctx.window, &originalWidth, &originalHeight);
+#endif
         }
 
         ~ScopedWindowSizeRestore()
         {
             if (ctx.window != nullptr)
             {
+#if defined(__OHOS__)
+                resizeOhosConsumerWindow(ctx, originalWidth, originalHeight);
+#else
                 SDL_SetWindowSize(ctx.window, originalWidth, originalHeight);
-                pumpWindowEvents(ctx.window, ctx.casePauseMs);
+#endif
+                pumpWindowEvents(ctx, ctx.casePauseMs);
             }
         }
     };
@@ -396,12 +469,18 @@ namespace
             if (hasOutstandingSwapchainImage)
             {
                 context.swapchain->present();
+#if defined(__OHOS__)
+                drainOhosConsumerBuffers(context.consumerSurface);
+#endif
             }
             FAIL() << "Pixel-local final-screen readback failed: " << ex.what();
             return;
         }
 
         context.swapchain->present();
+#if defined(__OHOS__)
+        drainOhosConsumerBuffers(context.consumerSurface);
+#endif
         validatePixelLocalReadbackImage(caseName, "present", "Pixel-local deferred present texture", presentImage);
         validatePixelLocalReadbackImage(caseName, "swapchain", "Pixel-local swapchain target", swapchainImage);
     }
@@ -438,29 +517,37 @@ namespace
         output << "}\n";
     }
 
-    /** Queries the current drawable pixel size of the SDL render test window across Metal and Vulkan surfaces. */
-    void queryRenderWindowDrawableSize(SDL_Window *window, int &drawableWidth, int &drawableHeight)
+    /** Queries the current drawable pixel size of the render test window across Metal, OHOS, and desktop Vulkan surfaces. */
+    void queryRenderWindowDrawableSize(const RenderFeatureContext &ctx, int &drawableWidth, int &drawableHeight)
     {
         drawableWidth = 0;
         drawableHeight = 0;
-#if defined(__APPLE__)
-        SDL_Metal_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+#if defined(__OHOS__)
+        if (ctx.window != nullptr)
+        {
+            (void)OH_NativeWindow_NativeWindowHandleOpt(ctx.window, GET_BUFFER_GEOMETRY, &drawableHeight, &drawableWidth);
+        }
+#elif defined(__APPLE__)
+        SDL_Metal_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
 #else
-        SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+        SDL_Vulkan_GetDrawableSize(ctx.window, &drawableWidth, &drawableHeight);
         if (drawableWidth <= 0 || drawableHeight <= 0)
         {
-            SDL_GetWindowSizeInPixels(window, &drawableWidth, &drawableHeight);
+            SDL_GetWindowSizeInPixels(ctx.window, &drawableWidth, &drawableHeight);
         }
 #endif
     }
 
-    /** Builds a platform-native swapchain surface descriptor from the hidden SDL render test window. */
+    /** Builds a platform-native swapchain surface descriptor from the render test window. */
     GVM::RHI::NativeSurfaceDescriptor makeRenderWindowNativeSurface(const RenderFeatureContext &ctx, const GVM::RHI::Extent3D &extentHint)
     {
         GVM::RHI::NativeSurfaceDescriptor surface = {};
         surface.extentHint = extentHint;
         surface.hasExtentHint = GVM::RHI::True;
-#if defined(__APPLE__)
+#if defined(__OHOS__)
+        surface.kind = GVM::RHI::NativeSurfaceKind::OhosWindow;
+        surface.surface = ctx.window;
+#elif defined(__APPLE__)
         surface.kind = GVM::RHI::NativeSurfaceKind::MetalLayer;
         surface.surface = SDL_Metal_GetLayer(ctx.metalView);
 #elif defined(_WIN32)
@@ -507,11 +594,13 @@ namespace
         {
             auto &ctx = context();
 
+#if !defined(__OHOS__)
 #if defined(__APPLE__)
             SDL_SetHintWithPriority(SDL_HINT_MAC_BACKGROUND_APP, "1", SDL_HINT_OVERRIDE);
             SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 #endif
             SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
+#endif
             ctx.quitRequested = false;
             ctx.available = false;
             ctx.unavailableReason.clear();
@@ -523,6 +612,27 @@ namespace
             ctx.casePauseMs = options.casePauseMs;
             ctx.backendName = options.backendName.c_str();
 
+#if defined(__OHOS__)
+            logRenderPhase("Creating OpenHarmony consumer surface and native window.");
+            ctx.consumerSurface = OH_ConsumerSurface_Create();
+            if (ctx.consumerSurface == nullptr)
+            {
+                ctx.unavailableReason = "OH_ConsumerSurface_Create returned nullptr.";
+                return;
+            }
+            (void)OH_ConsumerSurface_SetDefaultSize(ctx.consumerSurface, ctx.width, ctx.height);
+            (void)OH_ConsumerSurface_SetDefaultUsage(
+                ctx.consumerSurface,
+                NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_HW_RENDER | NATIVEBUFFER_USAGE_HW_TEXTURE);
+            ctx.window = OH_NativeImage_AcquireNativeWindow(ctx.consumerSurface);
+            if (ctx.window == nullptr)
+            {
+                ctx.unavailableReason = "OH_NativeImage_AcquireNativeWindow returned nullptr.";
+                return;
+            }
+            resizeOhosConsumerWindow(ctx, ctx.width, ctx.height);
+            pumpWindowEvents(ctx, ctx.warmupMs);
+#else
             logRenderPhase("Initializing SDL video subsystem.");
             if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
             {
@@ -558,7 +668,7 @@ namespace
                 return;
             }
 
-            pumpWindowEvents(ctx.window, ctx.warmupMs);
+            pumpWindowEvents(ctx, ctx.warmupMs);
 
 #if defined(__APPLE__)
             logRenderPhase("Creating SDL Metal view.");
@@ -568,6 +678,7 @@ namespace
                 ctx.unavailableReason = SDL_GetError();
                 return;
             }
+#endif
 #endif
 
             logRenderPhase("Creating GVM instance.");
@@ -593,7 +704,7 @@ namespace
             logRenderPhase("Creating GVM swapchain.");
             int drawableWidth = 0;
             int drawableHeight = 0;
-            queryRenderWindowDrawableSize(ctx.window, drawableWidth, drawableHeight);
+            queryRenderWindowDrawableSize(ctx, drawableWidth, drawableHeight);
             GVM::RHI::Extent3D swapchainExtent = {
                 .width = static_cast<uint32_t>(std::max(drawableWidth, 1)),
                 .height = static_cast<uint32_t>(std::max(drawableHeight, 1)),
@@ -620,7 +731,7 @@ namespace
             ctx.available = true;
 
             logRenderPhase("Render host window and swapchain are ready.");
-            pumpWindowEvents(ctx.window, ctx.warmupMs);
+            pumpWindowEvents(ctx, ctx.warmupMs);
         }
 
         static void TearDownTestSuite()
@@ -639,6 +750,15 @@ namespace
             }
             ctx.swapchain = nullptr;
             ctx.device = nullptr;
+#if defined(__OHOS__)
+            drainOhosConsumerBuffers(ctx.consumerSurface);
+            ctx.window = nullptr;
+            if (ctx.consumerSurface != nullptr)
+            {
+                OH_NativeImage_Destroy(&ctx.consumerSurface);
+                ctx.consumerSurface = nullptr;
+            }
+#else
 #if defined(__APPLE__)
             if (ctx.metalView != nullptr)
             {
@@ -652,6 +772,7 @@ namespace
                 ctx.window = nullptr;
             }
             SDL_Quit();
+#endif
         }
 
         void runMode(const char *windowTitle, int renderMode, int frameCount)
@@ -661,14 +782,20 @@ namespace
             ASSERT_NE(ctx.window, nullptr);
             ASSERT_NE(ctx.device, nullptr);
             ASSERT_NE(ctx.swapchain, nullptr);
+#if !defined(__OHOS__)
             ASSERT_NE(SDL_GetWindowFlags(ctx.window) & SDL_WINDOW_HIDDEN, 0u) << "Automated render tests must remain hidden.";
             ASSERT_EQ(SDL_GetWindowFlags(ctx.window) & SDL_WINDOW_INPUT_FOCUS, 0u) << "Automated render tests must not own keyboard focus.";
+#endif
 
             ScopedRendererDestroy rendererDestroy{ctx};
 
             const std::string backendWindowTitle = std::string(windowTitle) + " [" + ctx.backendName + "]";
+#if !defined(__OHOS__)
             SDL_SetWindowTitle(ctx.window, backendWindowTitle.c_str());
-            pumpWindowEvents(ctx.window, ctx.warmupMs);
+#else
+            (void)backendWindowTitle;
+#endif
+            pumpWindowEvents(ctx, ctx.warmupMs);
             ctx.quitRequested = false;
 
             logRenderPhase(std::string("Starting case: ") + windowTitle);
@@ -697,6 +824,7 @@ namespace
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 const auto frameStartTime = std::chrono::steady_clock::now();
+#if !defined(__OHOS__)
                 SDL_Event event;
                 while (SDL_PollEvent(&event) != 0)
                 {
@@ -705,11 +833,15 @@ namespace
                         ctx.quitRequested = true;
                     }
                 }
+#endif
 
                 ASSERT_FALSE(ctx.quitRequested) << "Window was closed before render test case finished: " << windowTitle;
                 try
                 {
                     ctx.renderer->render();
+#if defined(__OHOS__)
+                    drainOhosConsumerBuffers(ctx.consumerSurface);
+#endif
                 }
                 catch (const std::exception &ex)
                 {
@@ -729,7 +861,11 @@ namespace
                 const auto targetFrameTime = std::chrono::milliseconds(ctx.frameDelayMs);
                 if (elapsedTime < targetFrameTime)
                 {
+#if defined(__OHOS__)
+                    std::this_thread::sleep_for(targetFrameTime - elapsedTime);
+#else
                     SDL_Delay(static_cast<Uint32>((targetFrameTime - elapsedTime).count()));
+#endif
                 }
             }
 
@@ -740,7 +876,7 @@ namespace
             }
             writeRenderArtifact(windowTitle, renderMode, frameCount, ctx);
             logRenderPhase(std::string("Finished case: ") + windowTitle);
-            pumpWindowEvents(ctx.window, ctx.casePauseMs);
+            pumpWindowEvents(ctx, ctx.casePauseMs);
         }
 
         /** Renders the given number of frames, polling window events so a manual close still aborts the case. */
@@ -749,6 +885,7 @@ namespace
             auto &ctx = context();
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
+#if !defined(__OHOS__)
                 SDL_Event event;
                 while (SDL_PollEvent(&event) != 0)
                 {
@@ -757,10 +894,14 @@ namespace
                         ctx.quitRequested = true;
                     }
                 }
+#endif
                 ASSERT_FALSE(ctx.quitRequested) << "Window was closed before resize case finished: " << windowTitle;
                 try
                 {
                     ctx.renderer->render();
+#if defined(__OHOS__)
+                    drainOhosConsumerBuffers(ctx.consumerSurface);
+#endif
                 }
                 catch (const std::exception &ex)
                 {
@@ -790,13 +931,16 @@ namespace
                 {
                     break;
                 }
-                pumpWindowEvents(ctx.window, ctx.casePauseMs);
+                pumpWindowEvents(ctx, ctx.casePauseMs);
             }
             ASSERT_EQ(nextTexture.status, GVM::RHI::SwapchainNextTextureQueryStatus::Success) << "Swapchain never reacquired a texture after resize.";
             ASSERT_FALSE(nextTexture.texture.isNull());
             EXPECT_EQ(nextTexture.texture->getWidth(), expectedWidth) << "Reacquired swapchain texture width does not match the drawable size.";
             EXPECT_EQ(nextTexture.texture->getHeight(), expectedHeight) << "Reacquired swapchain texture height does not match the drawable size.";
             ctx.swapchain->present();
+#if defined(__OHOS__)
+            drainOhosConsumerBuffers(ctx.consumerSurface);
+#endif
         }
 
         /** Renders a short case, shrinks then restores the window, and verifies the swapchain
@@ -808,14 +952,20 @@ namespace
             ASSERT_NE(ctx.window, nullptr);
             ASSERT_NE(ctx.device, nullptr);
             ASSERT_NE(ctx.swapchain, nullptr);
+#if !defined(__OHOS__)
             ASSERT_NE(SDL_GetWindowFlags(ctx.window) & SDL_WINDOW_HIDDEN, 0u) << "Automated render tests must remain hidden.";
+#endif
 
             ScopedRendererDestroy rendererDestroy{ctx};
             ScopedWindowSizeRestore windowSizeRestore{ctx};
 
             const std::string backendWindowTitle = std::string(windowTitle) + " [" + ctx.backendName + "]";
+#if !defined(__OHOS__)
             SDL_SetWindowTitle(ctx.window, backendWindowTitle.c_str());
-            pumpWindowEvents(ctx.window, ctx.warmupMs);
+#else
+            (void)backendWindowTitle;
+#endif
+            pumpWindowEvents(ctx, ctx.warmupMs);
             ctx.quitRequested = false;
 
             logRenderPhase(std::string("Starting resize case: ") + windowTitle);
@@ -833,7 +983,7 @@ namespace
 
             int baselineDrawableWidth = 0;
             int baselineDrawableHeight = 0;
-            queryRenderWindowDrawableSize(ctx.window, baselineDrawableWidth, baselineDrawableHeight);
+            queryRenderWindowDrawableSize(ctx, baselineDrawableWidth, baselineDrawableHeight);
             const int resizedWindowWidth = std::max(1, ctx.width * 3 / 4);
             const int resizedWindowHeight = std::max(1, ctx.height * 3 / 4);
             const int framesPerPhase = std::min(8, std::max(1, ctx.simpleFrameCount));
@@ -842,12 +992,16 @@ namespace
             ASSERT_NO_FATAL_FAILURE(presentResizeCaseFrames(windowTitle, framesPerPhase));
 
             logRenderPhase("Shrinking the window to a clearly different drawable size.");
+#if defined(__OHOS__)
+            resizeOhosConsumerWindow(ctx, resizedWindowWidth, resizedWindowHeight);
+#else
             SDL_SetWindowSize(ctx.window, resizedWindowWidth, resizedWindowHeight);
-            pumpWindowEvents(ctx.window, ctx.casePauseMs);
+#endif
+            pumpWindowEvents(ctx, ctx.casePauseMs);
 
             int drawableWidth = 0;
             int drawableHeight = 0;
-            queryRenderWindowDrawableSize(ctx.window, drawableWidth, drawableHeight);
+            queryRenderWindowDrawableSize(ctx, drawableWidth, drawableHeight);
             ASSERT_NE(drawableWidth, baselineDrawableWidth) << "SDL resize did not change the drawable width.";
             ASSERT_NE(drawableHeight, baselineDrawableHeight) << "SDL resize did not change the drawable height.";
 
@@ -860,12 +1014,16 @@ namespace
             ASSERT_NO_FATAL_FAILURE(presentResizeCaseFrames(windowTitle, framesPerPhase));
 
             logRenderPhase("Restoring the original window size.");
+#if defined(__OHOS__)
+            resizeOhosConsumerWindow(ctx, ctx.width, ctx.height);
+#else
             SDL_SetWindowSize(ctx.window, ctx.width, ctx.height);
-            pumpWindowEvents(ctx.window, ctx.casePauseMs);
+#endif
+            pumpWindowEvents(ctx, ctx.casePauseMs);
 
             int restoredDrawableWidth = 0;
             int restoredDrawableHeight = 0;
-            queryRenderWindowDrawableSize(ctx.window, restoredDrawableWidth, restoredDrawableHeight);
+            queryRenderWindowDrawableSize(ctx, restoredDrawableWidth, restoredDrawableHeight);
             ASSERT_NE(restoredDrawableWidth, drawableWidth) << "SDL restore did not change the drawable width.";
             ASSERT_NE(restoredDrawableHeight, drawableHeight) << "SDL restore did not change the drawable height.";
 
@@ -878,7 +1036,7 @@ namespace
             ASSERT_NO_FATAL_FAILURE(presentResizeCaseFrames(windowTitle, framesPerPhase));
 
             logRenderPhase(std::string("Finished resize case: ") + windowTitle);
-            pumpWindowEvents(ctx.window, ctx.casePauseMs);
+            pumpWindowEvents(ctx, ctx.casePauseMs);
         }
     };
 
@@ -940,7 +1098,9 @@ namespace
         ASSERT_TRUE(ctx.available) << ctx.unavailableReason;
         ASSERT_NE(ctx.window, nullptr);
         ASSERT_NE(ctx.swapchain, nullptr);
+#if !defined(__OHOS__)
         ASSERT_NE(SDL_GetWindowFlags(ctx.window) & SDL_WINDOW_HIDDEN, 0u) << "Automated render tests must remain hidden.";
+#endif
 
         GVM::RHI::SwapchainQueryResult first = {};
         GVM::RHI::SwapchainQueryResult second = {};
@@ -961,6 +1121,9 @@ namespace
         try
         {
             ctx.swapchain->present();
+#if defined(__OHOS__)
+            drainOhosConsumerBuffers(ctx.consumerSurface);
+#endif
         }
         catch (const std::exception &ex)
         {
@@ -981,6 +1144,9 @@ namespace
         try
         {
             ctx.swapchain->present();
+#if defined(__OHOS__)
+            drainOhosConsumerBuffers(ctx.consumerSurface);
+#endif
         }
         catch (const std::exception &ex)
         {

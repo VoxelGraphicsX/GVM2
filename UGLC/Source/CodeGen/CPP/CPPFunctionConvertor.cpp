@@ -1,6 +1,7 @@
 #include "CPPFunctionConvertor.hpp"
 #include <CodeGen/ShaderBarrierBuiltinUtils.hpp>
 #include <CodeGen/UGLC.Constants.hpp>
+#include <string_view>
 
 namespace UGLC::CodeGen::CPP
 {
@@ -9,6 +10,11 @@ namespace UGLC::CodeGen::CPP
     std::string CPPFunctionConvertor::convertFunc(const std::string &canonicalName, const std::vector<std::string> &templateArgs) const
     {
         (void)templateArgs;
+        constexpr std::string_view LibcxxMathPrefix = "std::__math::";
+        if (canonicalName.starts_with(LibcxxMathPrefix))
+        {
+            return "std::" + canonicalName.substr(LibcxxMathPrefix.size());
+        }
         std::string result = canonicalName;
         if (canonicalName == "UGL::MakeSPTR")
         {

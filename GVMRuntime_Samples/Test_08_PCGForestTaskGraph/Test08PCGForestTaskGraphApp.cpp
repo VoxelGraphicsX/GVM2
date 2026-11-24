@@ -150,7 +150,7 @@ namespace
         {
             uint8_t *dst = rawScanlines.data() + size_t(y) * (1u + rowBytes);
             dst[0] = 0x00u; // Filter type 0 (None)
-            const uint8_t *src = rgba + size_t(height - 1u - y) * rowBytes;
+            const uint8_t *src = rgba + size_t(y) * rowBytes;
             std::copy(src, src + rowBytes, dst + 1u);
         }
 
@@ -261,8 +261,9 @@ namespace
         constexpr float kFovY = 50.0f * (3.14159265359f / 180.0f);
         constexpr float kZNear = 0.5f;
         constexpr float kZFar = 480.0f;
-        const float yScale = 1.0f / std::tan(kFovY * 0.5f);
-        const float xScale = yScale / safeAspect;
+        const float focalLength = 1.0f / std::tan(kFovY * 0.5f);
+        const float xScale = focalLength / safeAspect;
+        const float yScale = -focalLength;
         const float zA = kZFar / (kZFar - kZNear);
         const float zB = -(kZNear * kZFar) / (kZFar - kZNear);
 

@@ -51,9 +51,13 @@ target_sources(
 )
 set_target_properties(GVMCore PROPERTIES
     EXPORT_NAME Core
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+if(NOT ANDROID AND NOT OHOS)
+    set_target_properties(GVMCore PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+endif()
 if(APPLE)
     set_target_properties(GVMCore PROPERTIES INSTALL_RPATH "@loader_path")
 elseif(WIN32)

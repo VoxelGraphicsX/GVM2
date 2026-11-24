@@ -1,6 +1,6 @@
 include_guard(GLOBAL)
 
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT ANDROID AND NOT OHOS)
     set(_gvm_uglc_embed_metallib_default ON)
 else()
     set(_gvm_uglc_embed_metallib_default OFF)

@@ -28,6 +28,7 @@ function(gvm_configure_mobile_sample_hosts)
   set(GVM_SOURCE_DIR "${GVM_REPOSITORY_ROOT}")
   set(GVM_MOBILE_SAMPLE_ID "Test01Triangle")
   set(GVM_MOBILE_SAMPLE_LIBRARY_NAME "gvm_test01_triangle")
+  set(GVM_OHOS_SAMPLE_CMAKE_TARGET "GVMRuntimeSample_Test_01_Triangle_Ohos")
   set(GVM_MOBILE_SAMPLE_APP_LABEL "GVM Test01")
 
   set(GVM_MOBILE_UGLC_EXECUTABLE "")
@@ -54,6 +55,21 @@ function(gvm_configure_mobile_sample_hosts)
   gvm_configure_template_tree(
     "${GVM_MOBILE_TEMPLATE_ROOT}/OhosXComponentHost"
     "${GVM_OHOS_HOST_OUTPUT_DIR}")
+
+  foreach(_gvm_ohos_sample IN LISTS GVMRUNTIMES_SAMPLES)
+    if(NOT _gvm_ohos_sample STREQUAL "Test_01_Triangle" AND DEFINED GVM_RUNTIME_SAMPLE_APP_TARGET_${_gvm_ohos_sample})
+      string(TOLOWER "${_gvm_ohos_sample}" _gvm_ohos_sample_lower)
+      set(GVM_MOBILE_SAMPLE_ID "${_gvm_ohos_sample}")
+      set(GVM_MOBILE_SAMPLE_LIBRARY_NAME "gvm_${_gvm_ohos_sample_lower}")
+      set(GVM_OHOS_SAMPLE_CMAKE_TARGET "GVMRuntimeSample_${_gvm_ohos_sample}_Ohos")
+      set(GVM_MOBILE_SAMPLE_APP_LABEL "GVM ${_gvm_ohos_sample}")
+      set(GVM_OHOS_HOST_OUTPUT_DIR "${CMAKE_BINARY_DIR}/mobile/ohos/${GVM_MOBILE_SAMPLE_ID}")
+      gvm_configure_template_tree(
+        "${GVM_MOBILE_TEMPLATE_ROOT}/OhosXComponentHost"
+        "${GVM_OHOS_HOST_OUTPUT_DIR}")
+    endif()
+  endforeach()
+  set(GVM_OHOS_HOST_OUTPUT_DIR "${CMAKE_BINARY_DIR}/mobile/ohos/Test01Triangle")
 
   add_custom_target(GVMGenerateAndroidTest01Host
     COMMAND ${CMAKE_COMMAND} -E echo "Generated Android host: ${GVM_ANDROID_HOST_OUTPUT_DIR}"

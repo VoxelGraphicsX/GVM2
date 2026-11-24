@@ -3,15 +3,20 @@
 #include <GVMRHI/GVMRHI.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <type_traits>
+#include <utility>
 
 namespace GVM::Tests
 {
@@ -147,4 +152,103 @@ namespace GVM::Tests
     {
         return GVM::RHI::createInstance(makeTestInstanceDescriptor());
     }
+
+    /** Lightweight cooperative cancellation token for C++20 standard libraries that omit std::stop_token. */
+    class StopToken
+    {
+    public:
+        /** Constructs an empty stop token that never reports a stop request. */
+        StopToken() = default;
+
+        /** Constructs a stop token bound to shared atomic stop state. */
+        explicit StopToken(std::shared_ptr<std::atomic<bool>> state)
+            : mState(std::move(state))
+        {
+        }
+
+        /** Returns true once requestStop has been signaled on the owning ScopedThread. */
+        bool stop_requested() const noexcept
+        {
+            if (mState == nullptr)
+            {
+                return false;
+            }
+            return mState->load(std::memory_order_acquire);
+        }
+
+    private:
+        std::shared_ptr<std::atomic<bool>> mState;
+    };
+
+    /** Portable RAII thread wrapper that requests cooperative stop and joins automatically on destruction. */
+    class ScopedThread
+    {
+    public:
+        /** Constructs a non-joinable ScopedThread. */
+        ScopedThread() = default;
+
+        /** Starts a worker thread, passing a StopToken first when the callable accepts one. */
+        template <typename Callable, typename... Args, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Callable>, ScopedThread>>>
+        explicit ScopedThread(Callable &&callable, Args &&...args)
+            : mStopState(std::make_shared<std::atomic<bool>>(false))
+        {
+            if constexpr (std::is_invocable_v<std::decay_t<Callable>, StopToken, std::decay_t<Args>...>)
+            {
+                StopToken token(mStopState);
+                mThread = std::thread(std::forward<Callable>(callable), std::move(token), std::forward<Args>(args)...);
+            }
+            else
+            {
+                mThread = std::thread(std::forward<Callable>(callable), std::forward<Args>(args)...);
+            }
+        }
+
+        ScopedThread(const ScopedThread &) = delete;
+        ScopedThread &operator=(const ScopedThread &) = delete;
+
+        /** Moves ownership of an active worker thread and its stop state. */
+        ScopedThread(ScopedThread &&other) noexcept = default;
+
+        /** Replaces any current worker after requesting stop and joining it cleanly. */
+        ScopedThread &operator=(ScopedThread &&other) noexcept
+        {
+            if (this != &other)
+            {
+                request_stop();
+                join();
+                mStopState = std::move(other.mStopState);
+                mThread = std::move(other.mThread);
+            }
+            return *this;
+        }
+
+        /** Requests cooperative stop and joins the underlying thread if still joinable. */
+        ~ScopedThread()
+        {
+            request_stop();
+            join();
+        }
+
+        /** Signals cooperative cancellation to any StopToken observed by the worker. */
+        void request_stop() noexcept
+        {
+            if (mStopState != nullptr)
+            {
+                mStopState->store(true, std::memory_order_release);
+            }
+        }
+
+        /** Joins the worker thread if it is currently joinable. */
+        void join()
+        {
+            if (mThread.joinable())
+            {
+                mThread.join();
+            }
+        }
+
+    private:
+        std::shared_ptr<std::atomic<bool>> mStopState;
+        std::thread mThread;
+    };
 } // namespace GVM::Tests

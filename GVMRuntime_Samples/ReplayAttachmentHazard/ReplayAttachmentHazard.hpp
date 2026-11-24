@@ -467,6 +467,7 @@ namespace ReplayAttachmentHazard
         [[Export]] int grassVertexCount = 39;
         [[Export]] int grassDrawIndirect = 1;
         [[Export]] int grassBaryEnabled = 1;
+        int barycentricSupported = 0;
 
     public:
         /// Initializes all textures, bind groups, and shader classes for one hazard sample run.
@@ -494,12 +495,19 @@ namespace ReplayAttachmentHazard
             baseVisibilityPass = device->createRenderClass<BaseVisibilityPass>();
             grassVisibilityPass = device->createRenderClass<GrassVisibilityPass>();
             grassReplayVisibilityPass = device->createRenderClass<GrassReplayVisibilityPass>();
-            grassVisibilityBaryPass = device->createRenderClass<GrassVisibilityBaryPass>();
-            grassReplayVisibilityBaryPass = device->createRenderClass<GrassReplayVisibilityBaryPass>();
+            barycentricSupported = 0;
             textureConsumerPass = device->createRenderClass<TextureConsumerPass>(consumerBindGroup);
             pixelLocalResolvePass = device->createRenderClass<PixelLocalConsumerResolvePass>(consumerBindGroup);
             pixelLocalLightingPass = device->createRenderClass<PixelLocalConsumerLightingPass>();
             timestampProfiler = device->createTimestampFrameProfiler(8u, "ReplayHazard.TimestampProfiler");
+        }
+
+        /// Initializes optional fragment-barycentric grass passes when supported by the active GPU.
+        void initBarycentricPasses()
+        {
+            grassVisibilityBaryPass = device->createRenderClass<GrassVisibilityBaryPass>();
+            grassReplayVisibilityBaryPass = device->createRenderClass<GrassReplayVisibilityBaryPass>();
+            barycentricSupported = 1;
         }
 
         /// Renders one hazard sample frame and presents the output texture.
@@ -564,7 +572,7 @@ namespace ReplayAttachmentHazard
                     const GpuTimestampFrameProfiler::Scope grassScope = timestampProfiler.writePass("GrassVisibilityPass.WriteReplay");
                     if (grassDrawIndirect != 0)
                     {
-                        if (grassBaryEnabled != 0)
+                        if (grassBaryEnabled != 0 && barycentricSupported != 0)
                         {
                             device->graphicsQueue(0)->renderPass(
                                 "GrassVisibilityPass.WriteReplay",
@@ -583,7 +591,7 @@ namespace ReplayAttachmentHazard
                     }
                     else
                     {
-                        if (grassBaryEnabled != 0)
+                        if (grassBaryEnabled != 0 && barycentricSupported != 0)
                         {
                             device->graphicsQueue(0)->renderPass(
                                 "GrassVisibilityPass.WriteReplay",
@@ -613,7 +621,7 @@ namespace ReplayAttachmentHazard
                     const GpuTimestampFrameProfiler::Scope grassScope = timestampProfiler.writePass("GrassVisibilityPass.OmitReplay");
                     if (grassDrawIndirect != 0)
                     {
-                        if (grassBaryEnabled != 0)
+                        if (grassBaryEnabled != 0 && barycentricSupported != 0)
                         {
                             device->graphicsQueue(0)->renderPass(
                                 "GrassVisibilityPass.OmitReplay",
@@ -632,7 +640,7 @@ namespace ReplayAttachmentHazard
                     }
                     else
                     {
-                        if (grassBaryEnabled != 0)
+                        if (grassBaryEnabled != 0 && barycentricSupported != 0)
                         {
                             device->graphicsQueue(0)->renderPass(
                                 "GrassVisibilityPass.OmitReplay",

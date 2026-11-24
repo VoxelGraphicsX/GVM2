@@ -384,11 +384,11 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
     {
         using namespace GVM::RHI;
         eastl::array<Queue, 8> results{};
-        eastl::array<std::jthread, 8> workers;
+        eastl::array<GVM::Tests::ScopedThread, 8> workers;
         for (uint32_t index = 0; index < workers.size(); ++index)
         {
             const auto preference = index % 2 == 0 ? QueuePreference::Compute : QueuePreference::Transfer;
-            workers[index] = std::jthread(requestPreferredQueue, std::ref(*device), preference, std::ref(results[index]));
+            workers[index] = GVM::Tests::ScopedThread(requestPreferredQueue, std::ref(*device), preference, std::ref(results[index]));
         }
         for (auto &worker : workers)
         {
@@ -601,7 +601,7 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
         EXPECT_EQ(hostTimeline.currentValue(), 0u);
         EXPECT_FALSE(waitAny({}, &hostTimeline, 1u, 1'000'000ull));
 
-        std::jthread signaler([hostTimeline]()
+        GVM::Tests::ScopedThread signaler([hostTimeline]()
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             EXPECT_EQ(hostTimeline.signal(), 1u);
@@ -849,7 +849,7 @@ kernel void test_main(uint3 gid [[thread_position_in_grid]])
         auto live = device->createTexture(descriptor);
         std::atomic<uint32_t> samples{0};
         bool consistent = true;
-        std::jthread observer([&](std::stop_token stop)
+        GVM::Tests::ScopedThread observer([&](GVM::Tests::StopToken stop)
         {
             while (!stop.stop_requested())
             {

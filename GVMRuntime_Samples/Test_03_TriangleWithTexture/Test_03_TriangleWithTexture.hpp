@@ -8,7 +8,7 @@ class MyRenderer : public UGL::AbstractRenderer
     RenderClass<Triangle> triangle;
     Buffer<VertexInput, BufferUsage<Vertex, CopyDst>> vertexBuffer;
     Buffer<uint32_t, BufferUsage<Index, CopyDst>> indexBuffer;
-    Texture<UGL::TextureFormat::BGRA8Unorm, TextureUsage<TextureBinding, StorageBinding, CopyDst>, TextureDimension::e2D> texture0;
+    Texture<UGL::TextureFormat::BGRA8Unorm, TextureUsage<TextureBinding, CopyDst>, TextureDimension::e2D> texture0;
     Texture<UGL::TextureFormat::RGBA8Unorm, TextureUsage<RenderAttachment, TextureBinding>, TextureDimension::e2D> presentTexture;
     Sampler sampler;
 

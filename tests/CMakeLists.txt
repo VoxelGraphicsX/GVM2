@@ -950,6 +950,11 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
         )
 
     if(GVM_BUILD_TESTS_RENDER AND (APPLE OR GVM_RHI_ENABLE_VULKAN))
+        if(OHOS)
+            set(_render_window_link_libs libnative_image.so libnative_window.so glm::glm)
+        else()
+            set(_render_window_link_libs SDL2::SDL2main SDL2::SDL2-static glm::glm)
+        endif()
         set(_render_baseline_uglc_args --shader-pipeline=uglir)
         if(UGLC_ENABLE_LEGACY)
             set(_render_baseline_uglc_args --shader-pipeline=legacy)
@@ -964,9 +969,7 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
                 ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
                 ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Public
             LINK_LIBS
-                SDL2::SDL2main
-                SDL2::SDL2-static
-                glm::glm
+                ${_render_window_link_libs}
             UGL_INCLUDE_DIRS
                 ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
                 ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube
@@ -993,9 +996,7 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
                     ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Private
                     ${GVM_REPOSITORY_ROOT}/GVM/GVMCore/Public
                 LINK_LIBS
-                    SDL2::SDL2main
-                    SDL2::SDL2-static
-                    glm::glm
+                    ${_render_window_link_libs}
                 UGL_INCLUDE_DIRS
                     ${GVM_REPOSITORY_ROOT}/GVM/UGLHeaders
                     ${GVM_REPOSITORY_ROOT}/GVMRuntime_Samples/Test_04_Cube
@@ -1012,6 +1013,7 @@ if(GVM_BUILD_TESTS_DSL AND GVM_UGLC_COMPILER_AVAILABLE)
                 TIMEOUT 240
             )
             target_compile_definitions(gvm_dsl_uglir_render_feature_tests PRIVATE GLM_ENABLE_EXPERIMENTAL)
+        unset(_render_window_link_libs)
     elseif(GVM_BUILD_TESTS_RENDER)
         message(WARNING "GVM_BUILD_TESTS_RENDER is enabled, but no render runtime backend is enabled in this build.")
     endif()

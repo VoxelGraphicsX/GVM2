@@ -18,7 +18,11 @@ namespace GVM::Samples
     public:
         explicit Test08PCGForestTaskGraphApp(
             SampleWindowManager &window,
+#if defined(__APPLE__)
             GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Metal);
+#else
+            GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Vulkan);
+#endif
 
         ~Test08PCGForestTaskGraphApp() override;
 

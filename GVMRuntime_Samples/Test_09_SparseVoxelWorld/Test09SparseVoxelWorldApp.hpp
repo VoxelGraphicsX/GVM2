@@ -18,7 +18,11 @@ namespace GVM::Samples
     public:
         explicit Test09SparseVoxelWorldApp(
             SampleWindowManager &window,
+#if defined(__APPLE__)
             GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Metal);
+#else
+            GVM::RHI::GraphicsBackend preferredBackend = GVM::RHI::GraphicsBackend::Vulkan);
+#endif
 
         ~Test09SparseVoxelWorldApp() override;
 

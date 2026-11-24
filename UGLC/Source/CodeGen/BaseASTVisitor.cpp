@@ -1845,7 +1845,23 @@ namespace UGLC::CodeGen
         std::string qualifierStr = translateNestedNameSpecifier(E->getQualifier());
 
         // 2. 将限定符和名称拼接起来
-        return qualifierStr + E->getNameInfo().getName().getAsString();
+        const std::string name = E->getNameInfo().getName().getAsString();
+        if (qualifierStr.empty())
+        {
+            if (name == "__stderrp")
+            {
+                return "stderr";
+            }
+            if (name == "__stdoutp")
+            {
+                return "stdout";
+            }
+            if (name == "__stdinp")
+            {
+                return "stdin";
+            }
+        }
+        return qualifierStr + name;
     }
     std::string BaseASTVisitor::translateUnresolvedLookupExpr(const clang::UnresolvedLookupExpr *E)
     {

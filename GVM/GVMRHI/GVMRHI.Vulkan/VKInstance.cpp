@@ -18,6 +18,9 @@
 #if TARGET_OS_OSX
 #include <dlfcn.h>
 #endif
+#elif defined(__OHOS__)
+#include <dlfcn.h>
+#include <filesystem>
 #endif
 
 namespace GVM::RHI::Vulkan
@@ -65,6 +68,100 @@ namespace
         {
             static const auto address = loadMacVulkanEntryPoint("@loader_path/KosmicKrisp/libvulkan_kosmickrisp.dylib", "vk_icdGetInstanceProcAddr");
             return address;
+        }
+#elif defined(__OHOS__)
+        /// Pins every library_path declared in one OpenHarmony implicit Vulkan layer manifest JSON file.
+        void pinOhosLayerManifestLibraries(const std::filesystem::path &manifestPath)
+        {
+            std::FILE *file = std::fopen(manifestPath.c_str(), "rb");
+            if (file == nullptr)
+            {
+                return;
+            }
+            char buffer[16384];
+            const size_t bytesRead = std::fread(buffer, 1u, sizeof(buffer) - 1u, file);
+            std::fclose(file);
+            buffer[bytesRead] = '\0';
+
+            const eastl::string content(buffer, bytesRead);
+            constexpr const char *KeyToken = "\"library_path\"";
+            const size_t keyLength = std::strlen(KeyToken);
+            size_t searchPos = 0u;
+            while (true)
+            {
+                const size_t keyPos = content.find(KeyToken, searchPos);
+                if (keyPos == eastl::string::npos)
+                {
+                    break;
+                }
+                const size_t colonPos = content.find(':', keyPos + keyLength);
+                if (colonPos == eastl::string::npos)
+                {
+                    break;
+                }
+                const size_t quoteBegin = content.find('"', colonPos + 1u);
+                if (quoteBegin == eastl::string::npos)
+                {
+                    break;
+                }
+                const size_t quoteEnd = content.find('"', quoteBegin + 1u);
+                if (quoteEnd == eastl::string::npos)
+                {
+                    break;
+                }
+                if (quoteEnd > quoteBegin + 1u)
+                {
+                    const eastl::string libraryPath = content.substr(quoteBegin + 1u, quoteEnd - quoteBegin - 1u);
+                    (void)dlopen(libraryPath.c_str(), RTLD_LAZY | RTLD_LOCAL | RTLD_NODELETE);
+                }
+                searchPos = quoteEnd + 1u;
+            }
+        }
+
+        /// Loads OpenHarmony implicit Vulkan layers once with RTLD_NODELETE so repeated VkInstance teardown keeps static plugin state mapped.
+        bool loadOhosImplicitVulkanLayers()
+        {
+            (void)dlopen("libvulkan_swapchain.so", RTLD_LAZY | RTLD_LOCAL | RTLD_NODELETE);
+            constexpr const char *ConfigRoots[] = {
+                "/system/etc/vulkan",
+                "/vendor/etc/vulkan",
+                "/chip_prod/etc/vulkan",
+            };
+            for (const char *rootDir : ConfigRoots)
+            {
+                std::error_code errorCode;
+                if (!std::filesystem::exists(rootDir, errorCode))
+                {
+                    continue;
+                }
+                std::filesystem::recursive_directory_iterator it(
+                    rootDir,
+                    std::filesystem::directory_options::skip_permission_denied,
+                    errorCode);
+                const std::filesystem::recursive_directory_iterator end;
+                for (; !errorCode && it != end; it.increment(errorCode))
+                {
+                    std::error_code entryError;
+                    if (!it->is_regular_file(entryError))
+                    {
+                        continue;
+                    }
+                    const std::filesystem::path entryPath = it->path();
+                    if (entryPath.extension() == ".json" &&
+                        entryPath.parent_path().filename() == "implicit_layer.d")
+                    {
+                        pinOhosLayerManifestLibraries(entryPath);
+                    }
+                }
+            }
+            return true;
+        }
+
+        /// Ensures OpenHarmony implicit Vulkan layers are pinned before initializing the Vulkan loader.
+        void pinOhosImplicitVulkanLayers()
+        {
+            static const bool pinned = loadOhosImplicitVulkanLayers();
+            (void)pinned;
         }
 #endif
 
@@ -256,6 +353,9 @@ namespace
         static const auto loader = loadMacVulkanEntryPoint("@loader_path/KosmicKrisp/libvulkan.1.dylib", "vkGetInstanceProcAddr");
         volkInitializeCustom(loader);
 #else
+#if defined(__OHOS__)
+        pinOhosImplicitVulkanLayers();
+#endif
         if (volkInitialize() != VK_SUCCESS)
         {
             throw std::runtime_error("VKInstance::init failed to initialize volk.");

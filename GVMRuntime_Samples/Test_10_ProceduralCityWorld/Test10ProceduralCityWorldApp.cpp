@@ -99,8 +99,9 @@ namespace
         constexpr float kFovY = 50.0f * (3.14159265359f / 180.0f);
         constexpr float kZNear = 1.0f;
         constexpr float kZFar = 950.0f;
-        const float yScale = 1.0f / std::tan(kFovY * 0.5f);
-        const float xScale = yScale / safeAspect;
+        const float focalLength = 1.0f / std::tan(kFovY * 0.5f);
+        const float xScale = focalLength / safeAspect;
+        const float yScale = -focalLength;
         const float zA = kZFar / (kZFar - kZNear);
         const float zB = -(kZNear * kZFar) / (kZFar - kZNear);
 
@@ -461,7 +462,7 @@ namespace
         for (uint32_t y = 0u; y < height; ++y)
         {
             uint8_t *dstRow = rawStream.data() + static_cast<size_t>(y) * scanlineStride;
-            const uint8_t *srcRow = rgba + static_cast<size_t>(height - 1u - y) * rowBytes;
+            const uint8_t *srcRow = rgba + static_cast<size_t>(y) * rowBytes;
             dstRow[0] = 0x00u; // Filter method 0 (None)
             std::memcpy(dstRow + 1u, srcRow, rowBytes);
         }
