@@ -139,7 +139,7 @@ namespace ReplayAttachmentHazard
         {
             const float2 uv = hazardFullScreenUv(vertexID);
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.72f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.72f, 1.0f);
             output.uv = uv;
             output.instanceID = 0u;
             return output;
@@ -182,7 +182,7 @@ namespace ReplayAttachmentHazard
             const float2 uv = clamp(cellUv + jitter, float2(0.0f, 0.0f), float2(1.0f, 1.0f));
 
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.50f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.50f, 1.0f);
             output.uv = uv;
             output.instanceID = instanceID;
             return output;
@@ -224,7 +224,7 @@ namespace ReplayAttachmentHazard
             const float2 uv = clamp(cellUv + jitter, float2(0.0f, 0.0f), float2(1.0f, 1.0f));
 
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.50f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.50f, 1.0f);
             output.uv = uv;
             output.instanceID = instanceID;
             return output;
@@ -267,7 +267,7 @@ namespace ReplayAttachmentHazard
             const float2 uv = clamp(cellUv + jitter, float2(0.0f, 0.0f), float2(1.0f, 1.0f));
 
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.50f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.50f, 1.0f);
             output.uv = uv;
             output.instanceID = instanceID;
             return output;
@@ -315,7 +315,7 @@ namespace ReplayAttachmentHazard
             const float2 uv = clamp(cellUv + jitter, float2(0.0f, 0.0f), float2(1.0f, 1.0f));
 
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.50f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.50f, 1.0f);
             output.uv = uv;
             output.instanceID = instanceID;
             return output;
@@ -401,7 +401,7 @@ namespace ReplayAttachmentHazard
         {
             const float2 uv = hazardFullScreenUv(vertexID);
             HazardVertexOutput output = {};
-            output.position = float4(uv * 2.0f - 1.0f, 0.0f, 1.0f);
+            output.position = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.0f, 1.0f);
             output.uv = uv;
             output.instanceID = 0u;
             return output;

@@ -34,7 +34,7 @@ private:
     {
         float2 uv = float2((vid << 1) & 2, vid & 2);
         PresentQuadVertexOutput output;
-        output.pos = float4(uv * 2.0f - 1.0f, 0.0f, 1.0f);
+        output.pos = float4(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f, 0.0f, 1.0f);
         output.texCoord = uv;
         return output;
     }

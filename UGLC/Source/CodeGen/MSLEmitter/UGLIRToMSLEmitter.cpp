@@ -2331,7 +2331,7 @@ namespace UGLC::CodeGen::MSLEmitter
                 return "{" + joinCommaSeparated(elements) + "}";
             }
 
-            /** Emits a legacy-compatible Metal vertex return with clip-space Y correction. */
+            /** Emits a Metal vertex return after validating that the output record declares a [[Position]] field. */
             void emitVertexEntryReturnStatement(std::ostringstream &stream, const UGLIR::Statement &statement, int indentLevel)
             {
                 if (mCurrentFunction == nullptr || statement.expressions.empty())
@@ -2342,7 +2342,7 @@ namespace UGLC::CodeGen::MSLEmitter
                 const UGLIR::Type *returnType = findType(mCurrentFunction->returnType);
                 if (returnType == nullptr || returnType->kind != UGLIR::TypeKind::Struct)
                 {
-                    addDiagnostic(statement.sourceLocation, "MSL vertex entry \"" + mCurrentFunction->name + "\" must return a record type with a [[Position]] field so UGLC can apply Metal clip-space Y correction.");
+                    addDiagnostic(statement.sourceLocation, "MSL vertex entry \"" + mCurrentFunction->name + "\" must return a record type with a [[Position]] field.");
                     stream << makeIndent(indentLevel) << "return " << emitExpression(statement.expressions.front()) << ";\n";
                     return;
                 }
@@ -2358,17 +2358,12 @@ namespace UGLC::CodeGen::MSLEmitter
                 }
                 if (positionField == nullptr)
                 {
-                    addDiagnostic(statement.sourceLocation, "MSL vertex output record \"" + mCurrentFunction->returnType + "\" is missing required [[Position]] field for Metal clip-space Y correction.");
+                    addDiagnostic(statement.sourceLocation, "MSL vertex output record \"" + mCurrentFunction->returnType + "\" is missing required [[Position]] field.");
                     stream << makeIndent(indentLevel) << "return " << emitExpression(statement.expressions.front()) << ";\n";
                     return;
                 }
 
-                const std::string indent = makeIndent(indentLevel);
-                const std::string returnTypeName = emitTypeName(mCurrentFunction->returnType, statement.sourceLocation);
-                const std::string positionFieldName = sanitizeMSLIdentifier(positionField->name);
-                stream << indent << returnTypeName << " __REVERSED_VERTEX__OUTPUT__ = " << emitExpression(statement.expressions.front()) << ";\n";
-                stream << indent << "__REVERSED_VERTEX__OUTPUT__." << positionFieldName << ".y = -__REVERSED_VERTEX__OUTPUT__." << positionFieldName << ".y;\n";
-                stream << indent << "return __REVERSED_VERTEX__OUTPUT__;\n";
+                stream << makeIndent(indentLevel) << "return " << emitExpression(statement.expressions.front()) << ";\n";
             }
 
             /** Emits a UGLIR if statement with optional else branch. */

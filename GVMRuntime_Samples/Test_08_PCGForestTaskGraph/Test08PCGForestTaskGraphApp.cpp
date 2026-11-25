@@ -263,7 +263,7 @@ namespace
         constexpr float kZFar = 480.0f;
         const float focalLength = 1.0f / std::tan(kFovY * 0.5f);
         const float xScale = focalLength / safeAspect;
-        const float yScale = -focalLength;
+        const float yScale = focalLength;
         const float zA = kZFar / (kZFar - kZNear);
         const float zB = -(kZNear * kZFar) / (kZFar - kZNear);
 

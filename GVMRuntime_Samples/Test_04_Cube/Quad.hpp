@@ -32,7 +32,7 @@ private:
     {
         float2 output_uv = float2((vid << 1) & 2, vid & 2);
         QuadVertexOutput voutput;
-        voutput.pos = float4(output_uv * 2.0f - 1.0f, .0f, 1.0f);
+        voutput.pos = float4(output_uv.x * 2.0f - 1.0f, 1.0f - output_uv.y * 2.0f, .0f, 1.0f);
         voutput.texCoord = output_uv;
         return voutput;
     }

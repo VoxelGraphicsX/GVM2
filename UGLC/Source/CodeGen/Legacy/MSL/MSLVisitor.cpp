@@ -2875,16 +2875,16 @@ namespace UGLC::CodeGen::MSL
                 const auto *retRecord = getUnqualifiedType(vertRetType)->getAsCXXRecordDecl();
                 if (retRecord == nullptr)
                 {
-                    throw std::runtime_error("MSL vertex entry \"" + mMainFunc->getQualifiedNameAsString() + "\" must return a record type with a [[" + mUGLAttributePositionName + "]] field so UGLC can apply Metal clip-space Y correction.");
+                    throw std::runtime_error("MSL vertex entry \"" + mMainFunc->getQualifiedNameAsString() + "\" must return a record type with a [[" + mUGLAttributePositionName + "]] field.");
                 }
 
                 const auto *posField = getFieldFromClassWithAttribute(retRecord, mUGLAttributePositionName);
                 if (posField == nullptr)
                 {
-                    throw std::runtime_error("MSL vertex output record \"" + retRecord->getQualifiedNameAsString() + "\" is missing required [[" + mUGLAttributePositionName + "]] field for Metal clip-space Y correction.");
+                    throw std::runtime_error("MSL vertex output record \"" + retRecord->getQualifiedNameAsString() + "\" is missing required [[" + mUGLAttributePositionName + "]] field.");
                 }
 
-                return vertRetTypeName + "  __REVERSED_VERTEX__OUTPUT__ = " + retExpr + "; __REVERSED_VERTEX__OUTPUT__." + posField->getNameAsString() + ".y=-__REVERSED_VERTEX__OUTPUT__." + posField->getNameAsString() + ".y;return __REVERSED_VERTEX__OUTPUT__" + EOS();
+                return "return " + retExpr + EOS();
             }
         }
         return BaseASTVisitor::translateReturnStmt(S);

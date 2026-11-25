@@ -90,7 +90,7 @@ namespace Checker
     {
         const float2 pixelCenter = float2((float2)index.xy) + float2(0.5f, 0.5f);
         const float2 inUV = pixelCenter / float2(resolution.xy);
-        float2 d = inUV * 2.0f - 1.0f;
+        float2 d = float2(inUV.x * 2.0f - 1.0f, 1.0f - inUV.y * 2.0f);
         float4 target = mul(cam.projInv, float4(d.x, d.y, 1, 1));
 
         RayLWC rayDesc;

@@ -39,6 +39,13 @@ namespace GVM::RHI::Vulkan
             return lhs.buffer == rhs.buffer && lhs.offset == rhs.offset && lhs.size == rhs.size;
         }
 
+        /** Converts a top-left GVM viewport into a Vulkan maintenance1 negative-height viewport so clip-space +Y points upward. */
+        [[nodiscard]]
+        vk::Viewport makeVulkanViewport(float x, float y, float width, float height, float minDepth, float maxDepth)
+        {
+            return vk::Viewport{x, y + height, width, -height, minDepth, maxDepth};
+        }
+
 
         void appendAttachmentDetail(eastl::string &text, const char *kind, uint32_t index, const VKTextureView &view, LoadOp loadOp, StoreOp storeOp)
         {
@@ -793,7 +800,7 @@ namespace GVM::RHI::Vulkan
         beginInfo.pClearValues = setup.attachments.clearValues.data();
 
         commandBuffer.beginRenderPass(beginInfo, vk::SubpassContents::eInline);
-        commandBuffer.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(setup.attachments.width), static_cast<float>(setup.attachments.height), 0.0f, 1.0f});
+        commandBuffer.setViewport(0, makeVulkanViewport(0.0f, 0.0f, static_cast<float>(setup.attachments.width), static_cast<float>(setup.attachments.height), 0.0f, 1.0f));
         commandBuffer.setScissor(0, vk::Rect2D{vk::Offset2D{0, 0}, vk::Extent2D{setup.attachments.width, setup.attachments.height}});
 
         state.hasViewport = true;
@@ -917,7 +924,7 @@ namespace GVM::RHI::Vulkan
             return;
         }
 
-        commandBuffer.setViewport(0, vk::Viewport{typedCommand.x, typedCommand.y, typedCommand.width, typedCommand.height, typedCommand.minDepth, typedCommand.maxDepth});
+        commandBuffer.setViewport(0, makeVulkanViewport(typedCommand.x, typedCommand.y, typedCommand.width, typedCommand.height, typedCommand.minDepth, typedCommand.maxDepth));
         state.viewport = Private::RenderSetViewport{
             typedCommand.x,
             typedCommand.y,
@@ -1085,7 +1092,7 @@ namespace GVM::RHI::Vulkan
         };
         if (!state.hasViewport || state.viewport.x != pixelViewport.x || state.viewport.y != pixelViewport.y || state.viewport.width != pixelViewport.width || state.viewport.height != pixelViewport.height || state.viewport.minDepth != pixelViewport.minDepth || state.viewport.maxDepth != pixelViewport.maxDepth)
         {
-            commandBuffer.setViewport(0, vk::Viewport{pixelViewport.x, pixelViewport.y, pixelViewport.width, pixelViewport.height, pixelViewport.minDepth, pixelViewport.maxDepth});
+            commandBuffer.setViewport(0, makeVulkanViewport(pixelViewport.x, pixelViewport.y, pixelViewport.width, pixelViewport.height, pixelViewport.minDepth, pixelViewport.maxDepth));
             state.viewport = pixelViewport;
             state.hasViewport = true;
         }
@@ -1115,7 +1122,7 @@ namespace GVM::RHI::Vulkan
         const RenderPassSetup &setup = *context.setup;
         commandBuffer.nextSubpass(vk::SubpassContents::eInline);
         ++state.currentPixelLocalPassIndex;
-        commandBuffer.setViewport(0, vk::Viewport{0.0f, 0.0f, static_cast<float>(setup.attachments.width), static_cast<float>(setup.attachments.height), 0.0f, 1.0f});
+        commandBuffer.setViewport(0, makeVulkanViewport(0.0f, 0.0f, static_cast<float>(setup.attachments.width), static_cast<float>(setup.attachments.height), 0.0f, 1.0f));
         commandBuffer.setScissor(0, vk::Rect2D{vk::Offset2D{0, 0}, vk::Extent2D{setup.attachments.width, setup.attachments.height}});
         state.pipeline = nullptr;
         state.pipelineLayout = nullptr;

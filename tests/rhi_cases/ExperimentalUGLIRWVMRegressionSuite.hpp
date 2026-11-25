@@ -580,17 +580,17 @@ private:
         ExperimentalUGLIRWVMRegressionVertexOutput output;
         if (vertexID == 0u)
         {
-            output.position = float4(-1.0f, -1.0f, 0.0f, 1.0f);
+            output.position = float4(-1.0f, 1.0f, 0.0f, 1.0f);
             output.uv = float2(0.0f, 0.0f);
         }
         else if (vertexID == 1u)
         {
-            output.position = float4(3.0f, -1.0f, 0.0f, 1.0f);
+            output.position = float4(3.0f, 1.0f, 0.0f, 1.0f);
             output.uv = float2(2.0f, 0.0f);
         }
         else
         {
-            output.position = float4(-1.0f, 3.0f, 0.0f, 1.0f);
+            output.position = float4(-1.0f, -3.0f, 0.0f, 1.0f);
             output.uv = float2(0.0f, 2.0f);
         }
         return output;

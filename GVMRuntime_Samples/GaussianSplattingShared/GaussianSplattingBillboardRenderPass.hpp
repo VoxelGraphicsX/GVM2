@@ -87,7 +87,7 @@ private:
 
         output.pos = float4(
             pixelEdgeToNdc(pixelCoord.x, globals.imageInfo.x),
-            pixelEdgeToNdc(pixelCoord.y, globals.imageInfo.y),
+            -pixelEdgeToNdc(pixelCoord.y, globals.imageInfo.y),
             0.0f,
             1.0f
         );

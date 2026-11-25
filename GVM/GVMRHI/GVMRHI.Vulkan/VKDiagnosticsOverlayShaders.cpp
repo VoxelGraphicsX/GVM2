@@ -26,7 +26,7 @@ struct DiagnosticsOverlayVertexOutput {
 
 DiagnosticsOverlayVertexOutput diagnosticsOverlayVertexMain(DiagnosticsOverlayVertexInput input) {
     DiagnosticsOverlayVertexOutput output;
-    output.position = float4(input.positionAndLocal.x, -input.positionAndLocal.y, 0.0, 1.0);
+    output.position = float4(input.positionAndLocal.x, input.positionAndLocal.y, 0.0, 1.0);
     output.local = input.positionAndLocal.zw;
     output.glyphCode = input.glyphCode;
     return output;
@@ -55,7 +55,7 @@ float4 diagnosticsOverlayFragmentMain(DiagnosticsOverlayVertexOutput input) : SV
 )";
 
         constexpr uint32_t DiagnosticsOverlayTextVertexSpirv[] = {
-            0x07230203, 0x00010300, 0x000e0000, 0x0000001b, 0x00000000, 0x00020011, 0x00000001, 0x0003000e,
+            0x07230203, 0x00010300, 0x000e0000, 0x0000001a, 0x00000000, 0x00020011, 0x00000001, 0x0003000e,
             0x00000000, 0x00000001, 0x0010000f, 0x00000000, 0x00000001, 0x67616964, 0x74736f6e, 0x4f736369,
             0x6c726576, 0x65567961, 0x78657472, 0x6e69614d, 0x00000000, 0x00000002, 0x00000003, 0x00000004,
             0x00000005, 0x00000006, 0x00030003, 0x00000005, 0x00000258, 0x00070005, 0x00000002, 0x762e6e69,
@@ -77,10 +77,10 @@ float4 diagnosticsOverlayFragmentMain(DiagnosticsOverlayVertexOutput input) : SV
             0x00000011, 0x00000001, 0x00000000, 0x00000012, 0x000200f8, 0x00000013, 0x0004003d, 0x0000000a,
             0x00000014, 0x00000002, 0x0004003d, 0x00000007, 0x00000015, 0x00000003, 0x00050051, 0x00000007,
             0x00000016, 0x00000014, 0x00000000, 0x00050051, 0x00000007, 0x00000017, 0x00000014, 0x00000001,
-            0x0004007f, 0x00000007, 0x00000018, 0x00000017, 0x00070050, 0x0000000a, 0x00000019, 0x00000016,
-            0x00000018, 0x00000008, 0x00000009, 0x0007004f, 0x0000000e, 0x0000001a, 0x00000014, 0x00000014,
-            0x00000002, 0x00000003, 0x0003003e, 0x00000004, 0x00000019, 0x0003003e, 0x00000005, 0x0000001a,
-            0x0003003e, 0x00000006, 0x00000015, 0x000100fd, 0x00010038,
+            0x00070050, 0x0000000a, 0x00000018, 0x00000016, 0x00000017, 0x00000008, 0x00000009, 0x0007004f,
+            0x0000000e, 0x00000019, 0x00000014, 0x00000014, 0x00000002, 0x00000003, 0x0003003e, 0x00000004,
+            0x00000018, 0x0003003e, 0x00000005, 0x00000019, 0x0003003e, 0x00000006, 0x00000015, 0x000100fd,
+            0x00010038,
         };
 
         constexpr uint32_t DiagnosticsOverlayTextFragmentSpirv[] = {

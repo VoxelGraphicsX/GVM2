@@ -268,17 +268,17 @@ private:
         FeatureVertexOutput output;
         if (vid == 0)
         {
-            output.pos = float4(-1.0f, -1.0f, 0.0f, 1.0f);
+            output.pos = float4(-1.0f, 1.0f, 0.0f, 1.0f);
             output.uv = float2(0.0f, 0.0f);
         }
         else if (vid == 1)
         {
-            output.pos = float4(-1.0f, 3.0f, 0.0f, 1.0f);
+            output.pos = float4(-1.0f, -3.0f, 0.0f, 1.0f);
             output.uv = float2(0.0f, 2.0f);
         }
         else
         {
-            output.pos = float4(3.0f, -1.0f, 0.0f, 1.0f);
+            output.pos = float4(3.0f, 1.0f, 0.0f, 1.0f);
             output.uv = float2(2.0f, 0.0f);
         }
         output.color = float4(output.uv, 1.0f, 1.0f);
@@ -786,7 +786,7 @@ private:
     {
         float2 outputUV = float2((vid << 1) & 2, vid & 2);
         QuadVertexOutput output;
-        output.pos = float4(outputUV * 2.0f - 1.0f, 0.0f, 1.0f);
+        output.pos = float4(outputUV.x * 2.0f - 1.0f, 1.0f - outputUV.y * 2.0f, 0.0f, 1.0f);
         output.texCoord = outputUV;
         return output;
     }

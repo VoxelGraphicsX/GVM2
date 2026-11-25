@@ -1509,13 +1509,13 @@ function createExperimentalUglirNestedStageOutputCase() {
     uglcArgs: ['--shader-pipeline=uglir'],
     expectedExitCode: 0,
     description: 'Instantiates factory-referenced shader entries and nested stage records, retaining only the selected if constexpr branch.',
-    validates: ['Both direct backends retain nested template stage fields and the Metal position correction.'],
+    validates: ['Both direct backends retain nested template stage fields without synthetic Metal Y negation.'],
     verify: async (t) => {
       const vertexStem = 'NestedStagePass__I0__vertex';
       const fragmentStem = 'NestedStagePass__I0__fragment';
       await expectExperimentalSpirvOnlyPolicy(t, [vertexStem, fragmentStem]);
       await t.expectFileContains(`msl/${vertexStem}.msl`, '[[position]]', 'Nested vertex output must retain its position semantic.');
-      await t.expectFileContains(`msl/${vertexStem}.msl`, '.position.y = -', 'Nested vertex output must receive the Metal Y correction.');
+      await t.expectFileNotContains(`msl/${vertexStem}.msl`, '.position.y = -', 'Nested vertex output must not emit synthetic Metal Y negation.');
       await t.expectFileContains(`spv/${vertexStem}.raw.spvasm`, 'BuiltIn Position', 'Nested vertex output must retain the SPIR-V position decoration.');
       await t.expectFileContains(`spv/${vertexStem}.raw.spvasm`, 'Location 1', 'Nested indexed varyings must retain their locations.');
     }
@@ -3903,7 +3903,7 @@ export function getTestRegistry(sourceDir, profile) {
         await t.expectFileContains('generate_result.hpp', 'fragmentMain(RenderOverloadVertexOutput inputValue[[stage_in]]', 'MSL should select the real fragment entry overload.');
         await t.expectFileContains('generate_result.hpp', 'RenderOverloadEntrySelectionHelpers::buildVertexOutput(inputValue);', 'The selected vertex entry should call the namespace helper.');
         await t.expectFileContains('generate_result.hpp', 'RenderOverloadEntrySelectionHelpers::buildFrameBuffer(bindGroup, inputValue.uv);', 'The selected fragment entry should call the namespace helper.');
-        await t.expectFileOccurrenceCount('generate_result.hpp', '__REVERSED_VERTEX__OUTPUT__', 4, 'Metal clip-space Y correction must be emitted only at the vertex stage entry, not inside helpers returning the same output type.');
+        await t.expectFileNotContains('generate_result.hpp', '__REVERSED_VERTEX__OUTPUT__', 'MSL vertex entries emit native +Y-up clip-space positions directly without synthetic Y negation.');
       }
     }),
     createFixtureCase({

@@ -106,8 +106,8 @@ namespace
         EXPECT_NE(cubeVertexMSL.find("const constant CameraBindGroup* camBindGroup [[buffer(0)]]"), std::string::npos);
         EXPECT_NE(texturedFragmentMSL.find("const constant TexturedTriangleBindGroup* bindGroup [[buffer(0)]]"), std::string::npos);
         EXPECT_NE(bufferedVertexMSL.find("const constant FeatureGlobalsBindGroup* globalsBindGroup [[buffer(0)]]"), std::string::npos);
-        EXPECT_NE(cubeVertexMSL.find("__REVERSED_VERTEX__OUTPUT__"), std::string::npos);
-        EXPECT_NE(bufferedVertexMSL.find("__REVERSED_VERTEX__OUTPUT__"), std::string::npos);
+        EXPECT_EQ(cubeVertexMSL.find("__REVERSED_VERTEX__OUTPUT__"), std::string::npos);
+        EXPECT_EQ(bufferedVertexMSL.find("__REVERSED_VERTEX__OUTPUT__"), std::string::npos);
 
         EXPECT_EQ(lightingMSL.find("FeaturePixelLocalFrameBuffer inputValue [[stage_in]]"), std::string::npos);
         EXPECT_EQ(tonemapMSL.find("FeaturePixelLocalFrameBuffer inputValue [[stage_in]]"), std::string::npos);
